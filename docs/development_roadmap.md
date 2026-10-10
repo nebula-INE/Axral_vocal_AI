@@ -6,12 +6,15 @@ Status: initial sequence; items are not marked complete unless their code and te
 
 - [x] Locate existing AI manager and document its current behavior.
 - [x] Locate the existing UTAU voicebank parser and PrefixMap handling.
+- [x] Inspect the OtoParser and PrefixMap public API and existing parser tests.
+- [x] Record exact reuse points and add a real-parser integration-test path.
 - [ ] Inspect pitch curve representation and Desktop/Web boundaries in detail.
-- [ ] Record exact reuse points and tests before implementing an adapter.
 
 Audit notes:
 - `modules/ai/ai_manager.py` selects model paths and loads a phoneme dictionary, but its current `analyze_async` path emits fixed fallback timing values and `predict_vits_waveform` returns silence. Treat these as scaffolding, not a trained production model.
-- `modules/data/oto_parser.py` already handles `oto.ini`, nested files, alias lookup and PrefixMap-related resolution. Axral Vocal AI should consume its normalized output rather than create a competing parser.
+- `modules/data/oto_parser.py` exposes `load_voice_dir()`, `all_aliases()`, `get()`, `has_vcv()`, and `resolve_alias(lyric, prev_vowel=None, note_num=None)`. Its `resolve_alias` uses `map_alias` / `select_prefix_map` and handles folder-qualified aliases. Axral consumes this public surface instead of implementing a second resolver.
+- `modules/data/prefix_map.py` exposes `parse_prefix_map()`, `select_prefix_map()`, and `map_alias()`; boundary selection uses the greatest boundary not above the MIDI note, and notes below the first boundary have no mapping.
+- Integration tests now use the actual parser from a separate checkout via `VO_SE_VOCAL_ROOT`; the workflow checks out `nebula-INE/VO-SE_vocal` and runs those tests without modifying the production repository.
 - Existing rendering and pitch data must remain untouched during initial contract work.
 
 ## Gate 1 — Versioned contracts
@@ -30,14 +33,15 @@ The last confirmed successful workflow was for commit `2d19ca186557099aed0fbfb55
 - [x] Preserve alias-derived inventory hints without claiming canonical phoneme normalization.
 - [x] Add profile unit coverage for CV-shaped and VCV-shaped aliases, caller-supplied CVVC/PrefixMap hints, nested/folder-qualified alias shapes, multipitch boundaries, duplicate sample references and unresolved/missing sample references.
 - [x] Keep absolute paths transient for deduplication; returned profiles contain no paths or audio bytes.
-- [ ] Run integration tests against the real VO-SE_vocal OtoParser for CV/VCV/CVVC, PrefixMap, multipitch, nested `oto.ini`, and missing samples. Current tests use fakes and do not prove production-parser behavior.
+- [x] Add integration coverage against the real VO-SE_vocal OtoParser for CV/VCV, PrefixMap pitch-boundary selection, nested `oto.ini`/folder-qualified aliases, and missing WAV candidates.
+- [ ] Confirm the new integration tests pass on the current PR head in CI. CVVC remains a supplied format hint; the parser API audit has not established a canonical CVVC detector.
 
 ## Gate 3 — Dataset and baseline
 
 - [ ] Confirm permitted data sources and provenance.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
-- [ ] Execute and review the new baseline/profile tests in CI at the current head.
+- [ ] Execute and review the baseline, profile, and real-parser integration tests in CI at the current head. A green result has not yet been confirmed.
 - [ ] Establish voicebank-held-out validation and test splits for any future real dataset.
 - [ ] Set up a private Kaggle notebook only after data permission checks.
 
