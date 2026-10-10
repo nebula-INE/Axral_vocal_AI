@@ -1,4 +1,4 @@
-# Pitch-expression labels and evaluation — Draft 1
+# Pitch-expression labels and evaluation — Draft 2
 
 This document defines the minimum evaluation contract before real data or GPU training. It does not authorize use of any voicebank, recording, project, or pitch curve.
 
@@ -8,7 +8,19 @@ The initial model target is a pitch-expression offset in **semitones**, relative
 
 `delta_semitones(t) = target_pitch_semitones(t) - reference_pitch_semitones(t)`
 
-The reference and target must be produced by a documented method. Do not assume an existing `PitchEvent.value` is in semitones: VO-SE_vocal's current pitch-event and native automation value domains have not been calibrated to this target. Conversion is blocked until the units, origin, range, and interpolation behavior are verified with tests.
+The reference and target must be produced by a documented method. Do not assume an existing `PitchEvent.value` is in semitones.
+
+### Existing VO-SE_vocal representations found in the audit
+
+These are distinct data domains and must not be conflated:
+
+- **Sparse project/GUI automation points:** `PitchEvent(time, value)`; `time` is seconds, but `value` is only a float in the data model. The graph editor constrains Pitch values to -8192..8191.
+- **Automation sampling:** Python `GraphEditorWidget.get_value_at_time()` and native `AutomationCurves::evaluate()` both use step-hold (last point at or before the query time). The GUI draws straight lines between points, so visual interpolation differs from the sampled value behavior.
+- **Native automation conversion:** `AutomationRanges::pitchValueToSemitones()` currently calculates `(value / 8191) * 2.0`, and the native processor applies that as a frequency ratio. This defines a current native conversion, but does not prove all project, imported, or Web values share that meaning. Its endpoints are asymmetric (-8192 becomes slightly below -2 semitones; +8191 becomes +2).
+- **Render input pitch curve:** native interfaces expose dense per-sample `pitch_curve` arrays in Hz. These are not sparse automation values and are not semitone deltas.
+- **Timeline overlay:** the UI uses a similar ±2-semitone display conversion; display behavior alone does not verify every render path.
+
+Therefore, the conversion from existing `PitchEvent.value` to AI semitone labels remains **blocked** until the intended data path (including Web serialization and render handoff) is traced and covered by tests. Do not change production formulas just to make them symmetric during this AI work.
 
 A label record must identify:
 - target kind: `pitch_delta_semitones`;
@@ -55,6 +67,7 @@ Baseline and model must use the same records, time grid, voiced mask, and aggreg
 Kaggle training remains blocked until:
 - [ ] the exact source license/permission covers intended ML use, storage, derived labels, and model distribution;
 - [ ] label creation and pitch-unit conversion have documented, tested procedures;
+- [ ] Desktop/Web serialization and render handoff for the selected input representation are traced and tested;
 - [ ] data manifests contain no private paths, credentials, or unapproved audio;
 - [ ] voicebank-held-out split is reviewed and reproducible;
 - [ ] baseline metrics run successfully on the frozen fixture and, when approved data exists, on the same evaluation protocol as the candidate model.
