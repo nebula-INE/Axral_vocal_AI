@@ -128,3 +128,25 @@ def test_rejects_point_within_tolerance_of_rest_boundary() -> None:
     )
     with pytest.raises(PitchResponseValidationError, match="outside eligible"):
         validate_pitch_response(_request(), response)
+
+
+@pytest.mark.parametrize("delta", [-2.0, 2.0])
+def test_accepts_delta_exactly_at_inclusive_safety_bound(delta: float) -> None:
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.2, delta),),
+        request_id="req-1",
+    )
+    assert validate_pitch_response(_request(), response) is response
+
+
+def test_rejects_point_exactly_at_rest_end_before_unresolved_note() -> None:
+    # The explicit rest wins at both of its boundaries, including when the
+    # following unresolved note begins at the same timestamp.
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.75, 0.25),),
+        request_id="req-1",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(_request(), response)
