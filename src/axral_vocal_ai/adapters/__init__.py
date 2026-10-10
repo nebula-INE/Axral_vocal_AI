@@ -1,0 +1,1 @@
+"""Read-only VO-SE_vocal model adapter package."""
