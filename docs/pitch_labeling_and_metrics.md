@@ -1,0 +1,62 @@
+# Pitch-expression labels and evaluation — Draft 1
+
+This document defines the minimum evaluation contract before real data or GPU training. It does not authorize use of any voicebank, recording, project, or pitch curve.
+
+## 1. Target definition
+
+The initial model target is a pitch-expression offset in **semitones**, relative to an explicitly documented reference pitch trajectory:
+
+`delta_semitones(t) = target_pitch_semitones(t) - reference_pitch_semitones(t)`
+
+The reference and target must be produced by a documented method. Do not assume an existing `PitchEvent.value` is in semitones: VO-SE_vocal's current pitch-event and native automation value domains have not been calibrated to this target. Conversion is blocked until the units, origin, range, and interpolation behavior are verified with tests.
+
+A label record must identify:
+- target kind: `pitch_delta_semitones`;
+- label source: curated reference, expert annotation, or synthetic fixture;
+- source method/tool and version;
+- timestamp unit and time-grid policy;
+- voiced/unvoiced treatment;
+- annotator/reviewer and review status when applicable;
+- confidence and its defined meaning, if supplied.
+
+Synthetic fixture labels are only for testing plumbing. They must never be mixed into real-world quality claims without separate reporting.
+
+## 2. Label inclusion rules
+
+- Include only samples whose machine-learning use, storage, derived labels, and model distribution permissions have been reviewed and approved.
+- Exclude `review_required` and `prohibited` sources from training, validation, test, and Kaggle uploads.
+- Do not label unvoiced/rest regions as voiced pitch targets. If a model later predicts voiced/unvoiced state, define and evaluate that as a separate task.
+- Do not infer ground truth from an arbitrary existing pitch curve without checking how it was authored, processed, and scaled.
+- Keep unresolved aliases explicitly unresolved; do not silently substitute another sample or phoneme.
+- Preserve source timestamps. Any interpolation/resampling must be a named, versioned preprocessing operation and tested separately.
+
+## 3. Evaluation metrics
+
+Report all metrics on a fixed, documented time grid and only over eligible voiced target points unless a metric explicitly says otherwise.
+
+1. **MAE (semitones)** — primary metric; average absolute difference between predicted and reference deltas.
+2. **RMSE (semitones)** — secondary metric; highlights larger errors.
+3. **Mean signed error (semitones)** — detects systematic sharp/flat bias.
+4. **Coverage** — fraction of eligible reference points for which a prediction was produced; report separately so a model cannot appear better by skipping hard points.
+5. **Per-voicebank metrics** — report each held-out voicebank and macro-average across voicebanks; do not rely only on a pooled frame average.
+
+Baseline and model must use the same records, time grid, voiced mask, and aggregation policy. Report the deterministic zero-delta baseline alongside any learned model. No single aggregate metric is sufficient to establish naturalness or audio quality.
+
+## 4. Split and leakage policy
+
+- Split by complete `voicebank_id`, not by random frames or adjacent snippets from the same bank.
+- Freeze a deterministic split manifest with dataset version and seed before tuning.
+- Keep the final test voicebanks untouched during model selection.
+- When too few independent voicebanks are approved, document that limitation and do not claim cross-voicebank generalization.
+- Store only opaque IDs and provenance metadata in this repository; keep permitted audio and private paths in access-controlled storage.
+
+## 5. Gate before Kaggle
+
+Kaggle training remains blocked until:
+- [ ] the exact source license/permission covers intended ML use, storage, derived labels, and model distribution;
+- [ ] label creation and pitch-unit conversion have documented, tested procedures;
+- [ ] data manifests contain no private paths, credentials, or unapproved audio;
+- [ ] voicebank-held-out split is reviewed and reproducible;
+- [ ] baseline metrics run successfully on the frozen fixture and, when approved data exists, on the same evaluation protocol as the candidate model.
+
+Passing these gates permits a small experiment only. It does not permit integration with VO-SE_vocal's production renderer.
