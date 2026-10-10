@@ -18,7 +18,8 @@ Audit notes:
 
 - [x] Define initial request/response schema and validation.
 - [x] Add unit tests for time, MIDI range, order, finite values and schema versions.
-- [x] Add CI for Python 3.10 and 3.12; [ ] confirm the workflow passes.
+- [x] Add CI for Python 3.10 and 3.12.
+- [ ] Confirm the latest workflow run includes the new baseline tests.
 - [ ] Review the contract against actual VO-SE_vocal note/pitch data types.
 
 ## Gate 2 — Voicebank profile adapter
@@ -32,9 +33,10 @@ Audit notes:
 
 - [ ] Confirm permitted data sources and provenance.
 - [ ] Define target labels and metrics for pitch-expression assistance.
-- [ ] Create synthetic fixtures and a deterministic no-learning baseline.
+- [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
+- [ ] Execute and review the new baseline tests in CI.
+- [ ] Establish voicebank-held-out validation and test splits for any future real dataset.
 - [ ] Set up a private Kaggle notebook only after data permission checks.
-- [ ] Establish voicebank-held-out validation and test splits.
 
 ## Gate 4 — Small model experiment
 
