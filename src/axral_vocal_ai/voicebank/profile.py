@@ -1,10 +1,11 @@
-"""Build a compact profile from VO-SE_vocal existing OtoParser.
+"""Build a compact profile from VO-SE_vocal's existing OtoParser.
 
 This module does not parse oto.ini or prefix.map itself. Pass an already-loaded
 parser object so the established resolver remains authoritative.
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Iterable, Optional, Sequence
 
@@ -39,7 +40,8 @@ def build_voicebank_profile(
     """Summarize an already-loaded OtoParser without exporting local paths.
 
     Expected public methods are all_aliases(), get(alias), and has_vcv().
-    Absolute paths are transient deduplication keys only and are not returned.
+    A sample is counted only when the parser resolves it to an existing file.
+    Absolute paths are transient deduplication keys only and are never returned.
     PrefixMap boundaries are passed explicitly by the caller; this adapter does
     not inspect parser internals or duplicate PrefixMap parsing logic.
     """
@@ -60,15 +62,20 @@ def build_voicebank_profile(
     for alias in aliases:
         tokens.update(_alias_tokens(alias))
         entry = oto_parser.get(alias)
-        if entry is not None:
-            # Paths/filenames are transient deduplication keys only. They are
-            # never copied into the returned profile. An unresolved entry is
-            # not a sample and must not inflate sample_count.
-            wav_path = getattr(entry, "wav_path", None)
-            filename = getattr(entry, "filename", None)
-            sample_ref = wav_path or filename
-            if sample_ref:
-                sample_refs.add(sample_ref)
+        if entry is None:
+            continue
+
+        # OtoParser.wav_path deliberately returns a predictable candidate path
+        # even if the WAV is missing. Verify existence before counting it.
+        wav_path = getattr(entry, "wav_path", None)
+        if not isinstance(wav_path, (str, os.PathLike)) or not wav_path:
+            continue
+        try:
+            if not os.path.isfile(wav_path):
+                continue
+            sample_refs.add(os.path.normcase(os.path.realpath(wav_path)))
+        except (OSError, TypeError, ValueError):
+            continue
 
     return VoicebankProfile(
         alias_count=len(aliases),
