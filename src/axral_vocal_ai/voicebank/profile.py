@@ -6,7 +6,7 @@ parser object so the established resolver remains authoritative.
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Sequence
 
 from axral_vocal_ai.contracts import VoicebankProfile
 
@@ -34,11 +34,14 @@ def build_voicebank_profile(
     *,
     parser_version: Optional[str] = None,
     format_hints: Iterable[str] = (),
+    pitch_bank_boundaries: Sequence[float] = (),
 ) -> VoicebankProfile:
     """Summarize an already-loaded OtoParser without exporting local paths.
 
     Expected public methods are all_aliases(), get(alias), and has_vcv().
     Absolute paths are transient deduplication keys only and are not returned.
+    PrefixMap boundaries are passed explicitly by the caller; this adapter does
+    not inspect parser internals or duplicate PrefixMap parsing logic.
     """
     aliases = list(oto_parser.all_aliases())
     tokens: set[str] = set()
@@ -51,6 +54,8 @@ def build_voicebank_profile(
         hints.add("contextual_aliases")
     if any("/" in alias or "\\" in alias for alias in aliases):
         hints.add("folder_qualified_aliases")
+    if pitch_bank_boundaries:
+        hints.add("multipitch")
 
     for alias in aliases:
         tokens.update(_alias_tokens(alias))
@@ -66,6 +71,7 @@ def build_voicebank_profile(
         alias_count=len(aliases),
         sample_count=len(sample_refs),
         phoneme_inventory=tuple(sorted(tokens)),
+        pitch_bank_boundaries=tuple(pitch_bank_boundaries),
         parser_version=parser_version,
         format_hints=tuple(sorted(hints)),
     )
