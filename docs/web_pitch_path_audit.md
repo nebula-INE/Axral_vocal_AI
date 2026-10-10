@@ -62,3 +62,15 @@ This confirms a specific Web path, but does **not** establish Desktop/Web semant
 ## Training gate
 
 Kaggle training remains blocked until source-data permissions, label provenance, the fixed time grid, voiced/unvoiced rules, and voicebank-held-out splits are approved. This audit used source code only and did not access or upload voicebank audio.
+
+## Additional finding: editor serialization needs a separate regression pass
+
+A source-level comparison of `serializePitchBend()` with `parsePitchBend()` and the editor call sites found a likely unit mismatch:
+
+- The editor's `PitchPoint.semitone` values are already semitone offsets.
+- `serializePitchBend()` currently writes the first point's semitone value directly into PBS and writes subsequent semitone values directly into PBY.
+- `parsePitchBend()` multiplies PBS/PBY numeric values by 0.1 under the fixed UST convention.
+
+Consequently, a semitone value such as +1.0 appears to serialize as a raw value of 1 and parse back as +0.1 semitone. This is a **suspected existing editor round-trip defect**, separate from the renderer's Hz conversion. It was found by source inspection only; no audio was rendered and no production code was changed.
+
+Do not silently change the scale in the parser or renderer to compensate. Add a targeted parse → edit/serialize → parse regression test, decide the intended on-disk PBS/PBY encoding, then make the smallest isolated correction in the editor serialization adapter. Before merging any correction, verify representative existing UST files and compare before/after pitch points; do not change WORLD synthesis, sample placement, or audio post-processing.
