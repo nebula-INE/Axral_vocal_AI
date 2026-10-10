@@ -48,6 +48,7 @@ Audit findings:
 
 ## Gate 3 — Dataset and baseline
 
+- [x] Add a non-mutating pitch-response safety gate with bounded semitone deltas, request correlation, note-interval coverage, and explicit rest exclusion.
 - [ ] Confirm permitted data sources and provenance.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics, and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
@@ -64,6 +65,8 @@ Audit findings:
 
 ## Gate 5 — Opt-in integration
 
+- [ ] Route every model response through `validate_pitch_response()` before any preview/renderer adapter.
+- [ ] Review the conservative ±2-semitone default against approved training labels; keep it configurable and never silently clamp proposals.
 - [ ] Add AI behind an explicit opt-in flag.
 - [ ] Apply results to a preview/copy, never in-place to original note/pitch data.
 - [ ] Keep the existing renderer and no-AI path unchanged.
