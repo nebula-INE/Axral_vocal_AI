@@ -76,6 +76,15 @@ def test_rejects_request_id_mismatch() -> None:
         validate_pitch_response(_request(), response)
 
 
+def test_rejects_missing_response_request_id_when_request_has_one() -> None:
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.2, 0.25),),
+    )
+    with pytest.raises(PitchResponseValidationError, match="request_id"):
+        validate_pitch_response(_request(), response)
+
+
 @pytest.mark.parametrize("status", ["no_change", "rejected"])
 def test_non_mutating_statuses_are_passed_through(status: str) -> None:
     response = PitchResponse(status=status, request_id="req-1")
@@ -83,7 +92,7 @@ def test_non_mutating_statuses_are_passed_through(status: str) -> None:
 
 
 def test_rejects_invalid_policy_parameters() -> None:
-    response = PitchResponse(status="ok")
+    response = PitchResponse(status="ok", request_id="req-1")
     with pytest.raises(ValueError, match="greater than zero"):
         validate_pitch_response(_request(), response, max_abs_delta_semitones=0)
     with pytest.raises(ValueError, match="non-negative"):
