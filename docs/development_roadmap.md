@@ -9,7 +9,8 @@ Status: staged implementation; no production-renderer changes are in scope.
 - [x] Inspect the OtoParser and PrefixMap public API and existing parser tests.
 - [x] Record exact reuse points and add a real-parser integration-test path.
 - [x] Inspect the Python pitch-event model, graph-editor evaluation, native automation value conversion, and native render-curve boundary.
-- [ ] Complete a separate audit of every Web UI/API serialization boundary before claiming Desktop/Web parity.
+- [x] Trace the Web PBS/PBW/PBY note-to-WASM pitch path; see `docs/web_pitch_path_audit.md`.
+- [ ] Verify Desktop/Web project import/export parity and add deterministic curve/Hz adapter tests before integration.
 
 Audit findings:
 - `modules/ai/ai_manager.py` is scaffolding: its current analysis path emits fixed fallback timing values and `predict_vits_waveform` returns silence. It is not a trained model.
@@ -20,8 +21,10 @@ Audit findings:
 - `modules/gui/graph_editor_widget.py` uses a nominal Pitch value range of -8192..8191. Its `get_value_at_time()` is step-hold (last point at or before the requested time), but its graph draws straight lines between points. Thus the visible line is not the same as the sampled evaluation function.
 - Native `include/AutomationPoint.h` documents the same numeric range. `include/AutomationCurves.h::evaluate()` also uses step-hold. `pitchValueToSemitones()` maps values using `(value / 8191) * 2.0`, and `src/PluginProcessor.cpp` applies the result as a frequency ratio `2^(semitones/12)`. This is an implementation conversion of the current native automation control, not proof that every stored/project/Web pitch value has been authored in calibrated semitones.
 - The negative endpoint is asymmetric: -8192 maps slightly below -2 semitones under the current formula, while +8191 maps to +2. Do not “correct” this in the production code as part of AI work; first define and test compatibility requirements.
-- Native render interfaces such as `include/vose_core.h` and `include/vose_streaming_api.h` carry per-sample `pitch_curve` arrays documented in Hz. This is a different representation from sparse `PitchEvent(time, value)` automation points. They must not be interchanged or labeled with the same unit.
-- The UI timeline overlay also uses a ±2-semitone display conversion. A visual overlay is not sufficient evidence that an arbitrary curve was passed through the same conversion in every render path.
+- Native render interfaces such as `include/vose_core.h` and `include/vose_streaming_api.h` carry per-sample `pitch_curve` arrays in Hz. This is a different representation from sparse `PitchEvent(time, value)` automation points. They must not be interchanged or labeled with the same unit.
+- The Web note editor stores UST-style `PBS/PBW/PBY` strings. `src/utils/pitchCurve.ts` applies a fixed 0.1 scale to heights, producing semitone offsets; the Web render bridge smooths/samples these and passes a dense Hz pitch curve to WASM. This is separate from native Graph Editor automation.
+- Web `sampleSemitoneAt()` uses linear interpolation and endpoint hold; `smoothPitchBendPoints()` adds clamping and slew limiting. Native Graph Editor automation evaluation is step-hold. These are not equivalent curve semantics.
+- Web pitch-path audit is source-only and did not change VO-SE_vocal. Desktop/Web project serialization parity and deterministic curve-to-Hz tests remain open.
 - Real-parser integration tests use a separate checkout via `VO_SE_VOCAL_ROOT`; the AI repository's CI does not modify the production repository.
 
 ## Gate 1 — Versioned contracts
@@ -46,7 +49,7 @@ Audit findings:
 - [ ] Confirm permitted data sources and provenance.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics, and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
-- [x] Execute baseline, profile, and real-parser integration tests in CI on the current PR head.
+- [x] Execute baseline, profile, and real-parser integration tests in CI on the previously verified PR head.
 - [ ] Establish voicebank-held-out validation and test splits for any future approved real dataset.
 - [ ] Set up a private Kaggle notebook only after data permission and label-definition checks.
 
@@ -62,7 +65,7 @@ Audit findings:
 - [ ] Add AI behind an explicit opt-in flag.
 - [ ] Apply results to a preview/copy, never in-place to original note/pitch data.
 - [ ] Keep the existing renderer and no-AI path unchanged.
-- [ ] Audit Desktop and Web request/response and pitch-unit paths end-to-end, then run repeatable audio regression tests before any integration.
+- [ ] Complete Desktop/Web parity tests and repeatable audio regression tests before any integration.
 
 ## Out of scope for the first MVP
 
