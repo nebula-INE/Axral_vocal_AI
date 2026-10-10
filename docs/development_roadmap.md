@@ -14,6 +14,7 @@ Audit notes:
 - `modules/ai/ai_manager.py` selects model paths and loads a phoneme dictionary, but its current `analyze_async` path emits fixed fallback timing values and `predict_vits_waveform` returns silence. Treat these as scaffolding, not a trained production model.
 - `modules/data/oto_parser.py` exposes `load_voice_dir()`, `all_aliases()`, `get()`, `has_vcv()`, and `resolve_alias(lyric, prev_vowel=None, note_num=None)`. Its `resolve_alias` uses `map_alias` / `select_prefix_map` and handles folder-qualified aliases. Axral consumes this public surface instead of implementing a second resolver.
 - `modules/data/prefix_map.py` exposes `parse_prefix_map()`, `select_prefix_map()`, and `map_alias()`; boundary selection uses the greatest boundary not above the MIDI note, and notes below the first boundary have no mapping.
+- The real-parser fixture confirmed duplicate aliases are first-wins according to the parser's sorted `oto.ini` discovery order. Profile sample counts therefore count unique existing files reachable through the parser's public alias table, not every WAV file physically present in a bank.
 - Integration tests now use the actual parser from a separate checkout via `VO_SE_VOCAL_ROOT`; the workflow checks out `nebula-INE/VO-SE_vocal` and runs those tests without modifying the production repository.
 - Existing rendering and pitch data must remain untouched during initial contract work.
 
