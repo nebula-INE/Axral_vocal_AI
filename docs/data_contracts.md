@@ -62,3 +62,16 @@ Training examples should have an explicit provenance record and a documented lic
 ## Compatibility
 
 The initial contract is a proposal. Changes require a schema-version decision and tests. The AI layer must be optional; if it is disabled, VO-SE_vocal continues using its existing pitch and render path unchanged.
+
+
+## Response validation boundary
+
+`src/axral_vocal_ai/response_validation.py` provides a renderer-independent safety gate for returned proposals:
+
+- verifies request correlation when both request and response carry an ID;
+- rejects deltas beyond a caller-configurable absolute semitone bound (default ±2 semitones for the conservative MVP);
+- rejects points outside note intervals or inside notes explicitly marked unvoiced/rest;
+- permits unresolved notes when voiced status is unknown, rather than treating missing alias resolution as proof of silence;
+- returns valid responses unchanged and rejects invalid responses instead of silently clamping them.
+
+This is validation only: it does not apply deltas, interpolate curves, alter source data, or convert semitone values to native/Web pitch representations. If validation fails, callers must preserve the existing non-AI path. The ±2-semitone default is an initial guardrail and must be reviewed against approved labels before any production use.
