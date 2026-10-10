@@ -73,3 +73,25 @@ def test_resolver_errors_are_not_hidden():
 
     with pytest.raises(RuntimeError, match="resolver failure"):
         build_pitch_request([Note(60, 0.0, 0.2, "あ")], alias_resolver=fail)
+
+
+
+def test_existing_oto_parser_adapter_uses_note_num_keyword():
+    from axral_vocal_ai.adapters.vose import make_oto_alias_resolver
+
+    class Parser:
+        def __init__(self):
+            self.calls = []
+
+        def resolve_alias(self, lyric, prev_vowel=None, note_num=None):
+            self.calls.append((lyric, prev_vowel, note_num))
+            return OtoEntry(alias=lyric + "-resolved")
+
+    parser = Parser()
+    resolver = make_oto_alias_resolver(parser)
+    request = build_pitch_request(
+        [Note(64, 0.0, 0.3, "あ")],
+        alias_resolver=resolver,
+    )
+    assert parser.calls == [("あ", None, 64)]
+    assert request.notes[0].resolved_alias == "あ-resolved"
