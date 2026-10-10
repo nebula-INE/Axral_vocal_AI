@@ -61,11 +61,14 @@ def build_voicebank_profile(
         tokens.update(_alias_tokens(alias))
         entry = oto_parser.get(alias)
         if entry is not None:
-            # Local paths are only transient deduplication keys. They are
-            # never copied into the returned profile.
+            # Paths/filenames are transient deduplication keys only. They are
+            # never copied into the returned profile. An unresolved entry is
+            # not a sample and must not inflate sample_count.
             wav_path = getattr(entry, "wav_path", None)
             filename = getattr(entry, "filename", None)
-            sample_refs.add(wav_path or filename or alias)
+            sample_ref = wav_path or filename
+            if sample_ref:
+                sample_refs.add(sample_ref)
 
     return VoicebankProfile(
         alias_count=len(aliases),
