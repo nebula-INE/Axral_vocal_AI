@@ -10,7 +10,9 @@ Status: staged implementation; no production-renderer changes are in scope.
 - [x] Record exact reuse points and add a real-parser integration-test path.
 - [x] Inspect the Python pitch-event model, graph-editor evaluation, native automation value conversion, and native render-curve boundary.
 - [x] Trace the Web PBS/PBW/PBY note-to-WASM pitch path; see `docs/web_pitch_path_audit.md`.
-- [ ] Verify Desktop/Web project import/export parity and add deterministic curve/Hz adapter tests before integration.
+- [ ] Verify Desktop/Web project import/export parity and test the full curve-to-Hz adapter before integration.
+- [x] Add Web-side deterministic unit tests for PBS/PBW/PBY parsing, negative PBS offsets, clamping, linear sampling, slew limiting, and tick/ms conversion in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` (committed on `main`; execution/CI result still pending).
+- [ ] Add a parse → editor serialize → parse regression test. Source inspection found a likely 10× semitone scale mismatch in `serializePitchBend()` versus `parsePitchBend()`; see `docs/web_pitch_path_audit.md`. Keep production behavior unchanged until compatibility expectations are verified.
 
 Audit findings:
 - `modules/ai/ai_manager.py` is scaffolding: its current analysis path emits fixed fallback timing values and `predict_vits_waveform` returns silence. It is not a trained model.
