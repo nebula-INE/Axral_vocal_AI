@@ -71,6 +71,8 @@ A source-level comparison of `serializePitchBend()` with `parsePitchBend()` and 
 - `serializePitchBend()` currently writes the first point's semitone value directly into PBS and writes subsequent semitone values directly into PBY.
 - `parsePitchBend()` multiplies PBS/PBY numeric values by 0.1 under the fixed UST convention.
 
-Consequently, a semitone value such as +1.0 appears to serialize as a raw value of 1 and parse back as +0.1 semitone. This is a **suspected existing editor round-trip defect**, separate from the renderer's Hz conversion. It was found by source inspection only; no audio was rendered and no production code was changed.
+Consequently, a semitone value such as +1.0 would serialize as a raw value of 1 and parse back as +0.1 semitone. The source comments in the parser explicitly define the on-disk convention as 10 raw units = 1 semitone.
 
-Do not silently change the scale in the parser or renderer to compensate. Add a targeted parse → edit/serialize → parse regression test, decide the intended on-disk PBS/PBY encoding, then make the smallest isolated correction in the editor serialization adapter. Before merging any correction, verify representative existing UST files and compare before/after pitch points; do not change WORLD synthesis, sample placement, or audio post-processing.
+**Correction now committed on VO-SE_vocal/main:** `serializePitchBend()` multiplies the editor's semitone values by 10 when writing PBS/PBY, leaving parsing and rendering unchanged. A deterministic parse → serialize → parse regression test covers positive/negative values, fractional semitones, and a negative PBS start offset. Commits: `b7b36a6b8c63ff74bfa0171a2e97059abdb50fed` and `85a4cbba1bbed1b50fa93b3401e9bf1e12c9309e`.
+
+This is a narrow editor serialization-adapter change, not a renderer correction. The test has been committed but **has not yet been executed/verified by CI**, and representative existing UST compatibility checks remain open. No audio was rendered as part of this change. Do not change the parser's scale, WORLD synthesis, sample placement, pitch application, noise, volume, or audio post-processing to compensate.
