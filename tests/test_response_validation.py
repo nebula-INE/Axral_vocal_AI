@@ -16,7 +16,7 @@ def _request() -> PitchRequest:
     return PitchRequest(
         notes=(
             PitchNote(0.0, 0.5, 60, "あ", voiced=True),
-            PitchNote(0.5, 0.75, "62", "休符", voiced=False),
+            PitchNote(0.5, 0.75, 62, "休符", voiced=False),
             PitchNote(0.75, 1.0, 64, "い", voiced=None),
         ),
         request_id="req-1",
