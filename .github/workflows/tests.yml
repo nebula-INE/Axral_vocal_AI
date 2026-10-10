@@ -1,0 +1,32 @@
+name: Python tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - name: Check out Axral Vocal AI
+        uses: actions/checkout@v4
+      - name: Check out VO-SE_vocal parser for integration tests
+        uses: actions/checkout@v4
+        with:
+          repository: nebula-INE/VO-SE_vocal
+          path: VO-SE_vocal
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package and test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Run unit and production-parser integration tests
+        env:
+          VO_SE_VOCAL_ROOT: ${{ github.workspace }}/VO-SE_vocal
+        run: python -m pytest -q
