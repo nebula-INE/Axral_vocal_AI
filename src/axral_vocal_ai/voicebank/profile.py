@@ -10,11 +10,12 @@ from typing import Any, Iterable, Optional
 
 from axral_vocal_ai.contracts import VoicebankProfile
 
-_PITCH_FOLDER = re.compile(r"^[A-Ga-g][#b]?-?\\d+$")
+_PITCH_FOLDER = re.compile(r"^[A-Ga-g][#b]?-?\d+$")
+
 
 def _alias_tokens(alias: str) -> tuple[str, ...]:
     """Extract observable alias tokens without claiming canonical phonemes."""
-    lyric = alias.replace("\\\\", "/").rsplit("/", 1)[-1].strip()
+    lyric = alias.replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not lyric:
         return ()
     parts = lyric.split()
@@ -26,6 +27,7 @@ def _alias_tokens(alias: str) -> tuple[str, ...]:
     if _PITCH_FOLDER.fullmatch(token):
         return ()
     return (token,)
+
 
 def build_voicebank_profile(
     oto_parser: Any,
@@ -47,13 +49,15 @@ def build_voicebank_profile(
         hints.add("vcv_aliases")
     if any(" " in alias or "_" in alias for alias in aliases):
         hints.add("contextual_aliases")
-    if any("/" in alias or "\\\\" in alias for alias in aliases):
+    if any("/" in alias or "\\" in alias for alias in aliases):
         hints.add("folder_qualified_aliases")
 
     for alias in aliases:
         tokens.update(_alias_tokens(alias))
         entry = oto_parser.get(alias)
         if entry is not None:
+            # Local paths are only transient deduplication keys. They are
+            # never copied into the returned profile.
             wav_path = getattr(entry, "wav_path", None)
             filename = getattr(entry, "filename", None)
             sample_refs.add(wav_path or filename or alias)
