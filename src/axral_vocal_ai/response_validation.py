@@ -61,12 +61,21 @@ def validate_pitch_response(
                 f"pitch delta at index {index} exceeds the configured "
                 f"±{max_abs_delta_semitones:g}-semitone safety bound"
             )
+        # Explicit rests take precedence at shared note boundaries. Otherwise,
+        # an inclusive end on the preceding voiced note could accidentally admit
+        # a point exactly at the start of a following rest.
+        in_rest = any(
+            note.voiced is False
+            and note.start_sec - time_tolerance_sec <= point.time_sec
+            <= note.end_sec + time_tolerance_sec
+            for note in request.notes
+        )
         covered = any(
             note.start_sec - time_tolerance_sec <= point.time_sec
             <= note.end_sec + time_tolerance_sec
             for note in eligible
         )
-        if not covered:
+        if in_rest or not covered:
             raise PitchResponseValidationError(
                 f"pitch delta at index {index} falls outside eligible note intervals"
             )
