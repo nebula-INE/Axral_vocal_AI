@@ -19,22 +19,25 @@ Audit notes:
 - [x] Define initial request/response schema and validation.
 - [x] Add unit tests for time, MIDI range, order, finite values and schema versions.
 - [x] Add CI for Python 3.10 and 3.12.
-- [ ] Confirm the latest workflow run includes the new baseline tests.
+- [ ] Confirm a passing workflow run for the current head, including the newest profile tests.
 - [ ] Review the contract against actual VO-SE_vocal note/pitch data types.
+
+The last confirmed successful workflow was for commit `2d19ca186557099aed0fbfb55c4af241f01f741e`; subsequent profile changes still need CI confirmation.
 
 ## Gate 2 — Voicebank profile adapter
 
 - [x] Define a profile builder around the existing parser's public API.
 - [x] Preserve alias-derived inventory hints without claiming canonical phoneme normalization.
-- [ ] Cover CV, VCV, CVVC, PrefixMap/multipitch, missing samples and nested oto.ini.
+- [x] Add profile unit coverage for CV-shaped and VCV-shaped aliases, caller-supplied CVVC/PrefixMap hints, nested/folder-qualified alias shapes, multipitch boundaries, duplicate sample references and unresolved/missing sample references.
 - [x] Keep absolute paths transient for deduplication; returned profiles contain no paths or audio bytes.
+- [ ] Run integration tests against the real VO-SE_vocal OtoParser for CV/VCV/CVVC, PrefixMap, multipitch, nested `oto.ini`, and missing samples. Current tests use fakes and do not prove production-parser behavior.
 
 ## Gate 3 — Dataset and baseline
 
 - [ ] Confirm permitted data sources and provenance.
-- [ ] Define target labels and metrics for pitch-expression assistance.
+- [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
-- [ ] Execute and review the new baseline tests in CI.
+- [ ] Execute and review the new baseline/profile tests in CI at the current head.
 - [ ] Establish voicebank-held-out validation and test splits for any future real dataset.
 - [ ] Set up a private Kaggle notebook only after data permission checks.
 
