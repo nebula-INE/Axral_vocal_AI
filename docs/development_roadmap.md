@@ -18,15 +18,15 @@ Audit notes:
 
 - [x] Define initial request/response schema and validation.
 - [x] Add unit tests for time, MIDI range, order, finite values and schema versions.
-- [ ] Run tests in a clean environment and add CI.
+- [x] Add CI for Python 3.10 and 3.12; [ ] confirm the workflow passes.
 - [ ] Review the contract against actual VO-SE_vocal note/pitch data types.
 
 ## Gate 2 — Voicebank profile adapter
 
-- [ ] Define a profile builder around the existing parser's public API.
-- [ ] Preserve original aliases and expose normalization diagnostics.
+- [x] Define a profile builder around the existing parser's public API.
+- [x] Preserve alias-derived inventory hints without claiming canonical phoneme normalization.
 - [ ] Cover CV, VCV, CVVC, PrefixMap/multipitch, missing samples and nested oto.ini.
-- [ ] Ensure exported profiles contain no absolute local paths or audio bytes.
+- [x] Keep absolute paths transient for deduplication; returned profiles contain no paths or audio bytes.
 
 ## Gate 3 — Dataset and baseline
 
