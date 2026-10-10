@@ -77,3 +77,20 @@ def build_pitch_request(
         time_signature=time_signature,
         request_id=request_id,
     )
+
+
+
+def make_oto_alias_resolver(oto_parser: Any) -> AliasResolver:
+    """Adapt VO-SE_vocal's existing OtoParser without duplicating its rules.
+
+    Uses resolve_alias(lyric, note_num=...) so VCV/CV fallback, rest handling,
+    scoped multipitch aliases, and prefix.map selection remain owned by the app.
+    """
+    resolve = getattr(oto_parser, "resolve_alias", None)
+    if not callable(resolve):
+        raise TypeError("oto_parser must provide callable resolve_alias")
+
+    def resolve_for_note(lyric: str, midi_note: int) -> Optional[Any]:
+        return resolve(lyric, note_num=midi_note)
+
+    return resolve_for_note
