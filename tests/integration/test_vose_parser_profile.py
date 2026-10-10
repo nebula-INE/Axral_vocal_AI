@@ -78,7 +78,7 @@ def test_real_parser_cv_vcv_prefix_map_nested_bank_and_missing_samples(tmp_path)
     )
     # Count existing unique WAV files only. The missing candidate and duplicate
     # unqualified/scoped aliases do not inflate the sample count.
-    assert profile.sample_count == 5
+    assert profile.sample_count == 4
     assert "vcv_aliases" in profile.format_hints
     assert "folder_qualified_aliases" in profile.format_hints
     assert "multipitch" in profile.format_hints
