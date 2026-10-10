@@ -1,7 +1,7 @@
 # VO-SE_vocal Web pitch-path audit
 
 Audit date: 2026-10-10
-Scope: read-only source audit of the Web pitch-expression path. No files in VO-SE_vocal were changed.
+Scope: source audit plus narrowly scoped Web editor serialization regression coverage. The parser, renderer, WORLD synthesis, sample placement, volume/noise processing, and rendered audio path were not changed.
 
 ## Executive result
 
@@ -52,7 +52,7 @@ This confirms a specific Web path, but does **not** establish Desktop/Web semant
 
 ## Remaining verification before integration
 
-- Add focused tests for the Web pitch parser/sampler and the actual WASM input curve using deterministic fixtures, without changing production audio code.
+- Parser/sampler and editor serialization tests are now committed in `tests/test_web_pitch_curve.mjs`; execution is still unverified. A deterministic test of the actual WASM input Hz curve remains open and must avoid changing production audio code.
 - Trace project import/export and Web request/render payloads for any route that maps Python project data to Web note data; the current audit establishes the Web note-to-WASM path, not universal Desktop/Web project serialization parity.
 - Verify timing origin and tempo conversion across note tick, note-relative milliseconds, and dense curve sample indices, including negative PBS offsets and note boundaries.
 - Compare a fixed set of expected curve points/Hz values through the Web adapter in tests. Do not run an unreviewed production-audio rewrite as part of this audit.
@@ -68,11 +68,11 @@ Kaggle training remains blocked until source-data permissions, label provenance,
 A source-level comparison of `serializePitchBend()` with `parsePitchBend()` and the editor call sites found a likely unit mismatch:
 
 - The editor's `PitchPoint.semitone` values are already semitone offsets.
-- `serializePitchBend()` currently writes the first point's semitone value directly into PBS and writes subsequent semitone values directly into PBY.
+- Before the correction, `serializePitchBend()` wrote semitone values directly into PBS/PBY.
 - `parsePitchBend()` multiplies PBS/PBY numeric values by 0.1 under the fixed UST convention.
 
 Consequently, a semitone value such as +1.0 would serialize as a raw value of 1 and parse back as +0.1 semitone. The source comments in the parser explicitly define the on-disk convention as 10 raw units = 1 semitone.
 
 **Correction now committed on VO-SE_vocal/main:** `serializePitchBend()` multiplies the editor's semitone values by 10 when writing PBS/PBY, leaving parsing and rendering unchanged. A deterministic parse → serialize → parse regression test covers positive/negative values, fractional semitones, and a negative PBS start offset. Commits: `b7b36a6b8c63ff74bfa0171a2e97059abdb50fed` and `85a4cbba1bbed1b50fa93b3401e9bf1e12c9309e`.
 
-This is a narrow editor serialization-adapter change, not a renderer correction. The test has been committed but **has not yet been executed/verified by CI**, and representative existing UST compatibility checks remain open. No audio was rendered as part of this change. Do not change the parser's scale, WORLD synthesis, sample placement, pitch application, noise, volume, or audio post-processing to compensate.
+This is a narrow editor serialization-adapter change, not a renderer correction. A second test commit (`29283915bd21b12ffc973215f1e93c49693121e8`) now adds representative existing UST-value compatibility assertions alongside the parse → serialize → parse test. These tests **have not yet been executed/verified by CI**; existing UST compatibility is therefore covered in source but not confirmed by execution. No audio was rendered as part of these changes. Do not change the parser's scale, WORLD synthesis, sample placement, pitch application, noise, volume, or audio post-processing to compensate.
