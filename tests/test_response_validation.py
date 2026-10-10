@@ -106,3 +106,25 @@ def test_allows_small_boundary_rounding_tolerance() -> None:
         request_id="req-1",
     )
     assert validate_pitch_response(_request(), response) is response
+
+
+def test_rejects_point_exactly_at_rest_start_after_voiced_note() -> None:
+    # Note intervals share a boundary at 0.5s. The explicit rest must win
+    # over the preceding voiced note's inclusive endpoint.
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.5, 0.25),),
+        request_id="req-1",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(_request(), response)
+
+
+def test_rejects_point_within_tolerance_of_rest_boundary() -> None:
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.5000005, 0.25),),
+        request_id="req-1",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(_request(), response)
