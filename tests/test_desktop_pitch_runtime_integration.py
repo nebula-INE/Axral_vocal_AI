@@ -74,7 +74,7 @@ def test_real_desktop_sampler_preserves_negative_pitch_offsets() -> None:
 
 
 
-def test_actual_web_bridge_matches_desktop_sampler_for_shared_pitch_curve() -> None:
+def test_actual_web_bridge_matches_desktop_sampler_for_shared_positive_pitch_curve() -> None:
     engine_class = _desktop_engine_class()
     root = Path(os.environ["VO_SE_VOCAL_ROOT"]).resolve()
     probe = Path(__file__).with_name("web_pitch_runtime_probe.mjs")
@@ -87,7 +87,8 @@ def test_actual_web_bridge_matches_desktop_sampler_for_shared_pitch_curve() -> N
         text=True,
         timeout=30,
     )
-    web_curve = np.asarray(json.loads(completed.stdout), dtype=np.float64)
+    web_curves = {key: np.asarray(value, dtype=np.float64) for key, value in json.loads(completed.stdout).items()}
+    web_curve = web_curves["positive"]
 
     engine = SimpleNamespace(aural_ai=None)
     note = SimpleNamespace(note_number=69, start_time=0.0, duration=0.1)
@@ -103,3 +104,66 @@ def test_actual_web_bridge_matches_desktop_sampler_for_shared_pitch_curve() -> N
 
     assert web_curve.shape == desktop_curve.shape == (3,)
     assert web_curve == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
+
+
+
+def test_actual_web_bridge_matches_desktop_sampler_for_shared_negative_pitch_curve() -> None:
+    engine_class = _desktop_engine_class()
+    root = Path(os.environ["VO_SE_VOCAL_ROOT"]).resolve()
+    probe = Path(__file__).with_name("web_pitch_runtime_probe.mjs")
+    completed = subprocess.run(
+        ["node", str(probe)],
+        cwd=root,
+        env=os.environ.copy(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    web_curves = {key: np.asarray(value, dtype=np.float64) for key, value in json.loads(completed.stdout).items()}
+    engine = SimpleNamespace(aural_ai=None)
+    note = SimpleNamespace(note_number=69, start_time=0.0, duration=0.1)
+    events = [
+        SimpleNamespace(time=0.0, value=0.0),
+        SimpleNamespace(time=0.1, value=-2.0),
+    ]
+    desktop_curve = engine_class._get_sampled_curve(
+        engine, events, note, 3, is_pitch=True
+    )
+    assert web_curves["negative"] == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
+
+
+def test_actual_web_bridge_steep_bend_keeps_web_slew_limit_distinct_from_desktop() -> None:
+    """A steep bend must expose the existing Web slew limit, not force false parity."""
+    engine_class = _desktop_engine_class()
+    root = Path(os.environ["VO_SE_VOCAL_ROOT"]).resolve()
+    probe = Path(__file__).with_name("web_pitch_runtime_probe.mjs")
+    completed = subprocess.run(
+        ["node", str(probe)],
+        cwd=root,
+        env=os.environ.copy(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    web_curves = {key: np.asarray(value, dtype=np.float64) for key, value in json.loads(completed.stdout).items()}
+    engine = SimpleNamespace(aural_ai=None)
+    note = SimpleNamespace(note_number=69, start_time=0.0, duration=0.1)
+    events = [
+        SimpleNamespace(time=0.0, value=0.0),
+        SimpleNamespace(time=0.1, value=10.0),
+    ]
+    desktop_curve = engine_class._get_sampled_curve(
+        engine, events, note, 3, is_pitch=True
+    )
+    expected_web = 440.0 * np.power(2.0, np.array([0.0, 4.0, 8.0]) / 12.0)
+    assert web_curves["steep"] == pytest.approx(expected_web, rel=1e-7, abs=1e-7)
+    assert desktop_curve == pytest.approx(
+        440.0 * np.power(2.0, np.array([0.0, 5.0, 10.0]) / 12.0),
+        rel=1e-5,
+        abs=1e-4,
+    )
+    # The endpoints intentionally differ after Web slew limiting; this is a
+    # characterization of existing behavior, not an instruction to reconcile it.
+    assert web_curves["steep"][-1] != pytest.approx(desktop_curve[-1], rel=1e-4)
