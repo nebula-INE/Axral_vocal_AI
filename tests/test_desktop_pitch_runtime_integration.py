@@ -7,7 +7,9 @@ They characterize the no-AI baseline only; they do not assert Web parity.
 from __future__ import annotations
 
 import importlib
+import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -69,3 +71,35 @@ def test_real_desktop_sampler_preserves_negative_pitch_offsets() -> None:
     expected_hz = 440.0 * np.power(2.0, np.array([0.0, -1.0, -2.0]) / 12.0)
 
     assert curve == pytest.approx(expected_hz, rel=1e-5, abs=1e-4)
+
+
+
+def test_actual_web_bridge_matches_desktop_sampler_for_shared_pitch_curve() -> None:
+    engine_class = _desktop_engine_class()
+    root = Path(os.environ["VO_SE_VOCAL_ROOT"]).resolve()
+    probe = Path(__file__).with_name("web_pitch_runtime_probe.mjs")
+    completed = subprocess.run(
+        ["node", str(probe)],
+        cwd=root,
+        env=os.environ.copy(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    web_curve = np.asarray(json.loads(completed.stdout), dtype=np.float64)
+
+    engine = SimpleNamespace(aural_ai=None)
+    note = SimpleNamespace(note_number=69, start_time=0.0, duration=0.1)
+    # Same semantic curve as the Web UST fixture: A4, 0 -> +2 semitones
+    # over 100 ms, sampled at the inclusive 0/50/100 ms positions.
+    events = [
+        SimpleNamespace(time=0.0, value=0.0),
+        SimpleNamespace(time=0.1, value=2.0),
+    ]
+    desktop_curve = engine_class._get_sampled_curve(
+        engine, events, note, 3, is_pitch=True
+    )
+
+    assert web_curve.shape == desktop_curve.shape == (3,)
+    assert web_curve == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
