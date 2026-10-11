@@ -144,10 +144,17 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
         total += 1
     _require(total > 0, "dataset manifest contains no records")
     _require(any(counts[split] for split in ("train", "validation", "test")), "no split records found")
+    if require_labeled:
+        missing_splits = [split for split in ("train", "validation", "test") if counts[split] == 0]
+        _require(not missing_splits,
+                 "training readiness requires non-empty train, validation, and test splits; missing: "
+                 + ", ".join(missing_splits))
+        _require(len(bank_splits) >= 3,
+                 "training readiness requires at least three distinct voicebanks for isolated splits")
     return {
         "status": "valid",
         "records": total,
-        "labeled_records": None if not require_labeled else total,
+        "labeled_records": total if require_labeled else total,
         "records_by_split": counts,
         "voicebanks_by_split": {
             split: sorted(bank for bank, bank_split in bank_splits.items() if bank_split == split)
