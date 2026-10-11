@@ -27,7 +27,7 @@ Validate the metadata-only JSONL manifest first:
 python training/validate_dataset.py path/to/manifest.jsonl --require-labeled
 ```
 
-Then train the small ridge-regression MVP and evaluate it on the preassigned validation and test voicebanks:
+Then train the small ridge-regression MVP and evaluate train/validation metrics:
 
 ```bash
 python training/train_pitch_model.py path/to/manifest.jsonl --output artifacts/pitch_delta_report.json
