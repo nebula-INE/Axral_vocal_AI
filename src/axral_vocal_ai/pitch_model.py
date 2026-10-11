@@ -12,6 +12,7 @@ from typing import Any, Iterable
 import numpy as np
 
 FEATURE_VERSION = 1
+MAX_PREDICTION_DELTA_SEMITONES = 2.0
 FEATURE_NAMES = ("bias", "midi_normalized", "note_phase", "phase_squared", "duration_seconds")
 
 
@@ -100,7 +101,10 @@ class LinearPitchDeltaModel:
         result = sum(w * value for w, value in zip(self.weights, values))
         if not np.isfinite(result):
             raise ValueError("model produced a non-finite prediction")
-        return float(result)
+        # Keep experimental proposals inside the same safety envelope enforced
+        # for training labels. This does not alter the production renderer.
+        bounded = min(MAX_PREDICTION_DELTA_SEMITONES, max(-MAX_PREDICTION_DELTA_SEMITONES, result))
+        return float(bounded)
 
     def to_dict(self) -> dict[str, Any]:
         return {
