@@ -1,0 +1,46 @@
+{
+  "fixture_kind": "source-level-web-pitch-characterization",
+  "status": "derived-from-source-not-captured-from-running-app",
+  "observed_on": "2026-10-11",
+  "source_repository": "nebula-INE/VO-SE_vocal",
+  "source_ref": "main",
+  "source_files": [
+    "src/utils/pitchCurve.ts",
+    "src/voseCoreClient.ts"
+  ],
+  "input": {
+    "note_num": 60,
+    "duration_ms": 100,
+    "frame_count": 5,
+    "pbs": "0;0",
+    "pbw": "50,50",
+    "pby": "100,-100"
+  },
+  "expected": {
+    "parsed_points": [
+      {"offset_ms": 0, "semitone": 0},
+      {"offset_ms": 50, "semitone": 10},
+      {"offset_ms": 100, "semitone": -10}
+    ],
+    "smoothed_points": [
+      {"offset_ms": 0, "semitone": 0},
+      {"offset_ms": 50, "semitone": 4},
+      {"offset_ms": 100, "semitone": 0}
+    ],
+    "sample_times_ms": [0, 25, 50, 75, 100],
+    "sampled_semitones": [0, 2, 4, 2, 0],
+    "base_hz": 261.6255653005986,
+    "curve_hz": [
+      261.6255653005986,
+      293.6647679174076,
+      329.6275569128699,
+      293.6647679174076,
+      261.6255653005986
+    ]
+  },
+  "limitations": [
+    "This fixture is a manually derived characterization of the inspected source, not output captured by executing VO-SE_vocal.",
+    "It tests Axral's recorded reference expectations only; it does not execute or verify the TypeScript production helper.",
+    "It is not evidence of Desktop/Web parity or end-to-end audio equivalence."
+  ]
+}

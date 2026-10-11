@@ -57,8 +57,19 @@ class VoicebankProfile:
     format_hints: Sequence[str] = ()
 
     def __post_init__(self) -> None:
+        # Freeze caller-provided sequences so validated metadata cannot be
+        # mutated after construction through a retained list reference.
+        for name in ("phoneme_inventory", "pitch_bank_boundaries", "format_hints"):
+            value = getattr(self, name)
+            if isinstance(value, (str, bytes)):
+                raise TypeError(f"{name} must be a sequence, not a string")
+            object.__setattr__(self, name, tuple(value))
         if self.alias_count < 0 or self.sample_count < 0:
             raise ValueError("voicebank counts cannot be negative")
+        if any(not isinstance(item, str) for item in self.phoneme_inventory):
+            raise TypeError("phoneme_inventory entries must be strings")
+        if any(not isinstance(item, str) for item in self.format_hints):
+            raise TypeError("format_hints entries must be strings")
         for value in self.pitch_bank_boundaries:
             _finite(value, "pitch_bank_boundaries entry")
 
@@ -73,8 +84,12 @@ class PitchRequest:
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema_version != SCHEMA_VERSION:
+        # The contract is immutable after validation, even if callers pass lists.
+        object.__setattr__(self, "notes", tuple(self.notes))
+        if type(self.schema_version) is not int or self.schema_version != SCHEMA_VERSION:
             raise ValueError(f"unsupported request schema_version: {self.schema_version}")
+        if self.request_id is not None and not isinstance(self.request_id, str):
+            raise TypeError("request_id must be a string or None")
         previous_start: Optional[float] = None
         for note in self.notes:
             if previous_start is not None and note.start_sec < previous_start:
@@ -111,8 +126,15 @@ class PitchResponse:
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema_version != SCHEMA_VERSION:
+        # Prevent post-validation mutation via caller-owned lists.
+        object.__setattr__(self, "pitch_deltas", tuple(self.pitch_deltas))
+        object.__setattr__(self, "warnings", tuple(self.warnings))
+        if type(self.schema_version) is not int or self.schema_version != SCHEMA_VERSION:
             raise ValueError(f"unsupported response schema_version: {self.schema_version}")
+        if self.request_id is not None and not isinstance(self.request_id, str):
+            raise TypeError("request_id must be a string or None")
+        if any(not isinstance(warning, str) for warning in self.warnings):
+            raise TypeError("warnings entries must be strings")
         if self.status not in ("ok", "no_change", "rejected"):
             raise ValueError(f"unsupported response status: {self.status}")
         previous_time: Optional[float] = None
@@ -160,6 +182,11 @@ def response_from_dict(payload: Dict[str, Any]) -> PitchResponse:
         raise ValueError("response payload must be an object")
     if payload.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
         raise ValueError("unsupported response schema_version")
+    raw_warnings = payload.get("warnings", [])
+    if not isinstance(raw_warnings, list):
+        raise ValueError("warnings must be a list")
+    if any(not isinstance(item, str) for item in raw_warnings):
+        raise ValueError("warnings entries must be strings")
     raw_points = payload.get("pitch_deltas", [])
     if not isinstance(raw_points, list):
         raise ValueError("pitch_deltas must be a list")
@@ -169,7 +196,7 @@ def response_from_dict(payload: Dict[str, Any]) -> PitchResponse:
     return PitchResponse(
         status=payload.get("status", "rejected"),
         pitch_deltas=points,
-        warnings=payload.get("warnings", []),
+        warnings=raw_warnings,
         request_id=payload.get("request_id"),
         schema_version=payload.get("schema_version", SCHEMA_VERSION),
     )

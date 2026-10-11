@@ -36,9 +36,12 @@ Audit findings:
 
 - [x] Define initial request/response schema and validation.
 - [x] Reject malformed external request/response payload containers, non-object note/pitch entries, invalid voicebank container shapes, and malformed time signatures with clear `ValueError`s; focused regression tests added, latest-head CI pending.
+- [x] Validate external response `warnings` as a list of strings, require optional request IDs to be strings, and reject boolean schema versions even though Python treats `bool` as an `int`; parser-boundary and direct-constructor regression tests added, latest-head CI pending.
+- [x] Freeze validated request/response/profile sequences into tuples so callers cannot mutate accepted contract data after validation; validate voicebank inventory/hint entry types and add regression tests. CI pending for this change.
 - [x] Add unit tests for time, MIDI range, ordering, finite values, and schema versions.
 - [x] Add CI for Python 3.10 and 3.12.
 - [x] Review the contract against actual VO-SE_vocal note and pitch data types; keep uncalibrated pitch automation excluded from semitone conversion.
+- [x] Add isolated compatibility-characterization tests for seconds/MIDI/rest metadata, signed semitone offsets, frequency-ratio math, and shared voiced/rest boundaries. These validate only Axral's contract boundary; they do not establish Desktop/Web parity or enable an adapter.
 - [x] Confirm current-head CI passes for the real-parser integration path and the isolated pitch-math tests (Python 3.10 and 3.12; commit `b834035`).
 
 ## Gate 2 — Voicebank profile adapter
@@ -76,7 +79,7 @@ Audit findings:
 - [ ] Add AI behind an explicit opt-in flag.
 - [ ] Apply results to a preview/copy, never in-place to original note/pitch data.
 - [ ] Keep the existing renderer and no-AI path unchanged.
-- [ ] Complete Desktop/Web parity tests and repeatable audio regression tests before any integration.
+- [ ] Complete Desktop/Web parity tests and repeatable audio regression tests before any integration. The contract-boundary characterization tests do not satisfy this gate; golden fixtures from both apps and save/load round-trips are still required.
 
 ## Out of scope for the first MVP
 
@@ -85,3 +88,25 @@ Audit findings:
 - Automatically uploading user voicebanks or projects to cloud services.
 - Committing training audio, datasets, credentials, or checkpoints to this repository.
 - Modifying production pitch automation, WORLD synthesis, note timing, volume, noise, or sample placement as part of AI contract work.
+
+
+## Gate 0 follow-up — source-level details (2026-10-11)
+
+- [x] Re-read current Web `pitchCurve.ts`, `voseCoreClient.ts`, Desktop `PitchEvent`, and Graph Editor evaluation code without modifying the production repository.
+- [x] Confirm latest Axral PR-head CI run `38108115190` passed on Python 3.10 and 3.12 at `db6503247ccd9c4d6e9d22777cd21d5e05d2401b`.
+- [ ] Trace the exact Desktop `pitch_automation` serialization and restore call sites.
+- [ ] Trace all callers of Web `buildPitchCurveHz()` to determine the actual frame-time grid; the helper's time formula is endpoint-inclusive over `durationMs`, so the declared 5 ms constant must not be treated as proof of sample spacing.
+- [ ] Add cross-representation golden fixtures only after those paths and their units are fully identified.
+
+This follow-up is source audit and planning only. No production audio code was changed, and Axral contract CI does not validate VO-SE_vocal audio quality or Desktop/Web parity.
+
+
+## Gate 0 follow-up — confirmed save/load and Web sampling details (2026-10-11)
+
+- [x] Trace the current Desktop JSON loader: Graph Editor automation is restored from top-level `parameters.{Pitch,Gender,Tension,Breath}` arrays of `{time,value}` objects in `modules/gui/mixins/project_io_mixin.py::load_json_project()`.
+- [x] Distinguish the legacy `ProjectModel.serialize()` top-level `pitch_automation` field from the current GUI JSON `parameters.Pitch` path; do not assume these shapes are interchangeable.
+- [x] Trace the Web pitch helper's production call site: `pushEvent()` chooses `p = max(2, round(max(1, durationMs)/5)+1)`; the endpoint-inclusive helper then spaces samples by `durationMs/(p-1)`, approximately but not always exactly 5 ms.
+- [x] Inspect the current GUI save writer (`on_save_project_clicked`): it emits `parameters.{Pitch,Gender,Tension,Breath}` as `{time,value}` arrays and `tracks[*].notes`; the paired loader restores Graph Editor parameters from that field.
+- [x] Add schema-shape fixtures for the current GUI JSON (`parameters.Pitch`) and legacy `pitch_automation` model envelope, with explicit tests proving the document shapes remain distinct. These are deterministic representative fixtures, not files exported by the running app; units/interpolation remain uncalibrated and no production conversion is enabled.
+
+This update is audit-only. No VO-SE_vocal files, renderers, pitch application, WORLD synthesis, or audio processing were modified.

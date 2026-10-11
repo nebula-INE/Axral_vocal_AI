@@ -1,0 +1,35 @@
+{
+  "format_version": 1,
+  "parameters": {
+    "Pitch": [
+      {
+        "time": 0,
+        "value": 0
+      },
+      {
+        "time": 0.125,
+        "value": 2048
+      },
+      {
+        "time": 0.25,
+        "value": -4096
+      }
+    ],
+    "Gender": [],
+    "Tension": [],
+    "Breath": []
+  },
+  "tracks": [
+    {
+      "name": "Fixture Track",
+      "notes": [
+        {
+          "start": 0,
+          "end": 0.25,
+          "note_num": 60,
+          "lyric": "あ"
+        }
+      ]
+    }
+  ]
+}

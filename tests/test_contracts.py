@@ -171,3 +171,108 @@ def test_request_parser_rejects_malformed_time_signature(signature: object) -> N
 def test_response_parser_rejects_non_object_payload() -> None:
     with pytest.raises(ValueError, match="response payload must be an object"):
         response_from_dict(None)  # type: ignore[arg-type]
+
+
+
+def test_request_parser_rejects_boolean_schema_version() -> None:
+    # bool is an int subclass in Python, but it is not a valid schema version.
+    with pytest.raises(ValueError, match="schema_version"):
+        request_from_dict({"schema_version": True, "notes": []})
+
+
+def test_response_parser_rejects_boolean_schema_version() -> None:
+    with pytest.raises(ValueError, match="schema_version"):
+        response_from_dict({"schema_version": True, "status": "no_change"})
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_request_parser_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        request_from_dict({"notes": [], "request_id": request_id})
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_response_parser_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        response_from_dict(
+            {"status": "no_change", "request_id": request_id}
+        )
+
+
+@pytest.mark.parametrize("warnings", ["not-a-list", {"warning": "bad"}])
+def test_response_parser_rejects_non_list_warnings(warnings: object) -> None:
+    with pytest.raises(ValueError, match="warnings must be a list"):
+        response_from_dict(
+            {"status": "no_change", "warnings": warnings}  # type: ignore[dict-item]
+        )
+
+
+def test_response_parser_rejects_non_string_warning_entries() -> None:
+    with pytest.raises(ValueError, match="warnings entries must be strings"):
+        response_from_dict({"status": "no_change", "warnings": ["ok", 42]})
+
+
+def test_response_contract_rejects_non_string_warning_entries() -> None:
+    with pytest.raises(TypeError, match="warnings entries must be strings"):
+        PitchResponse(status="no_change", warnings=("ok", 42))  # type: ignore[arg-type]
+
+
+def test_request_contract_rejects_boolean_schema_version() -> None:
+    # bool subclasses int, but contract versions must be exact integers.
+    with pytest.raises(ValueError, match="schema_version"):
+        PitchRequest(notes=(), schema_version=True)  # type: ignore[arg-type]
+
+
+def test_response_contract_rejects_boolean_schema_version() -> None:
+    with pytest.raises(ValueError, match="schema_version"):
+        PitchResponse(status="no_change", schema_version=True)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_request_contract_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        PitchRequest(notes=(), request_id=request_id)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_response_contract_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        PitchResponse(status="no_change", request_id=request_id)  # type: ignore[arg-type]
+
+
+
+def test_request_freezes_caller_owned_notes_list() -> None:
+    notes = [PitchNote(0.0, 0.5, 60, "あ")]
+    request = PitchRequest(notes=notes)
+    notes.append(PitchNote(0.5, 1.0, 62, "い"))
+
+    assert len(request.notes) == 1
+    assert isinstance(request.notes, tuple)
+
+
+def test_response_freezes_caller_owned_pitch_and_warning_lists() -> None:
+    points = [PitchDeltaPoint(0.25, -0.5)]
+    warnings = ["review"]
+    response = PitchResponse(status="ok", pitch_deltas=points, warnings=warnings)
+    points.append(PitchDeltaPoint(0.5, 0.5))
+    warnings.append("mutated")
+
+    assert response.pitch_deltas == (PitchDeltaPoint(0.25, -0.5),)
+    assert response.warnings == ("review",)
+
+
+def test_voicebank_profile_freezes_sequences_and_validates_inventory_entries() -> None:
+    from axral_vocal_ai.contracts import VoicebankProfile
+
+    aliases = ["あ", "い"]
+    profile = VoicebankProfile(phoneme_inventory=aliases)
+    aliases.append("う")
+
+    assert profile.phoneme_inventory == ("あ", "い")
+    assert isinstance(profile.phoneme_inventory, tuple)
+
+    with pytest.raises(TypeError, match="phoneme_inventory must be a sequence"):
+        VoicebankProfile(phoneme_inventory="あ")  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="format_hints entries must be strings"):
+        VoicebankProfile(format_hints=["CV", 7])  # type: ignore[list-item]
