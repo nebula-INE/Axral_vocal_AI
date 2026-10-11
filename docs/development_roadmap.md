@@ -88,3 +88,14 @@ Audit findings:
 - Automatically uploading user voicebanks or projects to cloud services.
 - Committing training audio, datasets, credentials, or checkpoints to this repository.
 - Modifying production pitch automation, WORLD synthesis, note timing, volume, noise, or sample placement as part of AI contract work.
+
+
+## Gate 0 follow-up — source-level details (2026-10-11)
+
+- [x] Re-read current Web `pitchCurve.ts`, `voseCoreClient.ts`, Desktop `PitchEvent`, and Graph Editor evaluation code without modifying the production repository.
+- [x] Confirm latest Axral PR-head CI run `38108115190` passed on Python 3.10 and 3.12 at `db6503247ccd9c4d6e9d22777cd21d5e05d2401b`.
+- [ ] Trace the exact Desktop `pitch_automation` serialization and restore call sites.
+- [ ] Trace all callers of Web `buildPitchCurveHz()` to determine the actual frame-time grid; the helper's time formula is endpoint-inclusive over `durationMs`, so the declared 5 ms constant must not be treated as proof of sample spacing.
+- [ ] Add cross-representation golden fixtures only after those paths and their units are fully identified.
+
+This follow-up is source audit and planning only. No production audio code was changed, and Axral contract CI does not validate VO-SE_vocal audio quality or Desktop/Web parity.
