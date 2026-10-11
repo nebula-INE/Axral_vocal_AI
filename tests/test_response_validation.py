@@ -193,8 +193,9 @@ def test_validation_does_not_mutate_list_backed_contract_data() -> None:
     )
 
     assert validate_pitch_response(request, response) is response
-    assert request.notes is notes
-    assert response.pitch_deltas is points
+    # Constructors freeze caller-owned sequences; validation remains non-mutating.
+    assert request.notes == tuple(notes)
+    assert response.pitch_deltas == tuple(points)
     assert notes == [PitchNote(0.0, 1.0, 60, "あ", voiced=True)]
     assert points == [PitchDeltaPoint(0.25, 0.5)]
 
