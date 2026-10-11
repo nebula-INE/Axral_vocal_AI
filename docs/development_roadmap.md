@@ -50,6 +50,7 @@ Audit findings:
 
 - [x] Add a non-mutating pitch-response safety gate with bounded semitone deltas, request correlation, note-interval coverage, and explicit rest exclusion.
 - [ ] Confirm permitted data sources and provenance.
+- [x] Add a source-review checklist and explicit exclusion rules in `docs/training_data_source_review.md`; this is process scaffolding, not approval of any dataset.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics, and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
 - [x] Execute baseline, profile, and real-parser integration tests in CI on the previously verified PR head.
