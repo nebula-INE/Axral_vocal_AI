@@ -78,3 +78,15 @@ The latest PR-head workflow run observed during this audit is [run 38108115190](
 2. Inspect all call sites that produce `frameCount` and `durationMs` for `buildPitchCurveHz()`; establish whether the dense Hz array's time grid is 5 ms, endpoint-inclusive, or caller-defined.
 3. Add isolated golden fixtures for each representation before any conversion is implemented. Keep the Web production utility and the Desktop evaluator unchanged.
 4. Do not claim parity until the same fixtures can be loaded through both real implementations and compared with explicit, agreed interpolation semantics.
+
+
+## Source-level audit update — save/load and frame-grid trace (2026-10-11)
+
+A second read-only trace of `VO-SE_vocal/main` confirmed the following:
+
+- The legacy `ProjectModel.serialize()` in `modules/data/data_models.py` emits a top-level `pitch_automation` array containing `PitchEvent.to_dict()` objects (`time`, `value`). However, the current GUI JSON load path in `modules/gui/mixins/project_io_mixin.py::load_json_project()` restores Graph Editor automation from top-level `parameters`, with arrays named `Pitch`, `Gender`, `Tension`, and `Breath`. It calls `PitchEvent.from_dict()` for entries that contain both `time` and `value`. These are distinct serialized shapes; do not assume the legacy `pitch_automation` field is the active GUI project's canonical save/load path.
+- The current multitrack JSON loader reconstructs track notes from `tracks[*].notes`, then separately restores Graph Editor automation from `parameters`. This confirms the adapter must target the actual `parameters.Pitch` shape if integrating with current Graph Editor state, while retaining explicit compatibility handling for any legacy `pitch_automation` documents.
+- The Web bridge call site is in `src/voseCoreClient.ts::pushEvent()`: `p = max(2, round(max(1, durationMs) / 5) + 1)`, and then `buildPitchCurveHz(note, p, durationMs)`. The helper samples at `i / (frameCount - 1) * durationMs`, including both endpoints. Therefore actual spacing is `durationMs / (p - 1)`; because `p` is rounded, spacing is generally near 5 ms rather than guaranteed to be exactly 5 ms. This is a source-level result, not a request to alter the production curve.
+- For a gap/rest event, `pushEvent(null, null, ...)` uses `silentFrames(p)`; it does not invoke the pitch-bend helper. The pitch-grid conclusion applies to voiced notes that have a resolved sample.
+
+These findings identify serialization and sampling boundaries only. No VO-SE_vocal source or production audio behavior was changed.
