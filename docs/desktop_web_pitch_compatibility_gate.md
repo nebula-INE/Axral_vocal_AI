@@ -90,3 +90,12 @@ A second read-only trace of `VO-SE_vocal/main` confirmed the following:
 - For a gap/rest event, `pushEvent(null, null, ...)` uses `silentFrames(p)`; it does not invoke the pitch-bend helper. The pitch-grid conclusion applies to voiced notes that have a resolved sample.
 
 The current GUI writer was also confirmed in `modules/gui/mixins/project_io_mixin.py::on_save_project_clicked()`: it emits `parameters` with four named arrays (`Pitch`, `Gender`, `Tension`, `Breath`), each serialized as `{time, value}`, plus `tracks[*].notes`. It does not emit the legacy `ProjectModel.serialize()` top-level `pitch_automation` field. The paired loader restores those `parameters` arrays into Graph Editor state. These findings identify serialization and sampling boundaries only. No VO-SE_vocal source or production audio behavior was changed.
+
+
+## Serialization-shape fixtures added — 2026-10-11
+
+- `tests/fixtures/desktop_gui_project_pitch.json` records the current GUI document envelope: `parameters.Pitch` plus the sibling `Gender`, `Tension`, and `Breath` arrays and `tracks[*].notes`.
+- `tests/fixtures/legacy_project_model_pitch.json` records the legacy `pitch_automation` envelope.
+- `tests/test_pitch_representation_compatibility.py` asserts the two document shapes are distinct and preserves raw `time/value` data without converting the values to semitones.
+
+These are schema-shape fixtures with representative values, not projects exported from a running VO-SE_vocal build. They guard against accidentally treating the two envelopes as interchangeable; they do not prove either app's full save/load behavior, define the raw value unit, or establish Desktop/Web audio parity. Production renderer and audio code remain unchanged.
