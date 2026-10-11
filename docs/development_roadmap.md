@@ -14,7 +14,7 @@ Status: staged implementation; no production-renderer changes are in scope.
 - [ ] Verify Desktop/Web project import/export parity and test the full curve-to-Hz adapter before integration.
 - [x] Add Web-side deterministic unit tests for PBS/PBW/PBY parsing, negative PBS offsets, clamping, linear sampling, slew limiting, and tick/ms conversion in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` (committed on `main`; execution/CI result still pending).
 - [x] Add a parse → editor serialize → parse regression test in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` and correct the 10× unit mismatch at the Web editor serialization boundary: `serializePitchBend()` now converts semitone offsets to UST tenths, matching `parsePitchBend()`. Commits are on `main`; execution/CI and representative existing-UST compatibility verification are still pending. No renderer/audio-processing code was changed.
-- [x] Add isolated, renderer-independent MIDI-note-to-Hz and semitone-delta-to-frequency-ratio math primitives with reference-value and invalid-input tests in `pitch_math.py` / `test_pitch_math.py`. These helpers are not wired into Desktop, Web, or the renderer; latest CI for this addition is pending.
+- [x] Add isolated, renderer-independent MIDI-note-to-Hz and semitone-delta-to-frequency-ratio math primitives with reference-value, invalid-input, and cross-formula consistency tests in `pitch_math.py` / `test_pitch_math.py`. These helpers are not wired into Desktop, Web, or the renderer. CI passed on Python 3.10 and 3.12 for commit `b834035`; the additional consistency test is now committed separately and its CI is pending.
 
 Audit findings:
 - `modules/ai/ai_manager.py` is scaffolding: its current analysis path emits fixed fallback timing values and `predict_vits_waveform` returns silence. It is not a trained model.
@@ -37,7 +37,7 @@ Audit findings:
 - [x] Add unit tests for time, MIDI range, ordering, finite values, and schema versions.
 - [x] Add CI for Python 3.10 and 3.12.
 - [x] Review the contract against actual VO-SE_vocal note and pitch data types; keep uncalibrated pitch automation excluded from semitone conversion.
-- [x] Confirm current-head CI passes for the real-parser integration path.
+- [x] Confirm current-head CI passes for the real-parser integration path and the isolated pitch-math tests (Python 3.10 and 3.12; commit `b834035`).
 
 ## Gate 2 — Voicebank profile adapter
 
