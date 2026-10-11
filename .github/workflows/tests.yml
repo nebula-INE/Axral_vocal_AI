@@ -25,8 +25,7 @@ jobs:
         with:
           node-version: "22"
       - name: Install TypeScript for Web bridge characterization
-        working-directory: VO-SE_vocal
-        run: npm install --no-save --no-package-lock --ignore-scripts typescript@5.7.3
+        run: npm install --prefix "$RUNNER_TEMP/axral-typescript" --no-save --no-package-lock --ignore-scripts typescript@5.7.3
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -36,6 +35,7 @@ jobs:
       - name: Run actual Web pitch bridge probe
         env:
           VO_SE_VOCAL_ROOT: ${{ github.workspace }}/VO-SE_vocal
+          AXRAL_NODE_MODULES_ROOT: ${{ runner.temp }}/axral-typescript
         run: node tests/web_pitch_runtime_probe.mjs
       - name: Run unit and production-parser integration tests
         env:
