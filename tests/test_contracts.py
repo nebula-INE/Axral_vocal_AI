@@ -135,3 +135,13 @@ def test_response_parser_rejects_unsorted_pitch_points() -> None:
                 ],
             }
         )
+
+
+def test_response_parser_rejects_non_list_pitch_deltas() -> None:
+    with pytest.raises(ValueError, match="pitch_deltas must be a list"):
+        response_from_dict({"status": "ok", "pitch_deltas": {"time_sec": 0.0}})
+
+
+def test_response_parser_rejects_non_object_pitch_delta_entries() -> None:
+    with pytest.raises(ValueError, match="entries must be objects"):
+        response_from_dict({"status": "ok", "pitch_deltas": [0.25]})
