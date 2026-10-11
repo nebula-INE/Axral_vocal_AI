@@ -150,3 +150,51 @@ def test_rejects_point_exactly_at_rest_end_before_unresolved_note() -> None:
     )
     with pytest.raises(PitchResponseValidationError, match="outside eligible"):
         validate_pitch_response(_request(), response)
+
+@pytest.mark.parametrize("time_sec", [0.25, 0.75])
+def test_accepts_exact_voiced_note_boundaries_without_adjacent_rest(
+    time_sec: float,
+) -> None:
+    request = PitchRequest(
+        notes=(PitchNote(0.25, 0.75, 60, "あ", voiced=True),),
+        request_id="boundary-test",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(time_sec, 0.25),),
+        request_id="boundary-test",
+    )
+    assert validate_pitch_response(request, response) is response
+
+
+@pytest.mark.parametrize("time_sec", [0.249998, 0.750002])
+def test_rejects_points_beyond_voiced_boundary_tolerance(time_sec: float) -> None:
+    request = PitchRequest(
+        notes=(PitchNote(0.25, 0.75, 60, "あ", voiced=True),),
+        request_id="boundary-test",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(time_sec, 0.25),),
+        request_id="boundary-test",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(request, response)
+
+
+def test_validation_does_not_mutate_list_backed_contract_data() -> None:
+    notes = [PitchNote(0.0, 1.0, 60, "あ", voiced=True)]
+    points = [PitchDeltaPoint(0.25, 0.5)]
+    request = PitchRequest(notes=notes, request_id="immutable-check")
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=points,
+        request_id="immutable-check",
+    )
+
+    assert validate_pitch_response(request, response) is response
+    assert request.notes is notes
+    assert response.pitch_deltas is points
+    assert notes == [PitchNote(0.0, 1.0, 60, "あ", voiced=True)]
+    assert points == [PitchDeltaPoint(0.25, 0.5)]
+
