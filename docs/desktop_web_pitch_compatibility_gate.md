@@ -141,3 +141,18 @@ The Web fixture remains separate: it characterizes UST parsing, smoothing/slew l
 Added `tests/test_desktop_pitch_runtime_integration.py`. In the configured integration workflow, this test imports and executes the actual checked-out `VO-SE_vocal/modules/audio/vo_se_engine.py::VO_SE_Engine._get_sampled_curve()` with `aural_ai=None`, using synthetic absolute-time events. It checks endpoint-inclusive linear semitone interpolation and signed negative offsets after conversion to Hz.
 
 This improves the evidence level beyond the earlier source-derived fixture: the Desktop Python sampler is now executed by Axral's CI against the VO-SE_vocal checkout supplied by the workflow. It still does not test the native C++ renderer, full project save/load, the Web path in the same test, audio output, or Desktop/Web parity. The Web helper and all production rendering code remain unchanged. A missing integration checkout causes a local skip, while a misconfigured checkout in CI fails explicitly.
+
+
+
+## Executable shared-input Desktop/Web curve check — 2026-10-11
+
+The CI workflow now installs only the TypeScript compiler needed by the checked-out VO-SE_vocal Web test harness, executes the actual private `buildPitchCurveHz()` helper through an in-memory probe, and compares its returned Hz array against the actual Desktop Python `VO_SE_Engine._get_sampled_curve()` for one shared synthetic case:
+
+- A4 (MIDI 69), 100 ms note;
+- pitch offset rises linearly from 0 to +2 semitones;
+- three endpoint-inclusive samples at 0, 50, and 100 ms;
+- AI disabled on the Desktop sampler.
+
+For this deliberately simple bend, the Web UST control points (0, 1, 2 semitones) and Desktop endpoints (0, 2 semitones) produce matching three-point Hz curves. This is now a runtime comparison of both production helper implementations, not just source-derived arithmetic.
+
+**Scope remains narrow:** this single synthetic case does not establish general Desktop/Web parity. It does not cover negative bends in the Web path, nonlinear bends, UST boundary/rounding differences, slew limiting under steep changes, project import/export, native C++ rendering, voice samples, full audio output, or subjective audio quality. No production renderer, pitch helper, or VO-SE_vocal source was changed. The next step is to expand shared-input cases around negative and steep bends while preserving and explicitly testing each platform's existing interpolation/smoothing semantics; do not force equality where behavior intentionally differs.
