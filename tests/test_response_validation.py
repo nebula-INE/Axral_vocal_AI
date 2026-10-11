@@ -230,3 +230,52 @@ def test_zero_duration_rest_blocks_point_at_exact_boundary() -> None:
     )
     with pytest.raises(PitchResponseValidationError, match="outside eligible"):
         validate_pitch_response(request, response)
+
+def test_rejects_pitch_point_for_zero_duration_voiced_note() -> None:
+    request = PitchRequest(
+        notes=(PitchNote(0.5, 0.5, 60, "あ", voiced=True),),
+        request_id="zero-duration",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.5, 0.25),),
+        request_id="zero-duration",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(request, response)
+
+
+def test_zero_duration_rest_blocks_exact_shared_boundary() -> None:
+    request = PitchRequest(
+        notes=(
+            PitchNote(0.0, 0.5, 60, "あ", voiced=True),
+            PitchNote(0.5, 0.5, 0, "休符", voiced=False),
+            PitchNote(0.5, 1.0, 62, "い", voiced=True),
+        ),
+        request_id="zero-duration-rest",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.5, 0.25),),
+        request_id="zero-duration-rest",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(request, response)
+
+
+def test_rest_tolerance_blocks_overlapping_voiced_note() -> None:
+    request = PitchRequest(
+        notes=(
+            PitchNote(0.0, 1.0, 60, "あ", voiced=True),
+            PitchNote(0.4, 0.6, 0, "休符", voiced=False),
+        ),
+        request_id="overlap-rest",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.5, -0.25),),
+        request_id="overlap-rest",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(request, response)
+
