@@ -149,7 +149,12 @@ def response_from_dict(payload: Dict[str, Any]) -> PitchResponse:
     """Parse and validate a plain dictionary at an API/file boundary."""
     if payload.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
         raise ValueError("unsupported response schema_version")
-    points = [PitchDeltaPoint(**item) for item in payload.get("pitch_deltas", [])]
+    raw_points = payload.get("pitch_deltas", [])
+    if not isinstance(raw_points, list):
+        raise ValueError("pitch_deltas must be a list")
+    if any(not isinstance(item, dict) for item in raw_points):
+        raise ValueError("pitch_deltas entries must be objects")
+    points = [PitchDeltaPoint(**item) for item in raw_points]
     return PitchResponse(
         status=payload.get("status", "rejected"),
         pitch_deltas=points,
