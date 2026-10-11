@@ -171,3 +171,47 @@ def test_request_parser_rejects_malformed_time_signature(signature: object) -> N
 def test_response_parser_rejects_non_object_payload() -> None:
     with pytest.raises(ValueError, match="response payload must be an object"):
         response_from_dict(None)  # type: ignore[arg-type]
+
+
+
+def test_request_parser_rejects_boolean_schema_version() -> None:
+    # bool is an int subclass in Python, but it is not a valid schema version.
+    with pytest.raises(ValueError, match="schema_version"):
+        request_from_dict({"schema_version": True, "notes": []})
+
+
+def test_response_parser_rejects_boolean_schema_version() -> None:
+    with pytest.raises(ValueError, match="schema_version"):
+        response_from_dict({"schema_version": True, "status": "no_change"})
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_request_parser_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        request_from_dict({"notes": [], "request_id": request_id})
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_response_parser_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        response_from_dict(
+            {"status": "no_change", "request_id": request_id}
+        )
+
+
+@pytest.mark.parametrize("warnings", ["not-a-list", {"warning": "bad"}])
+def test_response_parser_rejects_non_list_warnings(warnings: object) -> None:
+    with pytest.raises(ValueError, match="warnings must be a list"):
+        response_from_dict(
+            {"status": "no_change", "warnings": warnings}  # type: ignore[dict-item]
+        )
+
+
+def test_response_parser_rejects_non_string_warning_entries() -> None:
+    with pytest.raises(ValueError, match="warnings entries must be strings"):
+        response_from_dict({"status": "no_change", "warnings": ["ok", 42]})
+
+
+def test_response_contract_rejects_non_string_warning_entries() -> None:
+    with pytest.raises(TypeError, match="warnings entries must be strings"):
+        PitchResponse(status="no_change", warnings=("ok", 42))  # type: ignore[arg-type]
