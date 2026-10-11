@@ -177,3 +177,39 @@ def test_manifest_accepts_training_delta_at_safe_range_boundary(delta):
     summary = validate_records([make_record(target=target)])
     assert summary["status"] == "valid"
 
+
+
+
+@pytest.mark.parametrize(
+    ("start_sec", "end_sec"),
+    [
+        (-0.01, 0.4),
+        (0.3, 0.2),
+        (float("nan"), 0.4),
+        (0.0, float("inf")),
+    ],
+)
+def test_manifest_rejects_invalid_note_time_bounds(start_sec, end_sec):
+    record = make_record()
+    record["input"]["notes"][0]["start_sec"] = start_sec
+    record["input"]["notes"][0]["end_sec"] = end_sec
+
+    with pytest.raises(DatasetValidationError):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("split", ["", "testing", "dev", None])
+def test_manifest_rejects_unknown_split_names(split):
+    record = make_record(split=split)
+
+    with pytest.raises(DatasetValidationError, match="split must be train, validation, or test"):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("delta", [True, False])
+def test_manifest_rejects_boolean_pitch_deltas(delta):
+    target = make_target()
+    target["points"][1]["delta_semitones"] = delta
+
+    with pytest.raises(DatasetValidationError, match="must be numeric"):
+        validate_records([make_record(target=target)])
