@@ -165,3 +165,49 @@ def test_prediction_is_clamped_to_plus_or_minus_two_semitones():
 
     assert positive.predict_features(features) == pytest.approx(2.0)
     assert negative.predict_features(features) == pytest.approx(-2.0)
+
+
+
+def test_baseline_comparison_reports_negative_improvement_when_model_is_worse():
+    from axral_vocal_ai.pitch_model import TrainingExample
+
+    examples = [
+        TrainingExample(
+            features=(1.0, 0.5, 0.5, 0.25, 1.0),
+            target=0.25,
+            record_id="held-out-1",
+            voicebank_id="held-out-bank",
+            split="validation",
+        )
+    ]
+    # Predicting +1.0 is worse than the zero-delta baseline for a +0.25 target.
+    model = LinearPitchDeltaModel(weights=(1.0, 0.0, 0.0, 0.0, 0.0))
+
+    metrics = compare_with_zero_baseline(examples, model)
+
+    assert metrics["mae_semitones"] == pytest.approx(0.75)
+    assert metrics["zero_delta_baseline_mae_semitones"] == pytest.approx(0.25)
+    assert metrics["mae_improvement_over_zero_baseline_semitones"] == pytest.approx(-0.5)
+    assert metrics["relative_mae_improvement_over_zero_baseline"] == pytest.approx(-2.0)
+
+
+def test_baseline_comparison_handles_perfect_zero_baseline_without_division():
+    from axral_vocal_ai.pitch_model import TrainingExample
+
+    examples = [
+        TrainingExample(
+            features=(1.0, 0.5, 0.5, 0.25, 1.0),
+            target=0.0,
+            record_id="held-out-zero",
+            voicebank_id="held-out-bank",
+            split="validation",
+        )
+    ]
+    model = LinearPitchDeltaModel(weights=(0.0, 0.0, 0.0, 0.0, 0.0))
+
+    metrics = compare_with_zero_baseline(examples, model)
+
+    assert metrics["mae_semitones"] == pytest.approx(0.0)
+    assert metrics["zero_delta_baseline_mae_semitones"] == pytest.approx(0.0)
+    assert metrics["mae_improvement_over_zero_baseline_semitones"] == pytest.approx(0.0)
+    assert metrics["relative_mae_improvement_over_zero_baseline"] is None
