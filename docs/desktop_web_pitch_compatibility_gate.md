@@ -110,3 +110,17 @@ Added `tests/fixtures/web_pitch_curve_characterization.json` and two focused tes
 - the five-point example spans 100 ms with 25 ms intervals. It must not be described as a fixed 5 ms interval just because the native frame-period constant is 5 ms.
 
 **Evidence limitation:** these expected values were derived by reading source and checking the math; they were not captured by executing the Web implementation. The Axral tests validate the fixture's recorded expectations and MIDI/semitone/Hz arithmetic, not the production TypeScript functions. This is not a Desktop/Web parity test. The next gate remains an executable test against the actual Web helper plus a separately captured Desktop result, with no production audio-path changes.
+
+
+## Executable Web bridge test verified — 2026-10-11
+
+A read-only inspection of `VO-SE_vocal/main` found `tests/test_web_pitch_curve.mjs`. It compiles the actual `src/utils/pitchCurve.ts` source in memory and extracts the private `buildPitchCurveHz()` helper from `src/voseCoreClient.ts` for focused tests, without exporting or changing the production helper. The covered cases include UST parse/serialize behavior, interpolation, smoothing, Hz conversion, and the no-bend base-frequency case.
+
+The latest observed VO-SE_vocal workflow runs for commit `5e8cc2f50f1890dc01f101b0e15c5770cfff279e` completed successfully (four runs observed). This confirms those workflow runs passed for that commit; it does not prove complete audio-output equivalence or Desktop/Web parity. The latest Axral Vocal AI main commit `9d28834724630eef837009d9e77199b194bf2d38` also has successful Python 3.10 and 3.12 jobs.
+
+### Revised next gate
+
+1. Keep the actual-Web-helper test as the Web reference; do not duplicate its expected values as if they were runtime-captured audio output.
+2. Add or capture a matching Desktop evaluator test from the actual Desktop implementation using the same time/value points, then document the expected difference between step-hold and Web linear/smoothed sampling.
+3. Only after the Desktop reference is executable should an adapter contract be specified. No conversion or live AI pitch application is enabled by this audit.
+4. Do not modify production rendering, WORLD synthesis, pitch application, sample placement, volume, or noise behavior as part of this work.
