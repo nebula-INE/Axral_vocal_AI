@@ -40,4 +40,5 @@ jobs:
       - name: Run unit and production-parser integration tests
         env:
           VO_SE_VOCAL_ROOT: ${{ github.workspace }}/VO-SE_vocal
+          AXRAL_NODE_MODULES_ROOT: ${{ runner.temp }}/axral-typescript
         run: python -m pytest -q
