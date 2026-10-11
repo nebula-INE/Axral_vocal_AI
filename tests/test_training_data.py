@@ -161,3 +161,19 @@ def test_manifest_rejects_windows_filesystem_paths(path):
     record["provenance"]["source_reference"] = path
     with pytest.raises(DatasetValidationError, match="Windows filesystem path"):
         validate_records([record])
+
+@pytest.mark.parametrize("delta", [-2.01, 2.01])
+def test_manifest_rejects_training_deltas_outside_safe_range(delta):
+    target = make_target()
+    target["points"][1]["delta_semitones"] = delta
+    with pytest.raises(DatasetValidationError, match=r"within /\+/-2.0 semitones"):
+        validate_records([make_record(target=target)])
+
+
+@pytest.mark.parametrize("delta", [-2.0, 2.0])
+def test_manifest_accepts_training_delta_at_safe_range_boundary(delta):
+    target = make_target()
+    target["points"][1]["delta_semitones"] = delta
+    summary = validate_records([make_record(target=target)])
+    assert summary["status"] == "valid"
+
