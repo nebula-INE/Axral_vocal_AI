@@ -37,3 +37,28 @@ For each run, save a human-readable record of:
 - artifact checksum and schema version.
 
 Do not upload copyrighted or restricted data to Kaggle merely because the platform supports private datasets. Confirm that the applicable license and consent permit hosted processing.
+
+
+## Implemented first gate: metadata manifest validation
+
+The repository now includes `training/validate_dataset.py` and
+`axral_vocal_ai.training_data`. Validate a JSONL manifest after installing the
+package with `python -m pip install -e ".[dev]"`:
+
+```bash
+python training/validate_dataset.py path/to/manifest.jsonl
+python training/validate_dataset.py path/to/manifest.jsonl --require-labeled
+```
+
+The first command checks the metadata schema and permission gate. The second
+also requires a non-empty pitch-delta target on every record and is the stricter
+pre-training readiness check. Both commands reject non-approved sources,
+missing permission evidence, malformed/non-finite pitch labels, duplicate record
+IDs, local paths/audio payload fields, and voicebanks assigned to multiple
+splits. A successful validation is **not** proof that a label is musically
+correct or that the dataset license was independently verified; the recorded
+approval must still be supported by human-reviewed evidence.
+
+No real dataset is included. The tests use synthetic metadata fixtures only.
+This is a data-ingestion safety gate, not a trained model or a claim of improved
+pitch quality.
