@@ -14,9 +14,8 @@ if str(ROOT) not in sys.path:
 
 from axral_vocal_ai.pitch_model import (
     examples_from_records,
+    compare_with_zero_baseline,
     fit_ridge,
-    mean_absolute_error,
-    zero_baseline_mae,
 )
 from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
 
@@ -40,13 +39,14 @@ def main() -> int:
         if not by_split["validation"] or not by_split["test"]:
             raise ValueError("validation and test splits must each contain usable voiced labels")
         model = fit_ridge(by_split["train"], alpha=args.alpha)
-        model_mae = {
-            split: mean_absolute_error(rows, model)
+        evaluation = {
+            split: compare_with_zero_baseline(rows, model)
             for split, rows in by_split.items()
         }
+        model_mae = {split: metrics["mae_semitones"] for split, metrics in evaluation.items()}
         baseline_mae = {
-            split: zero_baseline_mae(rows)
-            for split, rows in by_split.items()
+            split: metrics["zero_delta_baseline_mae_semitones"]
+            for split, metrics in evaluation.items()
         }
         report = {
             "status": "experimental_training_complete",
@@ -55,10 +55,7 @@ def main() -> int:
             "usable_examples_by_split": {split: len(rows) for split, rows in by_split.items()},
             "mae_semitones": model_mae,
             "zero_delta_baseline_mae_semitones": baseline_mae,
-            "mae_improvement_over_zero_baseline_semitones": {
-                split: baseline_mae[split] - model_mae[split]
-                for split in by_split
-            },
+            "evaluation_by_split": evaluation,
             "model": model.to_dict(),
             "limitations": [
                 "Metadata-only regression MVP; no waveform synthesis.",
@@ -76,7 +73,7 @@ def main() -> int:
             "usable_examples_by_split": report["usable_examples_by_split"],
             "mae_semitones": model_mae,
             "zero_delta_baseline_mae_semitones": baseline_mae,
-            "mae_improvement_over_zero_baseline_semitones": report["mae_improvement_over_zero_baseline_semitones"],
+            "evaluation_by_split": report["evaluation_by_split"],
         }, indent=2))
         print(f"Model report written to: {args.output}")
         return 0
