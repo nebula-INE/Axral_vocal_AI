@@ -4,6 +4,7 @@ import pytest
 
 from axral_vocal_ai.pitch_model import (
     _features_for_time,
+    LinearPitchDeltaModel,
     compare_with_zero_baseline,
     examples_from_records,
     fit_ridge,
@@ -154,3 +155,13 @@ def test_ridge_rejects_invalid_regularization():
 def test_ridge_requires_training_examples():
     with pytest.raises(ValueError, match="no usable"):
         fit_ridge([])
+
+
+
+def test_prediction_is_clamped_to_plus_or_minus_two_semitones():
+    positive = LinearPitchDeltaModel(weights=(10.0, 0.0, 0.0, 0.0, 0.0))
+    negative = LinearPitchDeltaModel(weights=(-10.0, 0.0, 0.0, 0.0, 0.0))
+    features = (1.0, 0.5, 0.5, 0.25, 1.0)
+
+    assert positive.predict_features(features) == pytest.approx(2.0)
+    assert negative.predict_features(features) == pytest.approx(-2.0)
