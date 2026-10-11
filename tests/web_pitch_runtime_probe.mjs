@@ -18,25 +18,41 @@ const utilityUrl = 'data:text/javascript;base64,' + Buffer.from(compiledUtility,
 
 const clientSource = readFileSync(resolve(root, 'src/voseCoreClient.ts'), 'utf8');
 const helperMatch = clientSource.match(
-  /function buildPitchCurveHz\(note: any, frameCount: number, durationMs: number\): number\[\] \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction silentFrames/
+  /function buildPitchCurveHz\\(note: any, frameCount: number, durationMs: number\\): number\\[\\] \\{[\\s\\S]*?\\r?\\n\\}\\r?\\n\\r?\\nfunction silentFrames/
 );
 assert.ok(helperMatch, 'production buildPitchCurveHz helper was not found');
-const helperSource = helperMatch[0].replace(/\r?\n\r?\nfunction silentFrames$/, '\nexport { buildPitchCurveHz };');
+const helperSource = helperMatch[0].replace(/\\r?\\n\\r?\\nfunction silentFrames$/, '\\nexport { buildPitchCurveHz };');
 const bridgeSource = 'import { parsePitchBend, smoothPitchBendPoints } from ' +
-  JSON.stringify(utilityUrl) + ';\n' + helperSource;
+  JSON.stringify(utilityUrl) + ';\\n' + helperSource;
 const compiledBridge = ts.transpileModule(bridgeSource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const bridgeUrl = 'data:text/javascript;base64,' + Buffer.from(compiledBridge, 'utf8').toString('base64');
 const bridge = await import(bridgeUrl);
 
-// Shared deterministic case: A4, 100 ms, pitch offsets 0 -> +2 semitones.
-// The Web UST representation uses tenths of a semitone; 3 endpoint-inclusive
-// samples should yield the same Hz values as the Desktop linear sampler.
-const curve = bridge.buildPitchCurveHz({
-  noteNum: 69,
-  pbs: '0;0',
-  pbw: '50,50',
-  pby: '10,20',
-}, 3, 100);
-process.stdout.write(JSON.stringify(curve));
+// Exercise the actual production Web helper with positive, negative, and steep
+// UST bends. UST PBY values are tenths of a semitone.
+const cases = {
+  positive: {
+    note: { noteNum: 69, pbs: '0;0', pbw: '50,50', pby: '10,20' },
+    frameCount: 3,
+    durationMs: 100,
+  },
+  negative: {
+    note: { noteNum: 69, pbs: '0;0', pbw: '100', pby: '-20' },
+    frameCount: 3,
+    durationMs: 100,
+  },
+  steep: {
+    note: { noteNum: 69, pbs: '0;0', pbw: '100', pby: '100' },
+    frameCount: 3,
+    durationMs: 100,
+  },
+};
+const curves = Object.fromEntries(
+  Object.entries(cases).map(([name, fixture]) => [
+    name,
+    bridge.buildPitchCurveHz(fixture.note, fixture.frameCount, fixture.durationMs),
+  ]),
+);
+process.stdout.write(JSON.stringify(curves));
