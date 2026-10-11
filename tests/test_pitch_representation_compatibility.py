@@ -233,3 +233,49 @@ def test_web_pitch_characterization_hz_values_match_midi_and_semitones() -> None
     assert [
         times[i + 1] - times[i] for i in range(len(times) - 1)
     ] == [25, 25, 25, 25]
+
+
+def test_desktop_render_pitch_characterization_fixture_records_linear_sampling() -> None:
+    """Record source-derived Desktop renderer behavior without importing VO-SE code."""
+    fixture = _read_fixture("desktop_render_pitch_characterization.json")
+    assert fixture["fixture_kind"] == "source-level-desktop-render-pitch-characterization"
+    assert fixture["status"] == "derived-from-source-not-captured-from-running-app"
+
+    inp = fixture["input"]
+    expected = fixture["expected"]
+    start = inp["start_time_sec"]
+    end = start + inp["duration_sec"]
+    frame_count = inp["frame_count"]
+    times = [start + (end - start) * i / (frame_count - 1) for i in range(frame_count)]
+    points = inp["events"]
+
+    # Mirrors the source algorithm's linear interpolation for this two-point
+    # fixture. It is a reference calculation, not execution of production code.
+    values = [
+        points[0]["value_semitones"]
+        + (points[1]["value_semitones"] - points[0]["value_semitones"])
+        * (t - points[0]["time_sec"])
+        / (points[1]["time_sec"] - points[0]["time_sec"])
+        for t in times
+    ]
+    hz = [
+        midi_note_to_hz(float(inp["note_number"]) + delta)
+        for delta in values
+    ]
+
+    assert times == pytest.approx(expected["sample_times_sec"])
+    assert values == pytest.approx(expected["sampled_semitone_offsets"])
+    assert hz == pytest.approx(expected["curve_hz"])
+    assert expected["base_hz"] == pytest.approx(midi_note_to_hz(69.0))
+
+
+def test_desktop_and_web_pitch_fixtures_are_separate_reference_paths() -> None:
+    """Keep Desktop renderer interpolation and Web UST slew limiting distinct."""
+    desktop = _read_fixture("desktop_render_pitch_characterization.json")
+    web = _read_fixture("web_pitch_curve_characterization.json")
+
+    assert desktop["source_files"] != web["source_files"]
+    assert desktop["status"] == "derived-from-source-not-captured-from-running-app"
+    assert web["status"] == "derived-from-source-not-captured-from-running-app"
+    assert "numpy.interp" in desktop["limitations"][1]
+    assert "smoothing" in web["limitations"][2]
