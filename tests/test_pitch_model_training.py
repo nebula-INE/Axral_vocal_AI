@@ -103,6 +103,29 @@ def test_zero_delta_baseline_and_improvement_metric():
     assert baseline == pytest.approx(sum(abs(row.target) for row in validation) / len(validation))
 
 
+def test_model_evaluation_reports_signed_baseline_improvement():
+    rows, _ = examples_from_records(synthetic_records())
+    validation = [row for row in rows if row.split == "validation"]
+    model = fit_ridge([row for row in rows if row.split == "train"], alpha=1.0)
+
+    metrics = compare_with_zero_baseline(validation, model)
+
+    assert metrics["mae_semitones"] == pytest.approx(mean_absolute_error(validation, model))
+    assert metrics["zero_delta_baseline_mae_semitones"] == pytest.approx(
+        zero_baseline_mae(validation)
+    )
+    assert metrics["mae_improvement_over_zero_baseline_semitones"] == pytest.approx(
+        metrics["zero_delta_baseline_mae_semitones"] - metrics["mae_semitones"]
+    )
+    baseline = metrics["zero_delta_baseline_mae_semitones"]
+    if baseline and baseline > 0:
+        assert metrics["relative_mae_improvement_over_zero_baseline"] == pytest.approx(
+            metrics["mae_improvement_over_zero_baseline_semitones"] / baseline
+        )
+    else:
+        assert metrics["relative_mae_improvement_over_zero_baseline"] is None
+
+
 def test_zero_delta_baseline_empty_and_non_finite_target():
     assert zero_baseline_mae([]) is None
     rows, _ = examples_from_records(synthetic_records())
