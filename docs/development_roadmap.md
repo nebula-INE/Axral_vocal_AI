@@ -41,6 +41,7 @@ Audit findings:
 - [x] Add unit tests for time, MIDI range, ordering, finite values, and schema versions.
 - [x] Add CI for Python 3.10 and 3.12.
 - [x] Review the contract against actual VO-SE_vocal note and pitch data types; keep uncalibrated pitch automation excluded from semitone conversion.
+- [x] Add isolated compatibility-characterization tests for seconds/MIDI/rest metadata, signed semitone offsets, frequency-ratio math, and shared voiced/rest boundaries. These validate only Axral's contract boundary; they do not establish Desktop/Web parity or enable an adapter.
 - [x] Confirm current-head CI passes for the real-parser integration path and the isolated pitch-math tests (Python 3.10 and 3.12; commit `b834035`).
 
 ## Gate 2 — Voicebank profile adapter
@@ -78,7 +79,7 @@ Audit findings:
 - [ ] Add AI behind an explicit opt-in flag.
 - [ ] Apply results to a preview/copy, never in-place to original note/pitch data.
 - [ ] Keep the existing renderer and no-AI path unchanged.
-- [ ] Complete Desktop/Web parity tests and repeatable audio regression tests before any integration.
+- [ ] Complete Desktop/Web parity tests and repeatable audio regression tests before any integration. The contract-boundary characterization tests do not satisfy this gate; golden fixtures from both apps and save/load round-trips are still required.
 
 ## Out of scope for the first MVP
 
