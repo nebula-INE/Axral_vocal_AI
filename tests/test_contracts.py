@@ -215,3 +215,26 @@ def test_response_parser_rejects_non_string_warning_entries() -> None:
 def test_response_contract_rejects_non_string_warning_entries() -> None:
     with pytest.raises(TypeError, match="warnings entries must be strings"):
         PitchResponse(status="no_change", warnings=("ok", 42))  # type: ignore[arg-type]
+
+
+def test_request_contract_rejects_boolean_schema_version() -> None:
+    # bool subclasses int, but contract versions must be exact integers.
+    with pytest.raises(ValueError, match="schema_version"):
+        PitchRequest(notes=(), schema_version=True)  # type: ignore[arg-type]
+
+
+def test_response_contract_rejects_boolean_schema_version() -> None:
+    with pytest.raises(ValueError, match="schema_version"):
+        PitchResponse(status="no_change", schema_version=True)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_request_contract_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        PitchRequest(notes=(), request_id=request_id)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("request_id", [1, True, [], {}])
+def test_response_contract_rejects_non_string_request_id(request_id: object) -> None:
+    with pytest.raises(TypeError, match="request_id must be a string"):
+        PitchResponse(status="no_change", request_id=request_id)  # type: ignore[arg-type]
