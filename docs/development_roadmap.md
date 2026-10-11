@@ -107,6 +107,6 @@ This follow-up is source audit and planning only. No production audio code was c
 - [x] Distinguish the legacy `ProjectModel.serialize()` top-level `pitch_automation` field from the current GUI JSON `parameters.Pitch` path; do not assume these shapes are interchangeable.
 - [x] Trace the Web pitch helper's production call site: `pushEvent()` chooses `p = max(2, round(max(1, durationMs)/5)+1)`; the endpoint-inclusive helper then spaces samples by `durationMs/(p-1)`, approximately but not always exactly 5 ms.
 - [x] Inspect the current GUI save writer (`on_save_project_clicked`): it emits `parameters.{Pitch,Gender,Tension,Breath}` as `{time,value}` arrays and `tracks[*].notes`; the paired loader restores Graph Editor parameters from that field.
-- [ ] Add golden fixtures for the actual GUI JSON save/load shape (`parameters.Pitch`) and the legacy `pitch_automation` model shape, with explicit tests for their distinct semantics; no production conversion until units and interpolation semantics are agreed.
+- [x] Add schema-shape fixtures for the current GUI JSON (`parameters.Pitch`) and legacy `pitch_automation` model envelope, with explicit tests proving the document shapes remain distinct. These are deterministic representative fixtures, not files exported by the running app; units/interpolation remain uncalibrated and no production conversion is enabled.
 
 This update is audit-only. No VO-SE_vocal files, renderers, pitch application, WORLD synthesis, or audio processing were modified.
