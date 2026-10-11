@@ -134,3 +134,21 @@ Added `tests/fixtures/desktop_render_pitch_characterization.json` and two focuse
 For a synthetic 100 ms note with a 0 → +4 semitone offset and five endpoint-inclusive samples, the source-derived reference is 0, 1, 2, 3, 4 semitones at 0, 25, 50, 75, 100 ms. This is a mathematical characterization from source inspection, not a value trace captured by executing the production Desktop engine.
 
 The Web fixture remains separate: it characterizes UST parsing, smoothing/slew limiting, and sampled Hz generation. The fixtures are not yet a shared-input Desktop/Web golden test, because the source representations and preprocessing differ. Neither fixture proves end-to-end audio parity. No VO-SE_vocal production code or audio behavior was changed.
+
+
+## Desktop runtime test discovered — 2026-10-11
+
+A follow-up read of `nebula-INE/VO-SE_vocal/main` found that the next gate's Desktop test already exists in `tests/test_pitch_render_path.py`:
+
+- `test_empty_pitch_curve_uses_note_base_frequency` calls the real `VO_SE_Engine._get_sampled_curve()` with `aural_ai=None` and verifies the MIDI base frequency.
+- `test_explicit_pitch_curve_is_still_interpreted_as_semitone_offset` calls that same production method with two events (0 and +12 semitones) and verifies the midpoint frequency ratio.
+- The production method uses `numpy.interp` at endpoint-inclusive `numpy.linspace(start_time, start_time + duration, res)` sample times, then converts the sampled semitone offsets plus MIDI note number to Hz.
+
+This advances the audit from a source-derived fixture to an existing executable Desktop unit-test reference. It is still a **baseline-only characterization**: the inspected tests set `aural_ai=None`. In the production method, a non-null `aural_ai` can subsequently transform the curve through `get_baked_pitch()`; that behavior is outside these tests and must not be assumed equivalent to the new Axral proposal contract.
+
+### Updated gate decision
+
+1. Reuse the existing Desktop test as the baseline reference; do not create a duplicate Axral-only calculation and call it a runtime test.
+2. Verify the Desktop test actually runs in the current VO-SE_vocal CI before treating it as a current passing result. The previously observed successful workflow was for an earlier commit and is not proof for the current HEAD.
+3. Keep Web's actual TypeScript-helper test as the Web reference. Compare the two only after defining a shared input representation and explicitly accounting for Web UST parsing/slew limiting versus Desktop semitone-offset interpolation.
+4. Do not alter `_get_sampled_curve()`, `buildPitchCurveHz()`, `get_baked_pitch()`, WORLD, or any production audio path as part of this audit.
