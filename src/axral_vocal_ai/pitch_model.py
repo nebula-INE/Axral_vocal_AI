@@ -129,6 +129,8 @@ def fit_ridge(examples: Iterable[TrainingExample], alpha: float = 1.0) -> Linear
         raise ValueError("no usable training labels")
     if not np.isfinite(alpha) or alpha < 0:
         raise ValueError("alpha must be finite and non-negative")
+    if any(row.split != "train" for row in rows):
+        raise ValueError("fit_ridge accepts training-split examples only")
     x = np.asarray([row.features for row in rows], dtype=np.float64)
     y = np.asarray([row.target for row in rows], dtype=np.float64)
     if x.ndim != 2 or x.shape[1] != len(FEATURE_NAMES) or not np.isfinite(x).all():
