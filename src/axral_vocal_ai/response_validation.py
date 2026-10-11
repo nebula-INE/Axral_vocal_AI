@@ -29,8 +29,8 @@ def validate_pitch_response(
     ±2-semitone bound is a conservative MVP guardrail, not a claim about the
     full expressive range of a future model.
 
-    If the request supplies a correlation ID, the response must echo that exact
-    ID. Invalid proposals are rejected rather than silently clamped. The caller
+    Both request and response must carry the same non-empty correlation ID.
+    Invalid proposals are rejected rather than silently clamped. The caller
     should keep the original pitch path when this function raises.
     """
     if not math.isfinite(max_abs_delta_semitones) or max_abs_delta_semitones <= 0:
@@ -38,7 +38,9 @@ def validate_pitch_response(
     if not math.isfinite(time_tolerance_sec) or time_tolerance_sec < 0:
         raise ValueError("time_tolerance_sec must be finite and non-negative")
 
-    if request.request_id is not None and response.request_id != request.request_id:
+    if not isinstance(request.request_id, str) or not request.request_id.strip():
+        raise PitchResponseValidationError("request request_id is required")
+    if response.request_id != request.request_id:
         raise PitchResponseValidationError(
             "response request_id is missing or does not match request"
         )
