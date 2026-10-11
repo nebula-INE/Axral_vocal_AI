@@ -84,3 +84,54 @@ def test_dict_parsers_validate_external_payloads() -> None:
 def test_dict_parser_rejects_unknown_version() -> None:
     with pytest.raises(ValueError, match="schema_version"):
         request_from_dict({"schema_version": 2, "notes": []})
+
+
+
+def test_response_parser_preserves_seconds_and_signed_semitone_deltas() -> None:
+    # These values are AI-contract units only: seconds + relative semitones.
+    # They must not be interpreted as UST PBS tenths, native automation values,
+    # MIDI note numbers, or absolute Hz values.
+    response = response_from_dict(
+        {
+            "schema_version": 1,
+            "status": "ok",
+            "request_id": "pitch-units-1",
+            "pitch_deltas": [
+                {"time_sec": 0.125, "delta_semitones": -1.5},
+                {"time_sec": 0.375, "delta_semitones": 0.75},
+            ],
+        }
+    )
+
+    assert response.request_id == "pitch-units-1"
+    assert [(point.time_sec, point.delta_semitones) for point in response.pitch_deltas] == [
+        (0.125, -1.5),
+        (0.375, 0.75),
+    ]
+
+
+def test_response_parser_rejects_non_finite_pitch_values() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        response_from_dict(
+            {
+                "schema_version": 1,
+                "status": "ok",
+                "pitch_deltas": [
+                    {"time_sec": 0.25, "delta_semitones": float("nan")}
+                ],
+            }
+        )
+
+
+def test_response_parser_rejects_unsorted_pitch_points() -> None:
+    with pytest.raises(ValueError, match="ordered"):
+        response_from_dict(
+            {
+                "schema_version": 1,
+                "status": "ok",
+                "pitch_deltas": [
+                    {"time_sec": 0.5, "delta_semitones": 0.25},
+                    {"time_sec": 0.25, "delta_semitones": -0.25},
+                ],
+            }
+        )
