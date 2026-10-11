@@ -65,12 +65,12 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
         _require(isinstance(record[field], str) and bool(record[field].strip()), f"{prefix}: {field} must be a non-empty string")
 
     permission = record["permission_status"]
-    _require(permission in PERMISSION_STATES, f"{prefix}: invalid permission_status")
+    _require(isinstance(permission, str) and permission in PERMISSION_STATES, f"{prefix}: invalid permission_status")
     _require(permission == "approved", f"{prefix}: source is not approved for ML use (status={permission})")
     license_id = record["license_id"]
     _require(isinstance(license_id, str) and bool(license_id.strip()), f"{prefix}: approved records require a non-empty license_id")
 
-    _require(record["split"] in SPLITS, f"{prefix}: split must be train, validation, or test")
+    _require(isinstance(record["split"], str) and record["split"] in SPLITS, f"{prefix}: split must be train, validation, or test")
     input_data = record["input"]
     _require(isinstance(input_data, dict), f"{prefix}: input must be an object")
     notes = input_data.get("notes")
