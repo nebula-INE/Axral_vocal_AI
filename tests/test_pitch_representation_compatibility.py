@@ -183,3 +183,53 @@ def test_desktop_pitch_fixtures_are_not_silently_interchangeable() -> None:
     assert "parameters" in gui_payload and "pitch_automation" not in gui_payload
     assert "pitch_automation" in legacy_payload and "parameters" not in legacy_payload
     assert gui_payload["parameters"]["Pitch"] != legacy_payload["pitch_automation"]
+
+
+def test_web_pitch_characterization_fixture_records_sampling_and_slew_limit() -> None:
+    """Pin source-derived Web expectations without importing production TS code.
+
+    This fixture is a reference for a later real integration test, not evidence
+    that the VO-SE_vocal implementation was executed or that Desktop matches it.
+    """
+    fixture = _read_fixture("web_pitch_curve_characterization.json")
+    assert fixture["fixture_kind"] == "source-level-web-pitch-characterization"
+    assert fixture["status"] == "derived-from-source-not-captured-from-running-app"
+
+    expected = fixture["expected"]
+    assert expected["parsed_points"] == [
+        {"offset_ms": 0, "semitone": 0},
+        {"offset_ms": 50, "semitone": 10},
+        {"offset_ms": 100, "semitone": -10},
+    ]
+    # The source's 0.08 semitone/ms slew limit allows a maximum 4-semitone
+    # change over each 50 ms interval, producing the characterized curve.
+    assert expected["smoothed_points"] == [
+        {"offset_ms": 0, "semitone": 0},
+        {"offset_ms": 50, "semitone": 4},
+        {"offset_ms": 100, "semitone": 0},
+    ]
+    assert expected["sample_times_ms"] == [0, 25, 50, 75, 100]
+    assert expected["sampled_semitones"] == [0, 2, 4, 2, 0]
+
+
+def test_web_pitch_characterization_hz_values_match_midi_and_semitones() -> None:
+    """Check recorded Hz references independently of the production renderer."""
+    fixture = _read_fixture("web_pitch_curve_characterization.json")
+    expected = fixture["expected"]
+    base_hz = midi_note_to_hz(float(fixture["input"]["note_num"]))
+
+    assert expected["base_hz"] == pytest.approx(base_hz)
+    calculated_curve = [
+        base_hz * semitone_delta_to_frequency_ratio(delta)
+        for delta in expected["sampled_semitones"]
+    ]
+    assert expected["curve_hz"] == pytest.approx(calculated_curve)
+    assert len(expected["curve_hz"]) == fixture["input"]["frame_count"]
+    # The fixture deliberately samples both endpoints, so the interval is
+    # duration/(frame_count-1), not necessarily a fixed 5 ms interval.
+    times = expected["sample_times_ms"]
+    assert times[0] == 0
+    assert times[-1] == fixture["input"]["duration_ms"]
+    assert [
+        times[i + 1] - times[i] for i in range(len(times) - 1)
+    ] == [25, 25, 25, 25]
