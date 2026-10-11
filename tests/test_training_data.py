@@ -166,7 +166,7 @@ def test_manifest_rejects_windows_filesystem_paths(path):
 def test_manifest_rejects_training_deltas_outside_safe_range(delta):
     target = make_target()
     target["points"][1]["delta_semitones"] = delta
-    with pytest.raises(DatasetValidationError, match=r"within /\+/-2.0 semitones"):
+    with pytest.raises(DatasetValidationError, match=r"within \+/-2.0 semitones"):
         validate_records([make_record(target=target)])
 
 
