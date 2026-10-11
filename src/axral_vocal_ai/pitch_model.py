@@ -26,36 +26,45 @@ class TrainingExample:
 
 
 def _features_for_time(notes: list[dict[str, Any]], time_sec: float) -> tuple[float, ...] | None:
-    """Resolve a label to a note using [start, end) intervals.
+    """Resolve a label to an unambiguous note using [start, end) intervals.
 
-    A label exactly at a note end is retained only when no note starts at that
-    timestamp. This prevents a shared boundary from being claimed by the
-    preceding note instead of the note that begins there.
+    Labels at shared boundaries belong to a note starting at that timestamp.
+    If multiple voiced notes overlap at the label time, the label is skipped
+    rather than silently training on whichever note happens to appear first.
     """
-    for note in notes:
+    active_notes = [
+        note for note in notes
+        if note.get("voiced") is not False
+        and float(note["end_sec"]) > float(note["start_sec"])
+        and float(note["start_sec"]) <= time_sec < float(note["end_sec"])
+    ]
+    if len(active_notes) > 1:
+        return None
+    if len(active_notes) == 1:
+        note = active_notes[0]
         start = float(note["start_sec"])
         end = float(note["end_sec"])
-        if note.get("voiced") is False or end <= start:
-            continue
-        if start <= time_sec < end:
-            duration = end - start
-            phase = min(1.0, max(0.0, (time_sec - start) / duration))
-            midi = float(note["midi_note"])
-            return (1.0, midi / 127.0, phase, phase * phase, duration)
+        duration = end - start
+        phase = min(1.0, max(0.0, (time_sec - start) / duration))
+        midi = float(note["midi_note"])
+        return (1.0, midi / 127.0, phase, phase * phase, duration)
 
-    # Preserve endpoint labels at the end of a note when there is no note
-    # beginning at that same timestamp (including a note boundary in a gap).
+    # Preserve endpoint labels when no note starts at that timestamp. A note
+    # beginning there takes precedence even if it is unvoiced.
     if any(float(note["start_sec"]) == time_sec for note in notes):
         return None
-    for note in reversed(notes):
-        start = float(note["start_sec"])
-        end = float(note["end_sec"])
-        if note.get("voiced") is False or end <= start or end != time_sec:
-            continue
-        duration = end - start
-        midi = float(note["midi_note"])
-        return (1.0, midi / 127.0, 1.0, 1.0, duration)
-    return None
+    ending_notes = [
+        note for note in notes
+        if note.get("voiced") is not False
+        and float(note["end_sec"]) > float(note["start_sec"])
+        and float(note["end_sec"]) == time_sec
+    ]
+    if len(ending_notes) != 1:
+        return None
+    note = ending_notes[0]
+    duration = float(note["end_sec"]) - float(note["start_sec"])
+    midi = float(note["midi_note"])
+    return (1.0, midi / 127.0, 1.0, 1.0, duration)
 
 
 def examples_from_records(records: Iterable[dict[str, Any]]) -> tuple[list[TrainingExample], dict[str, int]]:
