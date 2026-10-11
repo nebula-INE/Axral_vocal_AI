@@ -13,8 +13,9 @@ Keep Axral Vocal AI's proposal contract independent of VO-SE_vocal's current edi
 | Axral request notes | MIDI note number plus start/end | seconds; MIDI 0–127 | note intervals | Contracted and tested |
 | Axral AI proposal | sparse `PitchDeltaPoint` | seconds + delta semitones | no interpolation defined by contract | Validation only |
 | Python `PitchEvent` / project automation | `time` + untyped numeric `value` | time in seconds; value unit is not encoded | model does not define a unit | Do not map to semitones by assumption |
-| Desktop Graph Editor | nominal Pitch values -8192..8191 | native automation numeric domain | evaluator is step-hold; graph drawing is linear | Compatibility policy required |
+| Desktop Graph Editor UI helper | nominal Pitch values -8192..8191 | native automation numeric domain | `GraphEditorWidget.get_value_at_time()` is step-hold; graph drawing connects points linearly | UI helper only; do not assume it defines renderer sampling |
 | Native processor conversion | automation value → semitone offset | current formula: `(value / 8191) * 2.0` | then frequency ratio `2^(semitones/12)` | Preserve existing behavior pending parity spec |
+| Desktop Python render sampler | sparse `PitchEvent(time, value)` passed to `_get_sampled_curve()` | seconds; `value` is used as semitone offset in the inspected path | `numpy.interp` linearly samples across the note interval, then converts MIDI base + offset to Hz | Existing renderer path; no changes authorized |
 | Native render API | dense pitch array in Hz | one frequency value per sample/frame as defined by API | already sampled | Not interchangeable with sparse automation |
 | Web note editor | UST `PBS/PBW/PBY` | PBS heights scaled by 0.1 to semitones; PBW timing converted to ms/ticks | linear semitone sampling, endpoint hold, then smoothing/slew limiting | Web-only path |
 | Web WASM bridge | dense pitch curve in Hz | generated from note base frequency and sampled semitone offset | renderer input | Existing path must remain untouched during audit |
@@ -23,7 +24,7 @@ Keep Axral Vocal AI's proposal contract independent of VO-SE_vocal's current edi
 
 1. Never infer units from a field name such as `value` or `pitch`; units must be declared at the adapter boundary.
 2. Never pass sparse automation points where a dense Hz curve is expected, or vice versa.
-3. Do not assume Desktop step-hold semantics equal Web linear sampling/smoothing semantics.
+3. Distinguish the Desktop Graph Editor UI helper (step-hold lookup) from the Desktop audio renderer (`numpy.interp` linear sampling). Do not assume either is equivalent to Web linear sampling plus slew limiting.
 4. Preserve the native endpoint behavior, including its current negative/positive endpoint asymmetry, until an explicit compatibility decision and regression suite authorize a change.
 5. An AI delta is an offset from the note's MIDI-derived base pitch, not an absolute MIDI note number, Hz value, UST PBS height, or native automation integer.
 6. Reject invalid or ambiguous conversion inputs. Do not silently clamp, rescale, reorder, or repair source data.
@@ -110,3 +111,26 @@ Added `tests/fixtures/web_pitch_curve_characterization.json` and two focused tes
 - the five-point example spans 100 ms with 25 ms intervals. It must not be described as a fixed 5 ms interval just because the native frame-period constant is 5 ms.
 
 **Evidence limitation:** these expected values were derived by reading source and checking the math; they were not captured by executing the Web implementation. The Axral tests validate the fixture's recorded expectations and MIDI/semitone/Hz arithmetic, not the production TypeScript functions. This is not a Desktop/Web parity test. The next gate remains an executable test against the actual Web helper plus a separately captured Desktop result, with no production audio-path changes.
+
+
+## Executable Web bridge test verified — 2026-10-11
+
+A read-only inspection of `VO-SE_vocal/main` found `tests/test_web_pitch_curve.mjs`. It compiles the actual `src/utils/pitchCurve.ts` source in memory and extracts the private `buildPitchCurveHz()` helper from `src/voseCoreClient.ts` for focused tests, without exporting or changing the production helper. The covered cases include UST parse/serialize behavior, interpolation, smoothing, Hz conversion, and the no-bend base-frequency case.
+
+The latest observed VO-SE_vocal workflow runs for commit `5e8cc2f50f1890dc01f101b0e15c5770cfff279e` completed successfully (four runs observed). This confirms those workflow runs passed for that commit; it does not prove complete audio-output equivalence or Desktop/Web parity. The latest Axral Vocal AI main commit `9d28834724630eef837009d9e77199b194bf2d38` also has successful Python 3.10 and 3.12 jobs.
+
+### Revised next gate
+
+1. Keep the actual-Web-helper test as the Web reference; do not duplicate its expected values as if they were runtime-captured audio output.
+2. Add or capture a matching Desktop evaluator test from the actual Desktop implementation using the same time/value points, then document the expected difference between step-hold and Web linear/smoothed sampling.
+3. Only after the Desktop reference is executable should an adapter contract be specified. No conversion or live AI pitch application is enabled by this audit.
+4. Do not modify production rendering, WORLD synthesis, pitch application, sample placement, volume, or noise behavior as part of this work.
+
+
+## Desktop renderer characterization fixture — 2026-10-11
+
+Added `tests/fixtures/desktop_render_pitch_characterization.json` and two focused fixture tests. The inspected `modules/audio/vo_se_engine.py::_get_sampled_curve()` uses `numpy.interp` over the note's absolute start/end times, then adds the MIDI note number and converts the resulting semitone offset to Hz. This differs from the separate `GraphEditorWidget.get_value_at_time()` helper, which performs step-hold lookup for its caller; the latter must not be treated as proof of audio-render sampling semantics.
+
+For a synthetic 100 ms note with a 0 → +4 semitone offset and five endpoint-inclusive samples, the source-derived reference is 0, 1, 2, 3, 4 semitones at 0, 25, 50, 75, 100 ms. This is a mathematical characterization from source inspection, not a value trace captured by executing the production Desktop engine.
+
+The Web fixture remains separate: it characterizes UST parsing, smoothing/slew limiting, and sampled Hz generation. The fixtures are not yet a shared-input Desktop/Web golden test, because the source representations and preprocessing differ. Neither fixture proves end-to-end audio parity. No VO-SE_vocal production code or audio behavior was changed.

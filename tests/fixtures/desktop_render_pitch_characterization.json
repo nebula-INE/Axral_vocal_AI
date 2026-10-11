@@ -1,0 +1,56 @@
+{
+  "fixture_kind": "source-level-desktop-render-pitch-characterization",
+  "status": "derived-from-source-not-captured-from-running-app",
+  "observed_on": "2026-10-11",
+  "source_repository": "nebula-INE/VO-SE_vocal",
+  "source_ref": "main",
+  "source_files": [
+    "modules/audio/vo_se_engine.py::_get_sampled_curve",
+    "modules/gui/graph_editor_widget.py::get_value_at_time"
+  ],
+  "input": {
+    "note_number": 69,
+    "start_time_sec": 0,
+    "duration_sec": 0.1,
+    "frame_count": 5,
+    "events": [
+      {
+        "time_sec": 0,
+        "value_semitones": 0
+      },
+      {
+        "time_sec": 0.1,
+        "value_semitones": 4
+      }
+    ]
+  },
+  "expected": {
+    "sample_times_sec": [
+      0,
+      0.025,
+      0.05,
+      0.075,
+      0.1
+    ],
+    "sampled_semitone_offsets": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "base_hz": 440,
+    "curve_hz": [
+      440,
+      466.1637615180899,
+      493.8833012561241,
+      523.2511306011972,
+      554.3652619537442
+    ]
+  },
+  "limitations": [
+    "Expected values are derived from source inspection and math, not captured by executing VO-SE_vocal.",
+    "The audio renderer's _get_sampled_curve uses numpy.interp, while GraphEditorWidget.get_value_at_time is a separate step-hold helper; do not conflate GUI helper behavior with render evaluation.",
+    "The fixture characterizes a synthetic explicit pitch curve and does not prove parity with Web UST parsing/smoothing or end-to-end audio output."
+  ]
+}
