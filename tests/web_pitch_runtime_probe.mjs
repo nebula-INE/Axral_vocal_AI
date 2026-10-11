@@ -6,7 +6,8 @@ import { resolve } from 'node:path';
 const rootValue = process.env.VO_SE_VOCAL_ROOT;
 assert.ok(rootValue, 'VO_SE_VOCAL_ROOT must point to the checked-out VO-SE_vocal repository');
 const root = resolve(rootValue);
-const requireFromVoiceRepo = createRequire(resolve(root, 'package.json'));
+const moduleRoot = process.env.AXRAL_NODE_MODULES_ROOT || root;
+const requireFromVoiceRepo = createRequire(resolve(moduleRoot, 'package.json'));
 const ts = requireFromVoiceRepo('typescript');
 
 const utilitySource = readFileSync(resolve(root, 'src/utils/pitchCurve.ts'), 'utf8');
