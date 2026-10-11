@@ -96,11 +96,19 @@ def test_manifest_rejects_private_paths_and_audio_fields():
 
 def test_jsonl_cli_core_reads_metadata_without_audio(tmp_path):
     manifest = tmp_path / "manifest.jsonl"
-    manifest.write_text(json.dumps(make_record(target=make_target())) + "\n", encoding="utf-8")
+    rows = [
+        make_record("train-1", "bank-a", "train", target=make_target()),
+        make_record("validation-1", "bank-b", "validation", target=make_target()),
+        make_record("test-1", "bank-c", "test", target=make_target()),
+    ]
+    manifest.write_text(
+        "".join(json.dumps(row) + "\\n" for row in rows),
+        encoding="utf-8",
+    )
 
     summary = validate_jsonl(manifest, require_labeled=True)
 
-    assert summary["records"] == 1
+    assert summary["records"] == 3
     assert summary["require_labeled"] is True
 
 
