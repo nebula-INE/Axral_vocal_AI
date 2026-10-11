@@ -76,6 +76,8 @@ class LinearPitchDeltaModel:
         values = tuple(float(v) for v in features)
         if len(values) != len(self.weights):
             raise ValueError(f"expected {len(self.weights)} features, got {len(values)}")
+        if not all(np.isfinite(value) for value in values):
+            raise ValueError("prediction features must be finite")
         result = sum(w * value for w, value in zip(self.weights, values))
         if not np.isfinite(result):
             raise ValueError("model produced a non-finite prediction")
@@ -122,8 +124,19 @@ def fit_ridge(examples: Iterable[TrainingExample], alpha: float = 1.0) -> Linear
 
 
 def mean_absolute_error(examples: Iterable[TrainingExample], model: LinearPitchDeltaModel) -> float | None:
+    """Mean absolute error for a fitted model; None means no usable examples."""
     rows = list(examples)
     if not rows:
         return None
     errors = [abs(model.predict_features(row.features) - row.target) for row in rows]
     return float(sum(errors) / len(errors))
+
+
+def zero_baseline_mae(examples: Iterable[TrainingExample]) -> float | None:
+    """MAE for a no-correction baseline that predicts zero semitone delta."""
+    rows = list(examples)
+    if not rows:
+        return None
+    if not all(np.isfinite(row.target) for row in rows):
+        raise ValueError("baseline targets must be finite")
+    return float(sum(abs(row.target) for row in rows) / len(rows))
