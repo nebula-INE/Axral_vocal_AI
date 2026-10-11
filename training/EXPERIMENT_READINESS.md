@@ -46,3 +46,29 @@ No real dataset has been trained or evaluated by this repository's synthetic CI 
 Do not treat CI success as evidence of pitch quality or as approval to use any particular
 voicebank. If data rights or split isolation cannot be established, stop before uploading
 or training.
+
+## Status and realistic path to the first meaningful training run — 2026-10-11
+
+### What is already implemented
+
+- A metadata-only JSONL manifest validator with source approval assertions, provenance fields, finite/range checks, and voicebank/source split-leakage checks.
+- A deterministic zero-delta baseline, a small ridge-regression training loop, and train/validation metrics compared against that baseline.
+- A synthetic CI fixture that exercises training plumbing only. Its success is not evidence that the model has learned useful singing expression.
+- Request/response contracts and a runtime characterization of selected Desktop/Web pitch helper behavior. The AI proposal is not connected to the production renderer.
+
+### Remaining hard blockers
+
+1. **Real-data permission:** identify at least one concrete source and retain evidence that its terms permit ML training, derived labels, the selected storage/notebook service, evaluation, and the intended model/output distribution. An `approved` manifest value is only an assertion; it is not a substitute for reviewing the evidence.
+2. **Usable labels:** define how a pitch target is produced and reviewed (for example, curated pitch-expression contours with a documented reference and confidence). Do not treat arbitrary existing automation as ground truth until its units and meaning are calibrated.
+3. **Voicebank-isolated splits:** freeze a reproducible train/validation/test manifest with no source or voicebank crossing split boundaries and enough usable voiced labels in every split.
+4. **Feature/model adequacy:** the current five-feature linear ridge model is a training-pipeline smoke-test baseline, not a validated expressive singing model. Evaluate it against zero-delta first; if it does not beat the baseline on held-out voicebanks, do not promote it. Only then expand context features and compare a more capable model.
+5. **Reproducible experiment record:** record commit, dependency versions, data/manifest version, split counts, seed/configuration, runtime/resources, and metrics before interpreting results.
+
+### Estimate (planning range, not a promise)
+
+- **First real-data training run:** approximately 2–5 focused working days *after* rights-cleared data and reviewed labels are actually available, assuming the initial dataset is small and metadata-only. The current code can already run the synthetic smoke test; that is not the real-data milestone.
+- **First defensible held-out evaluation:** roughly 1–3 additional weeks after a suitable multi-voicebank labeled dataset is assembled, depending on annotation volume and label consistency.
+- **Useful, integration-ready pitch assistance:** no reliable calendar estimate yet. It requires iterative listening/evaluation, unseen-voicebank tests, and safe preview-only integration; a successful training command alone is not sufficient.
+
+The largest unknown is not GPU setup or Kaggle execution time. It is obtaining legally usable, consistently labeled examples that teach the behavior we want. Do not upload voicebanks or project/audio material to Kaggle until the source review explicitly permits that service.
+
