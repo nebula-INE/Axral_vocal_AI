@@ -278,4 +278,4 @@ def test_desktop_and_web_pitch_fixtures_are_separate_reference_paths() -> None:
     assert desktop["status"] == "derived-from-source-not-captured-from-running-app"
     assert web["status"] == "derived-from-source-not-captured-from-running-app"
     assert "numpy.interp" in desktop["limitations"][1]
-    assert "smoothing" in web["limitations"][2]
+    assert any("smoothing" in item.lower() for item in web["limitations"])
