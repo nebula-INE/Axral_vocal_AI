@@ -211,3 +211,23 @@ def test_baseline_comparison_handles_perfect_zero_baseline_without_division():
     assert metrics["zero_delta_baseline_mae_semitones"] == pytest.approx(0.0)
     assert metrics["mae_improvement_over_zero_baseline_semitones"] == pytest.approx(0.0)
     assert metrics["relative_mae_improvement_over_zero_baseline"] is None
+
+
+def test_ridge_rejects_validation_and_test_examples():
+    rows, _ = examples_from_records(synthetic_records())
+    validation = [row for row in rows if row.split == "validation"]
+    held_out_test = [row for row in rows if row.split == "test"]
+
+    with pytest.raises(ValueError, match="training-split examples only"):
+        fit_ridge(validation)
+    with pytest.raises(ValueError, match="training-split examples only"):
+        fit_ridge(held_out_test)
+
+
+def test_ridge_rejects_mixed_training_and_held_out_examples():
+    rows, _ = examples_from_records(synthetic_records())
+    train = [row for row in rows if row.split == "train"]
+    validation = [row for row in rows if row.split == "validation"]
+
+    with pytest.raises(ValueError, match="training-split examples only"):
+        fit_ridge(train + validation)
