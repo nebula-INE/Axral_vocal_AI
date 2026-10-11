@@ -10,6 +10,7 @@ Status: staged implementation; no production-renderer changes are in scope.
 - [x] Record exact reuse points and add a real-parser integration-test path.
 - [x] Inspect the Python pitch-event model, graph-editor evaluation, native automation value conversion, and native render-curve boundary.
 - [x] Trace the Web PBS/PBW/PBY note-to-WASM pitch path; see `docs/web_pitch_path_audit.md`.
+- [x] Define the Desktop/Web representation boundaries and pre-integration test gate in `docs/desktop_web_pitch_compatibility_gate.md`; this documents constraints only and does not enable conversion.
 - [ ] Verify Desktop/Web project import/export parity and test the full curve-to-Hz adapter before integration.
 - [x] Add Web-side deterministic unit tests for PBS/PBW/PBY parsing, negative PBS offsets, clamping, linear sampling, slew limiting, and tick/ms conversion in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` (committed on `main`; execution/CI result still pending).
 - [x] Add a parse → editor serialize → parse regression test in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` and correct the 10× unit mismatch at the Web editor serialization boundary: `serializePitchBend()` now converts semitone offsets to UST tenths, matching `parsePitchBend()`. Commits are on `main`; execution/CI and representative existing-UST compatibility verification are still pending. No renderer/audio-processing code was changed.
@@ -53,7 +54,7 @@ Audit findings:
 - [x] Add a source-review checklist and explicit exclusion rules in `docs/training_data_source_review.md`; this is process scaffolding, not approval of any dataset.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics, and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
-- [x] Execute baseline, profile, and real-parser integration tests in CI on the previously verified PR head.
+- [x] Confirm current PR-head CI passes for baseline, profile, response validation, and real-parser integration tests (Python 3.10/3.12).
 - [ ] Establish voicebank-held-out validation and test splits for any future approved real dataset.
 - [ ] Set up a private Kaggle notebook only after data permission and label-definition checks.
 
