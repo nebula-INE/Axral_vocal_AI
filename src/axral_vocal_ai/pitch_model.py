@@ -25,16 +25,35 @@ class TrainingExample:
 
 
 def _features_for_time(notes: list[dict[str, Any]], time_sec: float) -> tuple[float, ...] | None:
+    """Resolve a label to a note using [start, end) intervals.
+
+    A label exactly at a note end is retained only when no note starts at that
+    timestamp. This prevents a shared boundary from being claimed by the
+    preceding note instead of the note that begins there.
+    """
     for note in notes:
         start = float(note["start_sec"])
         end = float(note["end_sec"])
-        if note.get("voiced") is False:
+        if note.get("voiced") is False or end <= start:
             continue
-        if start <= time_sec <= end:
+        if start <= time_sec < end:
             duration = end - start
-            phase = 0.0 if duration <= 0.0 else min(1.0, max(0.0, (time_sec - start) / duration))
+            phase = min(1.0, max(0.0, (time_sec - start) / duration))
             midi = float(note["midi_note"])
             return (1.0, midi / 127.0, phase, phase * phase, duration)
+
+    # Preserve endpoint labels at the end of a note when there is no note
+    # beginning at that same timestamp (including a note boundary in a gap).
+    if any(float(note["start_sec"]) == time_sec for note in notes):
+        return None
+    for note in reversed(notes):
+        start = float(note["start_sec"])
+        end = float(note["end_sec"])
+        if note.get("voiced") is False or end <= start or end != time_sec:
+            continue
+        duration = end - start
+        midi = float(note["midi_note"])
+        return (1.0, midi / 127.0, 1.0, 1.0, duration)
     return None
 
 
