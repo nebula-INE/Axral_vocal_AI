@@ -14,7 +14,7 @@ Status: staged implementation; no production-renderer changes are in scope.
 - [ ] Verify Desktop/Web project import/export parity and test the full curve-to-Hz adapter before integration.
 - [x] Add Web-side deterministic unit tests for PBS/PBW/PBY parsing, negative PBS offsets, clamping, linear sampling, slew limiting, and tick/ms conversion in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` (committed on `main`; execution/CI result still pending).
 - [x] Add a parse → editor serialize → parse regression test in `VO-SE_vocal/tests/test_web_pitch_curve.mjs` and correct the 10× unit mismatch at the Web editor serialization boundary: `serializePitchBend()` now converts semitone offsets to UST tenths, matching `parsePitchBend()`. Commits are on `main`; execution/CI and representative existing-UST compatibility verification are still pending. No renderer/audio-processing code was changed.
-- [x] Add isolated, renderer-independent MIDI-note-to-Hz and semitone-delta-to-frequency-ratio math primitives with reference-value, invalid-input, full MIDI-range endpoint, and cross-formula consistency tests in `pitch_math.py` / `test_pitch_math.py`. These helpers are not wired into Desktop, Web, or the renderer. CI passed on Python 3.10 and 3.12 for commit `d40c254`; the latest full-range test expansion is committed separately and awaits its own CI run.
+- [x] Add isolated, renderer-independent MIDI-note-to-Hz and semitone-delta-to-frequency-ratio math primitives with reference-value, invalid-input, full MIDI-range endpoint, and cross-formula consistency tests in `pitch_math.py` / `test_pitch_math.py`. These helpers are not wired into Desktop, Web, or the renderer. CI passed on Python 3.10 and 3.12 for commit `184a8a8`; subsequent validation-boundary changes are awaiting CI.
 
 Audit findings:
 - `modules/ai/ai_manager.py` is scaffolding: its current analysis path emits fixed fallback timing values and `predict_vits_waveform` returns silence. It is not a trained model.
@@ -51,11 +51,12 @@ Audit findings:
 ## Gate 3 — Dataset and baseline
 
 - [x] Add a non-mutating pitch-response safety gate with bounded semitone deltas, request correlation, note-interval coverage, and explicit rest exclusion.
+- [x] Treat zero-duration voiced notes as having no eligible interval; keep explicit zero-duration rests blocking a proposal at their exact timestamp. Added focused regression tests; CI for the latest commits is pending.
 - [ ] Confirm permitted data sources and provenance.
 - [x] Add a source-review checklist and explicit exclusion rules in `docs/training_data_source_review.md`; this is process scaffolding, not approval of any dataset.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics, and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
 - [x] Add a synthetic fixture and deterministic zero-delta baseline with semitone MAE.
-- [x] Confirm CI passed for baseline, profile, response validation, and real-parser integration at the prior validated PR head. Re-check after the isolated pitch-math test commit before treating the current head as green.
+- [x] Confirm CI passed for baseline, profile, response validation, and real-parser integration at commit `184a8a8` (Python 3.10 and 3.12). Re-check the new zero-duration interval regression on the latest head before treating it as green.
 - [ ] Establish voicebank-held-out validation and test splits for any future approved real dataset.
 - [ ] Set up a private Kaggle notebook only after data permission and label-definition checks.
 
