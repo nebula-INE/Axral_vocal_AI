@@ -177,3 +177,75 @@ def test_manifest_accepts_training_delta_at_safe_range_boundary(delta):
     summary = validate_records([make_record(target=target)])
     assert summary["status"] == "valid"
 
+
+
+
+@pytest.mark.parametrize(
+    ("start_sec", "end_sec"),
+    [
+        (-0.01, 0.4),
+        (0.3, 0.2),
+        (float("nan"), 0.4),
+        (0.0, float("inf")),
+    ],
+)
+def test_manifest_rejects_invalid_note_time_bounds(start_sec, end_sec):
+    record = make_record()
+    record["input"]["notes"][0]["start_sec"] = start_sec
+    record["input"]["notes"][0]["end_sec"] = end_sec
+
+    with pytest.raises(DatasetValidationError):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("split", ["", "testing", "dev", None])
+def test_manifest_rejects_unknown_split_names(split):
+    record = make_record(split=split)
+
+    with pytest.raises(DatasetValidationError, match="split must be train, validation, or test"):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("delta", [True, False])
+def test_manifest_rejects_boolean_pitch_deltas(delta):
+    target = make_target()
+    target["points"][1]["delta_semitones"] = delta
+
+    with pytest.raises(DatasetValidationError, match="must be numeric"):
+        validate_records([make_record(target=target)])
+
+
+@pytest.mark.parametrize(
+    ("first_time", "second_time"),
+    [
+        (-0.01, 0.2),
+        (0.2, 0.1),
+        (0.0, float("nan")),
+        (0.0, float("inf")),
+    ],
+)
+def test_manifest_rejects_invalid_target_timestamps(first_time, second_time):
+    target = make_target()
+    target["points"][0]["time_sec"] = first_time
+    target["points"][1]["time_sec"] = second_time
+
+    with pytest.raises(DatasetValidationError):
+        validate_records([make_record(target=target)])
+
+
+@pytest.mark.parametrize("midi_note", [True, False, -0.1, 127.1, float("nan")])
+def test_manifest_rejects_invalid_midi_note_values(midi_note):
+    record = make_record()
+    record["input"]["notes"][0]["midi_note"] = midi_note
+
+    with pytest.raises(DatasetValidationError):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("confidence", [True, False, -0.01, 1.01, float("nan"), float("inf")])
+def test_manifest_rejects_invalid_label_confidence(confidence):
+    target = make_target()
+    target["confidence"] = confidence
+
+    with pytest.raises(DatasetValidationError):
+        validate_records([make_record(target=target)])
