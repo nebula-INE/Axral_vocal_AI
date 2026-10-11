@@ -156,3 +156,20 @@ The CI workflow now installs only the TypeScript compiler needed by the checked-
 For this deliberately simple bend, the Web UST control points (0, 1, 2 semitones) and Desktop endpoints (0, 2 semitones) produce matching three-point Hz curves. This is now a runtime comparison of both production helper implementations, not just source-derived arithmetic.
 
 **Scope remains narrow:** this single synthetic case does not establish general Desktop/Web parity. It does not cover negative bends in the Web path, nonlinear bends, UST boundary/rounding differences, slew limiting under steep changes, project import/export, native C++ rendering, voice samples, full audio output, or subjective audio quality. No production renderer, pitch helper, or VO-SE_vocal source was changed. The next step is to expand shared-input cases around negative and steep bends while preserving and explicitly testing each platform's existing interpolation/smoothing semantics; do not force equality where behavior intentionally differs.
+
+## Three-case executable Desktop/Web runtime comparison — 2026-10-11
+
+PR #20 is merged into `main` as merge commit `873823e13be0070fe8589eefe7b117dcc640a2b1`. The same-input runtime probe now exercises the actual checked-out Desktop Python sampler and the actual Web `buildPitchCurveHz()` helper for three synthetic A4 (MIDI 69), 100 ms curves, sampled at 0/50/100 ms. Desktop AI is disabled for these checks.
+
+- **Positive bend (0 → +2 semitones):** Desktop and Web produce matching three-point Hz curves.
+- **Negative bend (0 → −2 semitones):** Desktop and Web produce matching three-point Hz curves.
+- **Steep positive bend (0 → +10 semitones):** the Desktop sampler produces the unsmoothed 0/5/10-semitone samples. The Web path's existing 0.08 semitone/ms slew limiter produces 0/4/8 semitones at these sample positions. The test asserts and preserves this intentional observed difference; it does not force false parity or change either implementation.
+
+The PR-head CI run [#148](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/38130451265) succeeded, and the post-merge `main` CI run [#149](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/38130499272) also succeeded. These results confirm the Axral workflow executed the configured Python matrix and Web bridge probe successfully for the tested commits.
+
+**Evidence boundary:** this is an executable comparison of the two production helper implementations for these three controlled synthetic inputs. It is not proof of general Desktop/Web pitch parity, full project import/export compatibility, native C++ renderer equivalence, voice-sample resolution, rendered audio equivalence, or subjective sound quality. The work did not change VO-SE_vocal production files, pitch helpers, renderers, WORLD synthesis, sample placement, volume/noise handling, or live AI pitch application.
+
+### Next gate
+
+Use these results as a baseline for an explicit adapter design, but do not enable live conversion yet. Before integration, define and test the exact source representation and unit conversion for current Desktop project `parameters.Pitch` data, UST pitch-bend semantics, note boundaries/rest handling, and whether Web slew limiting should be preserved or deliberately harmonized. Any policy change to smoothing must be separately reviewed and regression-tested; do not silently remove existing behavior.
+
