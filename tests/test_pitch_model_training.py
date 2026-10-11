@@ -15,7 +15,7 @@ from axral_vocal_ai.training_data import validate_records
 
 def record(record_id, bank, split, start, end, midi, targets):
     return {
-        "schema_version": 1, "record_id": record_id, "source_id": "synthetic-source",
+        "schema_version": 1, "record_id": record_id, "source_id": f"synthetic-source-{record_id}",
         "permission_status": "approved", "license_id": "SYNTHETIC-TEST-ONLY",
         "voicebank_id": bank, "split": split,
         "input": {"notes": [{"start_sec": start, "end_sec": end, "midi_note": midi,
