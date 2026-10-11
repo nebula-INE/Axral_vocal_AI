@@ -41,6 +41,17 @@ Keep Axral Vocal AI's proposal contract independent of VO-SE_vocal's current edi
 - A no-AI regression proving source notes/curves and renderer inputs are unchanged when AI is disabled or rejected.
 - Desktop/Web import-export parity checks and audio regression tests before any live integration.
 
+## Contract-boundary characterization added
+
+`tests/test_pitch_representation_compatibility.py` now records a small, deterministic set of contract-level cases:
+
+- request parsing preserves seconds, MIDI note numbers, request correlation, and explicit rest metadata;
+- negative, zero, and positive semitone offsets remain signed offsets, with isolated frequency-ratio reference checks;
+- a proposal at a shared voiced-note/rest boundary is rejected;
+- sparse points remain sparse, and the contract does not prescribe step-hold, linear interpolation, or smoothing.
+
+These are guardrail tests for Axral's API contract only. They do not import or execute VO-SE_vocal's Desktop/Web implementation, and they are not evidence of cross-platform parity.
+
 ## Current decision
 
 The safe contract remains `PitchDeltaPoint(time_sec, delta_semitones)`. The current PR validates proposal bounds, request correlation, note coverage, and explicit rest exclusion only. It does not convert or apply proposals to either Desktop or Web. Full import/export parity and the renderer-facing curve adapter remain blocked until the required fixtures and tests exist.
