@@ -102,7 +102,7 @@ def test_jsonl_cli_core_reads_metadata_without_audio(tmp_path):
         make_record("test-1", "bank-c", "test", target=make_target()),
     ]
     manifest.write_text(
-        "".join(json.dumps(row) + "\\n" for row in rows),
+        "".join(json.dumps(row) + "\n" for row in rows),
         encoding="utf-8",
     )
 
