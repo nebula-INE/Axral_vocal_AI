@@ -231,3 +231,34 @@ def test_ridge_rejects_mixed_training_and_held_out_examples():
 
     with pytest.raises(ValueError, match="training-split examples only"):
         fit_ridge(train + validation)
+
+
+
+def test_overlapping_voiced_notes_make_label_context_ambiguous():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.5, "midi_note": 60, "voiced": True},
+        {"start_sec": 1.0, "end_sec": 2.0, "midi_note": 72, "voiced": True},
+    ]
+
+    assert _features_for_time(notes, 1.25) is None
+
+
+def test_overlapping_note_endpoint_is_skipped_as_ambiguous():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True},
+        {"start_sec": 0.5, "end_sec": 1.0, "midi_note": 72, "voiced": True},
+    ]
+
+    assert _features_for_time(notes, 1.0) is None
+
+
+def test_non_overlapping_note_context_still_resolves_at_shared_boundary():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True},
+        {"start_sec": 1.0, "end_sec": 2.0, "midi_note": 72, "voiced": True},
+    ]
+
+    features = _features_for_time(notes, 1.0)
+    assert features is not None
+    assert features[1] == pytest.approx(72 / 127)
+    assert features[2] == pytest.approx(0.0)
