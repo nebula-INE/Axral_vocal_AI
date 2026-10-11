@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const rootValue = process.env.VO_SE_VOCAL_ROOT;
 assert.ok(rootValue, 'VO_SE_VOCAL_ROOT must point to the checked-out VO-SE_vocal repository');
