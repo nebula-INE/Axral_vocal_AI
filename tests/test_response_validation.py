@@ -198,3 +198,35 @@ def test_validation_does_not_mutate_list_backed_contract_data() -> None:
     assert notes == [PitchNote(0.0, 1.0, 60, "あ", voiced=True)]
     assert points == [PitchDeltaPoint(0.25, 0.5)]
 
+
+
+@pytest.mark.parametrize("time_sec", [0.5, 0.5000005])
+def test_rejects_points_on_zero_duration_voiced_note(time_sec: float) -> None:
+    request = PitchRequest(
+        notes=(PitchNote(0.5, 0.5, 60, "あ", voiced=True),),
+        request_id="zero-duration",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(time_sec, 0.25),),
+        request_id="zero-duration",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(request, response)
+
+
+def test_zero_duration_rest_blocks_point_at_exact_boundary() -> None:
+    request = PitchRequest(
+        notes=(
+            PitchNote(0.0, 0.5, 60, "あ", voiced=True),
+            PitchNote(0.5, 0.5, 62, "休符", voiced=False),
+        ),
+        request_id="zero-duration-rest",
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.5, 0.25),),
+        request_id="zero-duration-rest",
+    )
+    with pytest.raises(PitchResponseValidationError, match="outside eligible"):
+        validate_pitch_response(request, response)
