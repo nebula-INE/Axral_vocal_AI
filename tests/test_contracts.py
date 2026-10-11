@@ -145,3 +145,29 @@ def test_response_parser_rejects_non_list_pitch_deltas() -> None:
 def test_response_parser_rejects_non_object_pitch_delta_entries() -> None:
     with pytest.raises(ValueError, match="entries must be objects"):
         response_from_dict({"status": "ok", "pitch_deltas": [0.25]})
+
+
+def test_request_parser_rejects_non_object_payload() -> None:
+    with pytest.raises(ValueError, match="request payload must be an object"):
+        request_from_dict(None)  # type: ignore[arg-type]
+
+
+def test_request_parser_rejects_non_object_note_entries() -> None:
+    with pytest.raises(ValueError, match="notes entries must be objects"):
+        request_from_dict({"notes": [60]})
+
+
+def test_request_parser_rejects_non_object_voicebank() -> None:
+    with pytest.raises(ValueError, match="voicebank must be an object"):
+        request_from_dict({"notes": [], "voicebank": ["not", "an", "object"]})
+
+
+@pytest.mark.parametrize("signature", [[4], [4, 4, 4], "4/4", 4])
+def test_request_parser_rejects_malformed_time_signature(signature: object) -> None:
+    with pytest.raises(ValueError, match="time_signature must contain"):
+        request_from_dict({"notes": [], "time_signature": signature})  # type: ignore[dict-item]
+
+
+def test_response_parser_rejects_non_object_payload() -> None:
+    with pytest.raises(ValueError, match="response payload must be an object"):
+        response_from_dict(None)  # type: ignore[arg-type]
