@@ -280,3 +280,19 @@ def test_rest_tolerance_blocks_overlapping_voiced_note() -> None:
     with pytest.raises(PitchResponseValidationError, match="outside eligible"):
         validate_pitch_response(request, response)
 
+
+
+
+@pytest.mark.parametrize("request_id", [None, "", "   "])
+def test_rejects_missing_or_blank_request_correlation_id(request_id):
+    request = PitchRequest(
+        notes=(PitchNote(0.0, 1.0, 60, "あ", voiced=True),),
+        request_id=request_id,
+    )
+    response = PitchResponse(
+        status="ok",
+        pitch_deltas=(PitchDeltaPoint(0.25, 0.25),),
+        request_id=request_id,
+    )
+    with pytest.raises(PitchResponseValidationError, match="request_id"):
+        validate_pitch_response(request, response)
