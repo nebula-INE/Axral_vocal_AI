@@ -54,7 +54,13 @@ def validate_pitch_response(
     if response.status != "ok":
         raise PitchResponseValidationError(f"unsupported response status: {response.status}")
 
-    eligible = tuple(note for note in request.notes if note.voiced is not False)
+    # A zero-duration voiced note has no interval to carry a pitch proposal.
+    # Keep zero-duration explicit rests in the rest check below so they still
+    # take precedence at an exact shared boundary.
+    eligible = tuple(
+        note for note in request.notes
+        if note.voiced is not False and note.end_sec > note.start_sec
+    )
     for index, point in enumerate(response.pitch_deltas):
         if abs(point.delta_semitones) > max_abs_delta_semitones:
             raise PitchResponseValidationError(
