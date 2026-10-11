@@ -109,6 +109,7 @@ def test_jsonl_cli_core_reads_metadata_without_audio(tmp_path):
     summary = validate_jsonl(manifest, require_labeled=True)
 
     assert summary["records"] == 3
+    assert summary["labeled_records"] == 3
     assert summary["require_labeled"] is True
 
 
@@ -120,3 +121,21 @@ def test_manifest_rejects_duplicate_record_ids():
 def test_manifest_rejects_empty_dataset():
     with pytest.raises(DatasetValidationError, match="no records"):
         validate_records([])
+
+
+
+def test_manifest_summary_counts_only_records_with_labels():
+    summary = validate_records([
+        make_record("labeled", "bank-a", "train", target=make_target()),
+        make_record("unlabeled", "bank-b", "validation", target=None),
+    ])
+    assert summary["records"] == 2
+    assert summary["labeled_records"] == 1
+
+
+@pytest.mark.parametrize("field", ["audio_file", "waveform", "file_path", "source_path", "relative_path"])
+def test_manifest_rejects_additional_payload_and_path_fields(field):
+    record = make_record()
+    record["provenance"][field] = "private-reference"
+    with pytest.raises(DatasetValidationError, match="not allowed"):
+        validate_records([record])
