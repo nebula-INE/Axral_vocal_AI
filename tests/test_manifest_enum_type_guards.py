@@ -1,7 +1,27 @@
 import pytest
 
 from axral_vocal_ai.training_data import DatasetValidationError, validate_records
-from test_training_data import make_record
+
+
+def make_record(permission="approved", split="train"):
+    return {
+        "schema_version": 1,
+        "record_id": "r1",
+        "source_id": "source-1",
+        "permission_status": permission,
+        "license_id": "fixture-license",
+        "voicebank_id": "bank-a",
+        "split": split,
+        "input": {"notes": [{"start_sec": 0.0, "end_sec": 0.4, "midi_note": 60, "lyric": "あ"}]},
+        "target": None,
+        "provenance": {
+            "acquisition_method": "synthetic fixture",
+            "source_reference": "synthetic://fixture",
+            "review_date": "2026-10-11",
+            "review_status": "approved",
+        },
+        "preprocessing": {"tool_version": "fixture-1", "transformations": []},
+    }
 
 
 @pytest.mark.parametrize("permission", [None, 1, [], {}, True])
