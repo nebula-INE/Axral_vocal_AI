@@ -35,6 +35,7 @@ Audit findings:
 ## Gate 1 — Versioned contracts
 
 - [x] Define initial request/response schema and validation.
+- [x] Reject malformed external `pitch_deltas` containers and non-object entries with clear `ValueError`s instead of leaking incidental iteration/type errors; focused regression tests added, latest-head CI pending.
 - [x] Add unit tests for time, MIDI range, ordering, finite values, and schema versions.
 - [x] Add CI for Python 3.10 and 3.12.
 - [x] Review the contract against actual VO-SE_vocal note and pitch data types; keep uncalibrated pitch automation excluded from semitone conversion.
@@ -52,7 +53,7 @@ Audit findings:
 ## Gate 3 — Dataset and baseline
 
 - [x] Add a non-mutating pitch-response safety gate with bounded semitone deltas, request correlation, note-interval coverage, and explicit rest exclusion.
-- [x] Treat zero-duration voiced notes as having no eligible interval; keep explicit zero-duration rests blocking a proposal at their exact timestamp. Added focused regression tests; CI for the latest commits is pending.
+- [x] Treat zero-duration voiced notes as having no eligible interval; keep explicit zero-duration rests blocking a proposal at their exact timestamp. Added focused regression tests; latest-head CI was green before the newest malformed-container guard, which is now awaiting CI.
 - [ ] Confirm permitted data sources and provenance.
 - [x] Add a source-review checklist and explicit exclusion rules in `docs/training_data_source_review.md`; this is process scaffolding, not approval of any dataset.
 - [x] Draft target-label provenance, semitone-unit guardrails, evaluation metrics, and split/leakage policy in `docs/pitch_labeling_and_metrics.md`.
