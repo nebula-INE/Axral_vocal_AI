@@ -16,6 +16,8 @@ from axral_vocal_ai.pitch_math import (
         (81.0, 880.0),
         (60.0, 261.6255653005986),
         (69.5, 440.0 * math.sqrt(2.0 ** (1.0 / 12.0))),
+        (0.0, 440.0 * (2.0 ** (-69.0 / 12.0))),
+        (127.0, 440.0 * (2.0 ** (58.0 / 12.0))),
     ],
 )
 def test_midi_note_to_hz_reference_values(midi_note: float, expected_hz: float) -> None:
@@ -53,6 +55,10 @@ def test_semitone_delta_to_frequency_ratio_rejects_invalid_or_unrepresentable_va
         (60.0, 0.5),
         (69.0, 2.0),
         (100.0, -1.25),
+        (12.25, 1.75),
+        (36.5, -1.125),
+        (72.75, 0.375),
+        (110.0, -2.0),
     ],
 )
 def test_midi_frequency_and_semitone_ratio_are_consistent(
