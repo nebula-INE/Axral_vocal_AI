@@ -12,6 +12,7 @@ from typing import Any, Iterable
 PERMISSION_STATES = {"approved", "review_required", "prohibited"}
 SPLITS = {"train", "validation", "test"}
 TARGET_KIND = "pitch_delta_semitones"
+MAX_TRAINING_DELTA_SEMITONES = 2.0
 FORBIDDEN_KEYS = {"audio", "audio_bytes", "audio_file", "audio_path", "waveform", "wav_path", "file_path", "source_path", "relative_path", "absolute_path", "local_path", "checkpoint", "credentials", "token", "secret"}
 
 
@@ -105,7 +106,9 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
             _require(isinstance(point, dict), f"{where} must be an object")
             _require("time_sec" in point and "delta_semitones" in point, f"{where} requires time_sec and delta_semitones")
             time_sec = _finite_number(point["time_sec"], f"{where}.time_sec")
-            _finite_number(point["delta_semitones"], f"{where}.delta_semitones")
+            delta = _finite_number(point["delta_semitones"], f"{where}.delta_semitones")
+            _require(-MAX_TRAINING_DELTA_SEMITONES <= delta <= MAX_TRAINING_DELTA_SEMITONES,
+                     f"{where}.delta_semitones must be within +/-{MAX_TRAINING_DELTA_SEMITONES} semitones")
             _require(time_sec >= 0 and time_sec >= previous_time, f"{where} timestamps must be non-negative and ordered")
             previous_time = time_sec
         _require(isinstance(target.get("label_source"), str) and bool(target["label_source"].strip()), f"{prefix}: target.label_source is required")
