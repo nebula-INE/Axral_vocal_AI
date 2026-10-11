@@ -42,3 +42,27 @@ def test_semitone_delta_to_frequency_ratio_rejects_invalid_or_unrepresentable_va
 ) -> None:
     with pytest.raises(ValueError):
         semitone_delta_to_frequency_ratio(delta)
+
+
+@pytest.mark.parametrize(
+    ("midi_note", "delta"),
+    [
+        (48.0, -2.0),
+        (60.0, -0.5),
+        (60.0, 0.0),
+        (60.0, 0.5),
+        (69.0, 2.0),
+        (100.0, -1.25),
+    ],
+)
+def test_midi_frequency_and_semitone_ratio_are_consistent(
+    midi_note: float, delta: float
+) -> None:
+    # Independent pure-math invariant: applying a semitone ratio to a base
+    # frequency must equal converting the correspondingly shifted MIDI pitch.
+    # This is not a renderer adapter and must not be wired into production audio.
+    base_hz = midi_note_to_hz(midi_note)
+    ratio = semitone_delta_to_frequency_ratio(delta)
+    shifted_hz = midi_note_to_hz(midi_note + delta)
+    assert base_hz * ratio == pytest.approx(shifted_hz, rel=1e-12)
+
