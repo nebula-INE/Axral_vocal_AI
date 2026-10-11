@@ -99,3 +99,14 @@ The current GUI writer was also confirmed in `modules/gui/mixins/project_io_mixi
 - `tests/test_pitch_representation_compatibility.py` asserts the two document shapes are distinct and preserves raw `time/value` data without converting the values to semitones.
 
 These are schema-shape fixtures with representative values, not projects exported from a running VO-SE_vocal build. They guard against accidentally treating the two envelopes as interchangeable; they do not prove either app's full save/load behavior, define the raw value unit, or establish Desktop/Web audio parity. Production renderer and audio code remain unchanged.
+
+## Web pitch curve characterization fixture — 2026-10-11
+
+Added `tests/fixtures/web_pitch_curve_characterization.json` and two focused tests in `tests/test_pitch_representation_compatibility.py`. The fixture records a small source-derived example from the inspected `VO-SE_vocal/main` files `src/utils/pitchCurve.ts` and `src/voseCoreClient.ts`:
+
+- UST PBY raw heights are scaled by 0.1 to semitones;
+- the existing 0.08 semitone/ms slew limit changes the 0 → 10 → -10 semitone raw points into the characterized 0 → 4 → 0 curve at 50 ms intervals;
+- the dense Hz curve samples linearly between the smoothed points, with both note endpoints included;
+- the five-point example spans 100 ms with 25 ms intervals. It must not be described as a fixed 5 ms interval just because the native frame-period constant is 5 ms.
+
+**Evidence limitation:** these expected values were derived by reading source and checking the math; they were not captured by executing the Web implementation. The Axral tests validate the fixture's recorded expectations and MIDI/semitone/Hz arithmetic, not the production TypeScript functions. This is not a Desktop/Web parity test. The next gate remains an executable test against the actual Web helper plus a separately captured Desktop result, with no production audio-path changes.
