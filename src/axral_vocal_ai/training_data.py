@@ -43,7 +43,7 @@ def _check_no_private_payload(value: Any, location: str = "record") -> None:
     elif isinstance(value, str):
         # Catch common local filesystem paths without rejecting ordinary URLs or opaque IDs.
         _require(not value.startswith(("/", "~/", "./", "../")), f"{location} must not contain a local filesystem path")
-        _require(not (len(value) > 2 and value[1] == ":" and value[2] in "\\\\/"), f"{location} must not contain a Windows filesystem path")
+        _require(not (value.startswith("\\\\") or (len(value) > 2 and value[1] == ":" and value[2] in "\\\\/")), f"{location} must not contain a Windows filesystem path")
 
 
 def validate_record(record: Any, line_number: int, require_labeled: bool = False) -> dict[str, Any]:
