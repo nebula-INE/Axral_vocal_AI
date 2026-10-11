@@ -3,6 +3,7 @@ import math
 import pytest
 
 from axral_vocal_ai.pitch_model import (
+    _features_for_time,
     examples_from_records,
     fit_ridge,
     mean_absolute_error,
@@ -47,6 +48,32 @@ def test_training_examples_use_note_context_and_skip_unvoiced_labels():
     examples, counts = examples_from_records(rows[:1])
     assert examples == []
     assert counts == {"labels_seen": 3, "labels_used": 0, "labels_without_voiced_note": 3}
+
+
+def test_adjacent_note_boundary_belongs_to_following_note():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True},
+        {"start_sec": 1.0, "end_sec": 2.0, "midi_note": 72, "voiced": True},
+    ]
+    features = _features_for_time(notes, 1.0)
+    assert features is not None
+    assert features[1] == pytest.approx(72 / 127)
+    assert features[2] == 0.0
+
+
+def test_terminal_note_endpoint_is_kept():
+    notes = [{"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True}]
+    features = _features_for_time(notes, 1.0)
+    assert features is not None
+    assert features[2] == 1.0
+
+
+def test_boundary_into_unvoiced_note_is_not_assigned_to_previous_note():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True},
+        {"start_sec": 1.0, "end_sec": 2.0, "midi_note": 0, "voiced": False},
+    ]
+    assert _features_for_time(notes, 1.0) is None
 
 
 def test_ridge_training_is_finite_and_serializable():
