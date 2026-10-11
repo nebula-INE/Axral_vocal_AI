@@ -159,3 +159,33 @@ def zero_baseline_mae(examples: Iterable[TrainingExample]) -> float | None:
     if not all(np.isfinite(row.target) for row in rows):
         raise ValueError("baseline targets must be finite")
     return float(sum(abs(row.target) for row in rows) / len(rows))
+
+
+def compare_with_zero_baseline(
+    examples: Iterable[TrainingExample], model: LinearPitchDeltaModel
+) -> dict[str, float | None]:
+    """Report model MAE and signed improvement against the zero-delta baseline.
+
+    Positive improvement means lower error than predicting no correction;
+    negative improvement means the fitted model is worse. Relative improvement
+    is omitted when the baseline error is zero to avoid division by zero.
+    """
+    rows = list(examples)
+    model_mae = mean_absolute_error(rows, model)
+    baseline_mae = zero_baseline_mae(rows)
+    improvement = (
+        baseline_mae - model_mae
+        if baseline_mae is not None and model_mae is not None
+        else None
+    )
+    relative_improvement = (
+        improvement / baseline_mae
+        if improvement is not None and baseline_mae is not None and baseline_mae > 0
+        else None
+    )
+    return {
+        "mae_semitones": model_mae,
+        "zero_delta_baseline_mae_semitones": baseline_mae,
+        "mae_improvement_over_zero_baseline_semitones": improvement,
+        "relative_mae_improvement_over_zero_baseline": relative_improvement,
+    }
