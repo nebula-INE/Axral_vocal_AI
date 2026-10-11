@@ -128,6 +128,7 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
 def validate_records(records: Iterable[Any], require_labeled: bool = False) -> dict[str, Any]:
     seen_ids: set[str] = set()
     bank_splits: dict[str, str] = {}
+    source_splits: dict[str, str] = {}
     counts = {split: 0 for split in sorted(SPLITS)}
     total = 0
     labeled_records = 0
@@ -137,10 +138,14 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
         _require(record_id not in seen_ids, f"line {line_number}: duplicate record_id {record_id!r}")
         seen_ids.add(record_id)
         bank = validated["voicebank_id"]
+        source = validated["source_id"]
         split = validated["split"]
         _require(bank not in bank_splits or bank_splits[bank] == split,
                  f"line {line_number}: voicebank {bank!r} appears in multiple splits")
+        _require(source not in source_splits or source_splits[source] == split,
+                 f"line {line_number}: source {source!r} appears in multiple splits")
         bank_splits[bank] = split
+        source_splits[source] = split
         counts[split] += 1
         total += 1
         target = validated.get("target")
