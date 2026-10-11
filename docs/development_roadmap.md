@@ -99,3 +99,14 @@ Audit findings:
 - [ ] Add cross-representation golden fixtures only after those paths and their units are fully identified.
 
 This follow-up is source audit and planning only. No production audio code was changed, and Axral contract CI does not validate VO-SE_vocal audio quality or Desktop/Web parity.
+
+
+## Gate 0 follow-up — confirmed save/load and Web sampling details (2026-10-11)
+
+- [x] Trace the current Desktop JSON loader: Graph Editor automation is restored from top-level `parameters.{Pitch,Gender,Tension,Breath}` arrays of `{time,value}` objects in `modules/gui/mixins/project_io_mixin.py::load_json_project()`.
+- [x] Distinguish the legacy `ProjectModel.serialize()` top-level `pitch_automation` field from the current GUI JSON `parameters.Pitch` path; do not assume these shapes are interchangeable.
+- [x] Trace the Web pitch helper's production call site: `pushEvent()` chooses `p = max(2, round(max(1, durationMs)/5)+1)`; the endpoint-inclusive helper then spaces samples by `durationMs/(p-1)`, approximately but not always exactly 5 ms.
+- [ ] Inspect the current GUI save writer (`on_save_project_clicked`) and its tests to confirm exact emitted JSON fields, including Graph Editor `parameters`, before writing fixture tests.
+- [ ] Add golden fixtures for both actual serialized shapes and their load/restore paths; no production conversion until units and interpolation semantics are agreed.
+
+This update is audit-only. No VO-SE_vocal files, renderers, pitch application, WORLD synthesis, or audio processing were modified.
