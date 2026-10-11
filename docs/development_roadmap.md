@@ -35,7 +35,7 @@ Audit findings:
 ## Gate 1 — Versioned contracts
 
 - [x] Define initial request/response schema and validation.
-- [x] Reject malformed external `pitch_deltas` containers and non-object entries with clear `ValueError`s instead of leaking incidental iteration/type errors; focused regression tests added, latest-head CI pending.
+- [x] Reject malformed external request/response payload containers, non-object note/pitch entries, invalid voicebank container shapes, and malformed time signatures with clear `ValueError`s; focused regression tests added, latest-head CI pending.
 - [x] Add unit tests for time, MIDI range, ordering, finite values, and schema versions.
 - [x] Add CI for Python 3.10 and 3.12.
 - [x] Review the contract against actual VO-SE_vocal note and pitch data types; keep uncalibrated pitch automation excluded from semitone conversion.
