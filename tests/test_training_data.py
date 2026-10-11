@@ -9,7 +9,7 @@ def make_record(record_id="r1", bank="bank-a", split="train", permission="approv
     return {
         "schema_version": 1,
         "record_id": record_id,
-        "source_id": "source-a",
+        "source_id": record_id,
         "permission_status": permission,
         "license_id": "INTERNAL-ML-PERMISSION-001",
         "voicebank_id": bank,
