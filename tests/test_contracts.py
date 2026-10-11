@@ -238,3 +238,41 @@ def test_request_contract_rejects_non_string_request_id(request_id: object) -> N
 def test_response_contract_rejects_non_string_request_id(request_id: object) -> None:
     with pytest.raises(TypeError, match="request_id must be a string"):
         PitchResponse(status="no_change", request_id=request_id)  # type: ignore[arg-type]
+
+
+
+def test_request_freezes_caller_owned_notes_list() -> None:
+    notes = [PitchNote(0.0, 0.5, 60, "あ")]
+    request = PitchRequest(notes=notes)
+    notes.append(PitchNote(0.5, 1.0, 62, "い"))
+
+    assert len(request.notes) == 1
+    assert isinstance(request.notes, tuple)
+
+
+def test_response_freezes_caller_owned_pitch_and_warning_lists() -> None:
+    points = [PitchDeltaPoint(0.25, -0.5)]
+    warnings = ["review"]
+    response = PitchResponse(status="ok", pitch_deltas=points, warnings=warnings)
+    points.append(PitchDeltaPoint(0.5, 0.5))
+    warnings.append("mutated")
+
+    assert response.pitch_deltas == (PitchDeltaPoint(0.25, -0.5),)
+    assert response.warnings == ("review",)
+
+
+def test_voicebank_profile_freezes_sequences_and_validates_inventory_entries() -> None:
+    from axral_vocal_ai.contracts import VoicebankProfile
+
+    aliases = ["あ", "い"]
+    profile = VoicebankProfile(phoneme_inventory=aliases)
+    aliases.append("う")
+
+    assert profile.phoneme_inventory == ("あ", "い")
+    assert isinstance(profile.phoneme_inventory, tuple)
+
+    with pytest.raises(TypeError, match="phoneme_inventory must be a sequence"):
+        VoicebankProfile(phoneme_inventory="あ")  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="format_hints entries must be strings"):
+        VoicebankProfile(format_hints=["CV", 7])  # type: ignore[list-item]
