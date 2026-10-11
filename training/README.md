@@ -33,7 +33,7 @@ Then train the small ridge-regression MVP and evaluate it on the preassigned val
 python training/train_pitch_model.py path/to/manifest.jsonl --output artifacts/pitch_delta_report.json
 ```
 
-The command validates the manifest, uses only records assigned to `train` for fitting, and reports mean absolute error in semitones for train, validation, and test. Labels that fall outside any voiced note are counted and skipped. If any split has no usable voiced labels, the run fails instead of reporting misleading metrics. The JSON output includes the feature version, weights, split counts, metrics, and explicit safety limitations.
+The command validates the manifest, uses only records assigned to `train` for fitting, and reports mean absolute error (MAE) in semitones for train, validation, and test. It also reports a zero-delta baseline (predict no pitch correction) and the MAE improvement over that baseline for each split; negative improvement means the fitted model performed worse. Labels that fall outside any voiced note are counted and skipped. If any split has no usable voiced labels, the run fails instead of reporting misleading metrics. The JSON output includes the feature version, weights, split counts, model/baseline metrics, and explicit safety limitations. Prediction inputs are checked for non-finite values.
 
 ## Scope and limitations
 
