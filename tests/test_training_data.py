@@ -68,6 +68,15 @@ def test_manifest_rejects_voicebank_leakage_across_splits():
         ])
 
 
+def test_manifest_rejects_source_leakage_across_splits():
+    first = make_record("train-1", "bank-a", "train")
+    second = make_record("test-1", "bank-b", "test")
+    second["source_id"] = first["source_id"]
+
+    with pytest.raises(DatasetValidationError, match="source .* appears in multiple splits"):
+        validate_records([first, second])
+
+
 def test_training_mode_requires_labels():
     with pytest.raises(DatasetValidationError, match="target labels are required"):
         validate_records([make_record()], require_labeled=True)
@@ -133,9 +142,22 @@ def test_manifest_summary_counts_only_records_with_labels():
     assert summary["labeled_records"] == 1
 
 
-@pytest.mark.parametrize("field", ["audio_file", "waveform", "file_path", "source_path", "relative_path"])
+@pytest.mark.parametrize("field", [
+    "audio_file", "waveform", "file_path", "source_path", "relative_path", "Audio_File",
+])
 def test_manifest_rejects_additional_payload_and_path_fields(field):
     record = make_record()
     record["provenance"][field] = "private-reference"
     with pytest.raises(DatasetValidationError, match="not allowed"):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("path", [
+    r"C:\\private\\voicebank\\a.wav",
+    r"\\\\server\\share\\voicebank.wav",
+])
+def test_manifest_rejects_windows_filesystem_paths(path):
+    record = make_record()
+    record["provenance"]["source_reference"] = path
+    with pytest.raises(DatasetValidationError, match="Windows filesystem path"):
         validate_records([record])
