@@ -73,6 +73,13 @@ def test_training_mode_requires_labels():
         validate_records([make_record()], require_labeled=True)
 
 
+def test_training_readiness_requires_three_voicebank_isolated_splits():
+    with pytest.raises(DatasetValidationError, match="missing: validation, test"):
+        validate_records([
+            make_record("train-1", "bank-a", "train", target=make_target()),
+        ], require_labeled=True)
+
+
 def test_manifest_rejects_nonfinite_or_unordered_targets():
     target = make_target()
     target["points"][1]["delta_semitones"] = float("nan")
