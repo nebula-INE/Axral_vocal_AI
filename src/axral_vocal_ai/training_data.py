@@ -12,7 +12,7 @@ from typing import Any, Iterable
 PERMISSION_STATES = {"approved", "review_required", "prohibited"}
 SPLITS = {"train", "validation", "test"}
 TARGET_KIND = "pitch_delta_semitones"
-FORBIDDEN_KEYS = {"audio", "audio_bytes", "audio_path", "wav_path", "absolute_path", "local_path", "checkpoint", "credentials", "token", "secret"}
+FORBIDDEN_KEYS = {"audio", "audio_bytes", "audio_file", "audio_path", "waveform", "wav_path", "file_path", "source_path", "relative_path", "absolute_path", "local_path", "checkpoint", "credentials", "token", "secret"}
 
 
 class DatasetValidationError(ValueError):
@@ -130,6 +130,7 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
     bank_splits: dict[str, str] = {}
     counts = {split: 0 for split in sorted(SPLITS)}
     total = 0
+    labeled_records = 0
     for line_number, record in enumerate(records, start=1):
         validated = validate_record(record, line_number, require_labeled=require_labeled)
         record_id = validated["record_id"]
@@ -142,6 +143,9 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
         bank_splits[bank] = split
         counts[split] += 1
         total += 1
+        target = validated.get("target")
+        if isinstance(target, dict) and isinstance(target.get("points"), list) and target["points"]:
+            labeled_records += 1
     _require(total > 0, "dataset manifest contains no records")
     _require(any(counts[split] for split in ("train", "validation", "test")), "no split records found")
     if require_labeled:
@@ -154,7 +158,7 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
     return {
         "status": "valid",
         "records": total,
-        "labeled_records": total if require_labeled else total,
+        "labeled_records": labeled_records,
         "records_by_split": counts,
         "voicebanks_by_split": {
             split: sorted(bank for bank, bank_split in bank_splits.items() if bank_split == split)
