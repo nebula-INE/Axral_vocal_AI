@@ -13,17 +13,28 @@ import math
 def _finite_time(value: float, *, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be a finite number")
-    result = float(value)
+    try:
+        result = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError(f"{name} must be a finite number") from exc
     if not math.isfinite(result):
         raise ValueError(f"{name} must be a finite number")
     return result
 
 
+def _finite_result(value: float, *, name: str) -> float:
+    if not math.isfinite(value):
+        raise ValueError(f"converted {name} is outside the finite numeric range")
+    return value
+
+
 def seconds_to_milliseconds(time_sec: float) -> float:
     """Convert an absolute time from seconds to milliseconds without quantizing."""
-    return _finite_time(time_sec, name="time_sec") * 1000.0
+    seconds = _finite_time(time_sec, name="time_sec")
+    return _finite_result(seconds * 1000.0, name="time_ms")
 
 
 def milliseconds_to_seconds(time_ms: float) -> float:
     """Convert an absolute time from milliseconds to seconds without quantizing."""
-    return _finite_time(time_ms, name="time_ms") / 1000.0
+    milliseconds = _finite_time(time_ms, name="time_ms")
+    return _finite_result(milliseconds / 1000.0, name="time_sec")
