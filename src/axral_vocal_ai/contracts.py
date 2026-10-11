@@ -57,8 +57,19 @@ class VoicebankProfile:
     format_hints: Sequence[str] = ()
 
     def __post_init__(self) -> None:
+        # Freeze caller-provided sequences so validated metadata cannot be
+        # mutated after construction through a retained list reference.
+        for name in ("phoneme_inventory", "pitch_bank_boundaries", "format_hints"):
+            value = getattr(self, name)
+            if isinstance(value, (str, bytes)):
+                raise TypeError(f"{name} must be a sequence, not a string")
+            object.__setattr__(self, name, tuple(value))
         if self.alias_count < 0 or self.sample_count < 0:
             raise ValueError("voicebank counts cannot be negative")
+        if any(not isinstance(item, str) for item in self.phoneme_inventory):
+            raise TypeError("phoneme_inventory entries must be strings")
+        if any(not isinstance(item, str) for item in self.format_hints):
+            raise TypeError("format_hints entries must be strings")
         for value in self.pitch_bank_boundaries:
             _finite(value, "pitch_bank_boundaries entry")
 
@@ -73,6 +84,8 @@ class PitchRequest:
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        # The contract is immutable after validation, even if callers pass lists.
+        object.__setattr__(self, "notes", tuple(self.notes))
         if type(self.schema_version) is not int or self.schema_version != SCHEMA_VERSION:
             raise ValueError(f"unsupported request schema_version: {self.schema_version}")
         if self.request_id is not None and not isinstance(self.request_id, str):
@@ -113,6 +126,9 @@ class PitchResponse:
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        # Prevent post-validation mutation via caller-owned lists.
+        object.__setattr__(self, "pitch_deltas", tuple(self.pitch_deltas))
+        object.__setattr__(self, "warnings", tuple(self.warnings))
         if type(self.schema_version) is not int or self.schema_version != SCHEMA_VERSION:
             raise ValueError(f"unsupported response schema_version: {self.schema_version}")
         if self.request_id is not None and not isinstance(self.request_id, str):
