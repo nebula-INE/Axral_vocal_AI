@@ -55,3 +55,26 @@ These are guardrail tests for Axral's API contract only. They do not import or e
 ## Current decision
 
 The safe contract remains `PitchDeltaPoint(time_sec, delta_semitones)`. The current PR validates proposal bounds, request correlation, note coverage, and explicit rest exclusion only. It does not convert or apply proposals to either Desktop or Web. Full import/export parity and the renderer-facing curve adapter remain blocked until the required fixtures and tests exist.
+
+
+## Source-level audit update — 2026-10-11
+
+The current `VO-SE_vocal/main` source was re-read for this audit. This section records observations only; it does not change that repository.
+
+- `modules/data/data_models.py::PitchEvent` explicitly documents `time` in seconds, while `value` is only typed as `float`; no musical unit is encoded in the serialized `time/value` pair.
+- `modules/gui/graph_editor_widget.py::get_value_at_time()` returns the most recent point at or before the query time (step-hold). This is observably different from the Web helper's linear interpolation between UST-derived points.
+- `src/utils/pitchCurve.ts::parsePitchBend()` uses a fixed 0.1 scale for PBS/PBY heights and represents point times as milliseconds relative to the note. `serializePitchBend()` multiplies semitone values by 10 at the UST serialization boundary. The Web regression test covers this parse → serialize → parse round trip.
+- `src/voseCoreClient.ts::buildPitchCurveHz()` converts a MIDI note base frequency plus sampled semitone offset into a dense Hz array. It applies the existing Web smoothing helper before sampling. The bridge and production renderer remain out of scope for changes.
+- The bridge declares a 5 ms frame period constant, while the currently inspected helper computes sample times as `i / (frameCount - 1) * durationMs`. Before designing an adapter, characterize how callers derive `frameCount` and `durationMs`; do not assume the comment alone proves every generated sample is exactly 5 ms apart.
+- The existing Web tests exercise the actual TypeScript utility and instrument the private bridge helper in memory. They do not establish Desktop/Web equivalence, and they do not prove the whole renderer's audio output is unchanged.
+
+### Verified CI snapshot
+
+The latest PR-head workflow run observed during this audit is [run 38108115190](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/38108115190), for commit `db6503247ccd9c4d6e9d22777cd21d5e05d2401b`. Both Python 3.10 and 3.12 jobs completed successfully. This validates the Axral repository's current tests only; it is not a VO-SE_vocal build or audio-regression result.
+
+### Next compatibility work
+
+1. Inspect the Desktop project's save/load path and identify the exact serialized key/path used for `pitch_automation`.
+2. Inspect all call sites that produce `frameCount` and `durationMs` for `buildPitchCurveHz()`; establish whether the dense Hz array's time grid is 5 ms, endpoint-inclusive, or caller-defined.
+3. Add isolated golden fixtures for each representation before any conversion is implemented. Keep the Web production utility and the Desktop evaluator unchanged.
+4. Do not claim parity until the same fixtures can be loaded through both real implementations and compared with explicit, agreed interpolation semantics.
