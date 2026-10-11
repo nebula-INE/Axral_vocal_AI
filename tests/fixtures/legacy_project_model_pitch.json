@@ -1,0 +1,16 @@
+{
+  "pitch_automation": [
+    {
+      "time": 0,
+      "value": 0
+    },
+    {
+      "time": 0.125,
+      "value": 0.5
+    },
+    {
+      "time": 0.25,
+      "value": -1
+    }
+  ]
+}
