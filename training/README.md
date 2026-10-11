@@ -33,7 +33,13 @@ Then train the small ridge-regression MVP and evaluate it on the preassigned val
 python training/train_pitch_model.py path/to/manifest.jsonl --output artifacts/pitch_delta_report.json
 ```
 
-The command validates the manifest, uses only records assigned to `train` for fitting, and reports mean absolute error (MAE) in semitones for train, validation, and test. It also reports a zero-delta baseline (predict no pitch correction) and the MAE improvement over that baseline for each split; negative improvement means the fitted model performed worse. Labels that fall outside any voiced note are counted and skipped. If any split has no usable voiced labels, the run fails instead of reporting misleading metrics. The JSON output includes the feature version, weights, split counts, model/baseline metrics, and explicit safety limitations. Prediction inputs are checked for non-finite values.
+By default, the command reports train and validation metrics only. After model and settings decisions are finalized using validation data, evaluate the held-out test split once by explicitly adding:
+
+```bash
+python training/train_pitch_model.py path/to/manifest.jsonl --output artifacts/pitch_delta_report.json --evaluate-test
+```
+
+The command validates the manifest and uses only records assigned to `train` for fitting. By default it reports mean absolute error (MAE) in semitones for train and validation, plus a zero-delta baseline (predict no pitch correction) and improvement over that baseline; negative improvement means the fitted model performed worse. The held-out test metrics are omitted unless `--evaluate-test` is explicitly supplied after model/settings decisions are finalized. This reduces the risk of tuning against the test set. Labels that fall outside any voiced note are counted and skipped. If any split has no usable voiced labels, the run fails instead of reporting misleading metrics. The JSON output includes the feature version, weights, split counts, model/baseline metrics, and explicit safety limitations. Prediction inputs are checked for non-finite values.
 
 ## Scope and limitations
 
