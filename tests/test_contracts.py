@@ -84,3 +84,90 @@ def test_dict_parsers_validate_external_payloads() -> None:
 def test_dict_parser_rejects_unknown_version() -> None:
     with pytest.raises(ValueError, match="schema_version"):
         request_from_dict({"schema_version": 2, "notes": []})
+
+
+
+def test_response_parser_preserves_seconds_and_signed_semitone_deltas() -> None:
+    # These values are AI-contract units only: seconds + relative semitones.
+    # They must not be interpreted as UST PBS tenths, native automation values,
+    # MIDI note numbers, or absolute Hz values.
+    response = response_from_dict(
+        {
+            "schema_version": 1,
+            "status": "ok",
+            "request_id": "pitch-units-1",
+            "pitch_deltas": [
+                {"time_sec": 0.125, "delta_semitones": -1.5},
+                {"time_sec": 0.375, "delta_semitones": 0.75},
+            ],
+        }
+    )
+
+    assert response.request_id == "pitch-units-1"
+    assert [(point.time_sec, point.delta_semitones) for point in response.pitch_deltas] == [
+        (0.125, -1.5),
+        (0.375, 0.75),
+    ]
+
+
+def test_response_parser_rejects_non_finite_pitch_values() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        response_from_dict(
+            {
+                "schema_version": 1,
+                "status": "ok",
+                "pitch_deltas": [
+                    {"time_sec": 0.25, "delta_semitones": float("nan")}
+                ],
+            }
+        )
+
+
+def test_response_parser_rejects_unsorted_pitch_points() -> None:
+    with pytest.raises(ValueError, match="ordered"):
+        response_from_dict(
+            {
+                "schema_version": 1,
+                "status": "ok",
+                "pitch_deltas": [
+                    {"time_sec": 0.5, "delta_semitones": 0.25},
+                    {"time_sec": 0.25, "delta_semitones": -0.25},
+                ],
+            }
+        )
+
+
+def test_response_parser_rejects_non_list_pitch_deltas() -> None:
+    with pytest.raises(ValueError, match="pitch_deltas must be a list"):
+        response_from_dict({"status": "ok", "pitch_deltas": {"time_sec": 0.0}})
+
+
+def test_response_parser_rejects_non_object_pitch_delta_entries() -> None:
+    with pytest.raises(ValueError, match="entries must be objects"):
+        response_from_dict({"status": "ok", "pitch_deltas": [0.25]})
+
+
+def test_request_parser_rejects_non_object_payload() -> None:
+    with pytest.raises(ValueError, match="request payload must be an object"):
+        request_from_dict(None)  # type: ignore[arg-type]
+
+
+def test_request_parser_rejects_non_object_note_entries() -> None:
+    with pytest.raises(ValueError, match="notes entries must be objects"):
+        request_from_dict({"notes": [60]})
+
+
+def test_request_parser_rejects_non_object_voicebank() -> None:
+    with pytest.raises(ValueError, match="voicebank must be an object"):
+        request_from_dict({"notes": [], "voicebank": ["not", "an", "object"]})
+
+
+@pytest.mark.parametrize("signature", [[4], [4, 4, 4], "4/4", 4])
+def test_request_parser_rejects_malformed_time_signature(signature: object) -> None:
+    with pytest.raises(ValueError, match="time_signature must contain"):
+        request_from_dict({"notes": [], "time_signature": signature})  # type: ignore[dict-item]
+
+
+def test_response_parser_rejects_non_object_payload() -> None:
+    with pytest.raises(ValueError, match="response payload must be an object"):
+        response_from_dict(None)  # type: ignore[arg-type]

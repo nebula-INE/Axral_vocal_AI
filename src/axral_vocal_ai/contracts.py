@@ -126,15 +126,24 @@ class PitchResponse:
 
 def request_from_dict(payload: Dict[str, Any]) -> PitchRequest:
     """Parse and validate a plain dictionary at an API/file boundary."""
+    if not isinstance(payload, dict):
+        raise ValueError("request payload must be an object")
     if payload.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
         raise ValueError("unsupported request schema_version")
     raw_notes = payload.get("notes")
     if not isinstance(raw_notes, list):
         raise ValueError("notes must be a list")
+    if any(not isinstance(item, dict) for item in raw_notes):
+        raise ValueError("notes entries must be objects")
     notes = [PitchNote(**item) for item in raw_notes]
     raw_voicebank = payload.get("voicebank")
+    if raw_voicebank is not None and not isinstance(raw_voicebank, dict):
+        raise ValueError("voicebank must be an object or None")
     voicebank = VoicebankProfile(**raw_voicebank) if raw_voicebank is not None else None
     signature = payload.get("time_signature")
+    if signature is not None:
+        if not isinstance(signature, (list, tuple)) or len(signature) != 2:
+            raise ValueError("time_signature must contain numerator and denominator")
     return PitchRequest(
         notes=notes,
         voicebank=voicebank,
@@ -147,9 +156,16 @@ def request_from_dict(payload: Dict[str, Any]) -> PitchRequest:
 
 def response_from_dict(payload: Dict[str, Any]) -> PitchResponse:
     """Parse and validate a plain dictionary at an API/file boundary."""
+    if not isinstance(payload, dict):
+        raise ValueError("response payload must be an object")
     if payload.get("schema_version", SCHEMA_VERSION) != SCHEMA_VERSION:
         raise ValueError("unsupported response schema_version")
-    points = [PitchDeltaPoint(**item) for item in payload.get("pitch_deltas", [])]
+    raw_points = payload.get("pitch_deltas", [])
+    if not isinstance(raw_points, list):
+        raise ValueError("pitch_deltas must be a list")
+    if any(not isinstance(item, dict) for item in raw_points):
+        raise ValueError("pitch_deltas entries must be objects")
+    points = [PitchDeltaPoint(**item) for item in raw_points]
     return PitchResponse(
         status=payload.get("status", "rejected"),
         pitch_deltas=points,
