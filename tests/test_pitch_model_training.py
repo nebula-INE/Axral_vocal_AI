@@ -1,6 +1,13 @@
+import math
+
 import pytest
 
-from axral_vocal_ai.pitch_model import examples_from_records, fit_ridge, mean_absolute_error
+from axral_vocal_ai.pitch_model import (
+    examples_from_records,
+    fit_ridge,
+    mean_absolute_error,
+    zero_baseline_mae,
+)
 from axral_vocal_ai.training_data import validate_records
 
 
@@ -51,11 +58,40 @@ def test_ridge_training_is_finite_and_serializable():
     test = [row for row in examples if row.split == "test"]
     model = fit_ridge(train, alpha=1.0)
     assert len(model.weights) == 5
-    assert all(value == value and abs(value) != float("inf") for value in model.weights)
+    assert all(math.isfinite(value) for value in model.weights)
     assert mean_absolute_error(validation, model) is not None
     assert mean_absolute_error(test, model) is not None
     assert model.to_dict()["safety"]["production_renderer_integration"] is False
     assert counts["labels_used"] == 12
+
+
+def test_zero_delta_baseline_and_improvement_metric():
+    rows, _ = examples_from_records(synthetic_records())
+    validation = [row for row in rows if row.split == "validation"]
+    model = fit_ridge([row for row in rows if row.split == "train"], alpha=1.0)
+    baseline = zero_baseline_mae(validation)
+    measured = mean_absolute_error(validation, model)
+    assert baseline is not None and measured is not None
+    assert math.isfinite(baseline)
+    assert baseline == pytest.approx(sum(abs(row.target) for row in validation) / len(validation))
+
+
+def test_zero_delta_baseline_empty_and_non_finite_target():
+    assert zero_baseline_mae([]) is None
+    rows, _ = examples_from_records(synthetic_records())
+    rows[0] = rows[0].__class__(
+        features=rows[0].features, target=float("nan"), record_id=rows[0].record_id,
+        voicebank_id=rows[0].voicebank_id, split=rows[0].split,
+    )
+    with pytest.raises(ValueError, match="finite"):
+        zero_baseline_mae(rows)
+
+
+def test_predict_rejects_non_finite_features():
+    rows, _ = examples_from_records(synthetic_records())
+    model = fit_ridge([row for row in rows if row.split == "train"])
+    with pytest.raises(ValueError, match="finite"):
+        model.predict_features([1.0, 0.5, float("nan"), 0.0, 1.0])
 
 
 def test_ridge_rejects_invalid_regularization():
