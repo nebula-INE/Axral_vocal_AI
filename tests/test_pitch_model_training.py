@@ -4,6 +4,7 @@ import pytest
 
 from axral_vocal_ai.pitch_model import (
     _features_for_time,
+    compare_with_zero_baseline,
     examples_from_records,
     fit_ridge,
     mean_absolute_error,
