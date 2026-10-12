@@ -41,6 +41,12 @@ python training/train_pitch_model.py path/to/manifest.jsonl --output artifacts/p
 
 The command validates the manifest and uses only records assigned to `train` for fitting. By default it reports mean absolute error (MAE) in semitones for train and validation, plus a zero-delta baseline (predict no pitch correction) and improvement over that baseline; negative improvement means the fitted model performed worse. The held-out test metrics are omitted unless `--evaluate-test` is explicitly supplied after model/settings decisions are finalized. This reduces the risk of tuning against the test set. Labels that fall outside any voiced note are counted and skipped. If any split has no usable voiced labels, the run fails instead of reporting misleading metrics. The JSON output includes the feature version, weights, split counts, model/baseline metrics, and explicit safety limitations. Prediction inputs are checked for non-finite values.
 
+## Building manifest targets from reviewed labels
+
+The metadata-only helper `axral_vocal_ai.pitch_labels.build_pitch_delta_labels` creates deterministic target-minus-reference pitch labels from two reviewed pitch tracks already expressed in semitones on an identical absolute-seconds grid. It does not estimate pitch from audio, resample, interpolate, or establish that either track is ground truth.
+
+Use `make_training_target(labels, label_source="...", confidence=...)` to package the generated points into the manifest's `target` schema (`kind`, `points`, `label_source`, and optional aggregate `confidence`). It rejects empty labels and malformed timestamps/deltas. This packaging step does not create or approve the surrounding record: source IDs, permission evidence, voicebank-level split, provenance, and preprocessing metadata must still be supplied and reviewed independently.
+
 ## Scope and limitations
 
 - This is a tiny linear ridge-regression model over note pitch, relative note phase, and note duration; it is **not** a neural singing synthesis model.
