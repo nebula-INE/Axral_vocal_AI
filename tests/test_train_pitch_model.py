@@ -42,3 +42,43 @@ def test_assess_validation_rejects_non_finite_or_non_numeric_improvement(improve
 
     assert status == "unavailable"
     assert warnings
+
+
+from types import SimpleNamespace
+
+from training.train_pitch_model import build_label_quality_report
+
+
+def test_label_quality_report_exposes_skip_rates_by_split_and_voicebank():
+    records = [
+        {"voicebank_id": "bank-a", "split": "train", "target": {"points": [{}, {}, {}]}},
+        {"voicebank_id": "bank-b", "split": "validation", "target": {"points": [{}, {}]}},
+        {"voicebank_id": "bank-c", "split": "test", "target": {"points": [{}]}},
+    ]
+    examples = [
+        SimpleNamespace(split="train", voicebank_id="bank-a"),
+        SimpleNamespace(split="train", voicebank_id="bank-a"),
+        SimpleNamespace(split="validation", voicebank_id="bank-b"),
+    ]
+    counts = {"labels_seen": 6, "labels_used": 3, "labels_without_voiced_note": 3}
+
+    report = build_label_quality_report(records, counts, examples)
+
+    assert report["overall"]["label_use_rate"] == pytest.approx(0.5)
+    assert report["overall"]["label_skip_rate"] == pytest.approx(0.5)
+    assert report["by_split"]["train"]["label_use_rate"] == pytest.approx(2 / 3)
+    assert report["by_split"]["validation"]["label_use_rate"] == pytest.approx(0.5)
+    assert report["by_split"]["test"]["label_use_rate"] == 0.0
+    assert report["by_voicebank"]["bank-a"]["train"]["labels_without_voiced_note"] == 1
+    assert "does not measure acoustic correctness" in report["definition"]
+
+
+def test_label_quality_report_handles_no_labels_without_division_by_zero():
+    report = build_label_quality_report(
+        [{"voicebank_id": "bank-a", "split": "train", "target": None}],
+        {"labels_seen": 0, "labels_used": 0, "labels_without_voiced_note": 0},
+        [],
+    )
+    assert report["overall"]["label_use_rate"] is None
+    assert report["overall"]["label_skip_rate"] is None
+    assert report["by_split"]["train"]["label_use_rate"] is None
