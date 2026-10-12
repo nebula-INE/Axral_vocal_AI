@@ -249,3 +249,12 @@ def test_manifest_rejects_invalid_label_confidence(confidence):
 
     with pytest.raises(DatasetValidationError):
         validate_records([make_record(target=target)])
+
+
+
+def test_manifest_rejects_duplicate_target_timestamps():
+    target = make_target()
+    target["points"][1]["time_sec"] = target["points"][0]["time_sec"]
+
+    with pytest.raises(DatasetValidationError, match="strictly increasing"):
+        validate_records([make_record(target=target)])
