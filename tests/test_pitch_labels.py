@@ -1,5 +1,6 @@
 import pytest
 
+from axral_vocal_ai.training_data import validate_record
 from axral_vocal_ai.pitch_labels import (
     PitchLabelError,
     build_pitch_delta_labels,
@@ -136,3 +137,41 @@ def test_training_target_rejects_empty_labels_and_bad_confidence():
 def test_training_target_rejects_invalid_points(labels):
     with pytest.raises(PitchLabelError):
         make_training_target(labels, label_source="reviewed")
+
+
+
+def test_built_target_passes_training_manifest_record_validation():
+    labels = build_pitch_delta_labels(track([60.0, 61.0]), track([60.25, 61.25]))
+    record = {
+        "schema_version": 1,
+        "record_id": "bridge-record",
+        "source_id": "bridge-source",
+        "permission_status": "approved",
+        "license_id": "TEST-REVIEWED-PERMISSION",
+        "voicebank_id": "bridge-bank",
+        "split": "train",
+        "input": {
+            "notes": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.4,
+                    "midi_note": 60,
+                    "lyric": "あ",
+                    "voiced": True,
+                }
+            ]
+        },
+        "target": make_training_target(labels, label_source="reviewed-track-v1"),
+        "provenance": {
+            "acquisition_method": "reviewed fixture",
+            "source_reference": "synthetic://reviewed-fixture",
+            "review_date": "2026-10-12",
+            "review_status": "approved",
+        },
+        "preprocessing": {"tool_version": "fixture-1", "transformations": []},
+    }
+
+    validated = validate_record(record, line_number=1, require_labeled=True)
+
+    assert validated["target"]["kind"] == "pitch_delta_semitones"
+    assert len(validated["target"]["points"]) == 2
