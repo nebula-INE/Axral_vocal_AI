@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 from axral_vocal_ai.pitch_model import (
     examples_from_records,
     compare_with_zero_baseline,
+    evaluate_by_voicebank,
     fit_ridge,
 )
 from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
@@ -53,6 +54,10 @@ def main() -> int:
             split: compare_with_zero_baseline(by_split[split], model)
             for split in evaluated_splits
         }
+        evaluation_by_voicebank = {
+            split: evaluate_by_voicebank(by_split[split], model)
+            for split in evaluated_splits
+        }
         model_mae = {split: metrics["mae_semitones"] for split, metrics in evaluation.items()}
         baseline_mae = {
             split: metrics["zero_delta_baseline_mae_semitones"]
@@ -67,6 +72,7 @@ def main() -> int:
             "mae_semitones": model_mae,
             "zero_delta_baseline_mae_semitones": baseline_mae,
             "evaluation_by_split": evaluation,
+            "evaluation_by_voicebank": evaluation_by_voicebank,
             "model": model.to_dict(),
             "limitations": [
                 "Metadata-only regression MVP; no waveform synthesis.",
@@ -87,6 +93,7 @@ def main() -> int:
             "mae_semitones": model_mae,
             "zero_delta_baseline_mae_semitones": baseline_mae,
             "evaluation_by_split": report["evaluation_by_split"],
+            "evaluation_by_voicebank": report["evaluation_by_voicebank"],
         }, indent=2))
         print(f"Model report written to: {args.output}")
         return 0
