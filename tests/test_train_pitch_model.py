@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from training.train_pitch_model import assess_validation
@@ -25,6 +27,18 @@ def test_assess_validation_baseline_comparison(improvement, expected_status, has
 
 def test_assess_validation_handles_missing_validation_metrics():
     status, warnings = assess_validation({})
+
+    assert status == "unavailable"
+    assert warnings
+
+
+@pytest.mark.parametrize("improvement", [math.nan, math.inf, -math.inf, "0.2", True])
+def test_assess_validation_rejects_non_finite_or_non_numeric_improvement(improvement):
+    status, warnings = assess_validation({
+        "validation": {
+            "mae_improvement_over_zero_baseline_semitones": improvement,
+        }
+    })
 
     assert status == "unavailable"
     assert warnings
