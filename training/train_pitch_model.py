@@ -89,8 +89,70 @@ def build_label_quality_report(records, counts, examples):
         "overall": {
             **counts,
             "label_use_rate": used / seen if seen else None,
-            "label_skip_rate": counts["labels_without_voiced_note"] / seen if seen else None,
+            "labels_not_mapped": seen - used,
+            "label_skip_rate": (seen - used) / seen if seen else None,
         },
+        "by_split": by_split,
+        "by_voicebank": by_voicebank,
+    }
+
+
+def build_target_distribution_report(records):
+    """Summarize target pitch-delta balance from metadata only.
+
+    These descriptive statistics help reveal skew or sparse groups; they do
+    not establish label correctness, acoustic quality, or a rejection threshold.
+    """
+    values_by_group = {"overall": []}
+    for record in records:
+        split = record["split"]
+        bank = record["voicebank_id"]
+        split_key = ("split", split)
+        bank_key = ("voicebank", bank)
+        values_by_group.setdefault(split_key, [])
+        values_by_group.setdefault(bank_key, [])
+        target = record.get("target")
+        points = target.get("points", []) if isinstance(target, dict) else []
+        for point in points:
+            value = float(point["delta_semitones"])
+            values_by_group["overall"].append(value)
+            values_by_group[split_key].append(value)
+            values_by_group[bank_key].append(value)
+
+    def summarize(values):
+        if not values:
+            return {
+                "count": 0, "mean": None, "median": None, "min": None,
+                "max": None, "p10": None, "p90": None,
+                "positive_count": 0, "negative_count": 0, "zero_count": 0,
+            }
+        ordered = sorted(values)
+        middle = len(ordered) // 2
+        median = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+        def quantile(q):
+            # Linear interpolation on the inclusive [0, n-1] index convention.
+            position = (len(ordered) - 1) * q
+            lower = math.floor(position)
+            upper = math.ceil(position)
+            return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+        return {
+            "count": len(ordered),
+            "mean": sum(ordered) / len(ordered),
+            "median": median,
+            "min": ordered[0],
+            "max": ordered[-1],
+            "p10": quantile(0.1),
+            "p90": quantile(0.9),
+            "positive_count": sum(value > 0 for value in ordered),
+            "negative_count": sum(value < 0 for value in ordered),
+            "zero_count": sum(value == 0 for value in ordered),
+        }
+
+    by_split = {key[1]: summarize(values) for key, values in values_by_group.items() if isinstance(key, tuple) and key[0] == "split"}
+    by_voicebank = {key[1]: summarize(values) for key, values in values_by_group.items() if isinstance(key, tuple) and key[0] == "voicebank"}
+    return {
+        "definition": "Descriptive statistics of pitch_delta_semitones labels; these do not measure label correctness or acoustic quality and define no pass/fail threshold.",
+        "overall": summarize(values_by_group["overall"]),
         "by_split": by_split,
         "by_voicebank": by_voicebank,
     }
@@ -136,6 +198,7 @@ def main() -> int:
         }
         validation_assessment, quality_warnings = assess_validation(evaluation)
         label_quality = build_label_quality_report(records, counts, examples)
+        target_distribution = build_target_distribution_report(records)
         report = {
             "status": "experimental_training_complete",
             "validation_assessment": validation_assessment,
@@ -144,6 +207,7 @@ def main() -> int:
             "manifest_validation": summary,
             "label_usage": counts,
             "label_quality": label_quality,
+            "target_distribution": target_distribution,
             "usable_examples_by_split": {split: len(rows) for split, rows in by_split.items()},
             "mae_semitones": model_mae,
             "zero_delta_baseline_mae_semitones": baseline_mae,
@@ -167,6 +231,7 @@ def main() -> int:
             "test_evaluation_included": report["test_evaluation_included"],
             "label_usage": counts,
             "label_quality": report["label_quality"],
+            "target_distribution": report["target_distribution"],
             "usable_examples_by_split": report["usable_examples_by_split"],
             "mae_semitones": model_mae,
             "zero_delta_baseline_mae_semitones": baseline_mae,
