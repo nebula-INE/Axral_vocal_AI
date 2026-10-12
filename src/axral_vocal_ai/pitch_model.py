@@ -204,3 +204,24 @@ def compare_with_zero_baseline(
         "mae_improvement_over_zero_baseline_semitones": improvement,
         "relative_mae_improvement_over_zero_baseline": relative_improvement,
     }
+
+
+
+def evaluate_by_voicebank(
+    examples: Iterable[TrainingExample], model: LinearPitchDeltaModel
+) -> dict[str, dict[str, float | int | None]]:
+    """Report baseline-comparison metrics separately for each voicebank.
+
+    Grouping is diagnostic only; the caller must still enforce voicebank-level
+    split isolation before fitting or interpreting held-out metrics.
+    """
+    grouped: dict[str, list[TrainingExample]] = {}
+    for example in examples:
+        grouped.setdefault(example.voicebank_id, []).append(example)
+    return {
+        bank: {
+            "examples": len(rows),
+            **compare_with_zero_baseline(rows, model),
+        }
+        for bank, rows in sorted(grouped.items())
+    }
