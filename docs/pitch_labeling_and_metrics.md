@@ -33,6 +33,19 @@ A label record must identify:
 
 Synthetic fixture labels are only for testing plumbing. They must never be mixed into real-world quality claims without separate reporting.
 
+
+## 2A. Deterministic pitch-track label construction
+
+The metadata-only helper axral_vocal_ai.pitch_labels.build_pitch_delta_labels creates labels from two already-reviewed pitch tracks. It does not estimate pitch from audio and is not a substitute for human review.
+
+- Both tracks must already use semitones and the same absolute time_sec grid. Mismatched grids are rejected; the helper never aligns, interpolates, smooths, or resamples.
+- Every point must explicitly identify voiced/unvoiced state. Unvoiced pairs are omitted; no label is synthesized across a gap.
+- A configured min_confidence requires confidence on every voiced point. Pairs below the threshold are omitted. The confidence value and threshold must be documented by the caller; the helper does not prescribe an estimator-specific threshold.
+- The delta is always target_pitch_semitones - reference_pitch_semitones. Non-finite values, duplicate/out-of-order timestamps, invalid confidence, and deltas outside +/-2 semitones are rejected. Values are never silently clipped.
+- The output contains only time_sec and delta_semitones. The caller must still attach reviewed source/license/provenance metadata and pass the result through the manifest validator before training.
+
+This helper establishes deterministic arithmetic and input validation only. It does not verify source rights, prove that a pitch track is ground truth, or demonstrate singing quality.
+
 ## 2. Label inclusion rules
 
 - Include only samples whose machine-learning use, storage, derived labels, and model distribution permissions have been reviewed and approved.
