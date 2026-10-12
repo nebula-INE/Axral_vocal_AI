@@ -1,3 +1,4 @@
+import hashlib
 import json
 import subprocess
 import sys
@@ -75,6 +76,13 @@ def test_training_cli_omits_held_out_test_metrics_by_default(tmp_path):
     assert report["test_evaluation_included"] is False
     assert set(report["evaluation_by_split"]) == {"train", "validation"}
     assert "test" not in report["mae_semitones"]
+    metadata = report["run_metadata"]
+    assert metadata["python_version"]
+    assert metadata["numpy_version"]
+    assert metadata["feature_version"] == 1
+    assert metadata["alpha"] == 1.0
+    assert metadata["manifest_sha256"] == hashlib.sha256(manifest.read_bytes()).hexdigest()
+    assert metadata["created_at_utc"].endswith("Z")
 
 
 def test_training_cli_evaluates_test_only_with_explicit_opt_in(tmp_path):
