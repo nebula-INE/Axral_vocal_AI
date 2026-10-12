@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 
@@ -27,8 +28,14 @@ def assess_validation(evaluation: dict[str, dict[str, float | None]]) -> tuple[s
         return "unavailable", ["Validation metrics are unavailable; do not use this model."]
 
     improvement = metrics.get("mae_improvement_over_zero_baseline_semitones")
-    if improvement is None:
-        return "unavailable", ["Validation baseline comparison is unavailable; do not use this model."]
+    if (
+        isinstance(improvement, bool)
+        or not isinstance(improvement, (int, float))
+        or not math.isfinite(improvement)
+    ):
+        return "unavailable", [
+            "Validation baseline comparison is missing or non-finite; do not use this model."
+        ]
     if improvement > 0:
         return "better_than_zero_baseline", []
     if improvement < 0:
