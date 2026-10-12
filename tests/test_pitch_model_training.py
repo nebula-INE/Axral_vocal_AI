@@ -6,6 +6,7 @@ from axral_vocal_ai.pitch_model import (
     _features_for_time,
     LinearPitchDeltaModel,
     compare_with_zero_baseline,
+    evaluate_by_voicebank,
     examples_from_records,
     fit_ridge,
     mean_absolute_error,
@@ -262,3 +263,20 @@ def test_non_overlapping_note_context_still_resolves_at_shared_boundary():
     assert features is not None
     assert features[1] == pytest.approx(72 / 127)
     assert features[2] == pytest.approx(0.0)
+
+
+
+def test_evaluation_reports_metrics_separately_for_each_voicebank():
+    rows, _ = examples_from_records(synthetic_records())
+    train = [row for row in rows if row.split == "train"]
+    validation = [row for row in rows if row.split == "validation"]
+    model = fit_ridge(train)
+
+    report = evaluate_by_voicebank(validation, model)
+
+    assert list(report) == ["bank-b"]
+    assert report["bank-b"]["examples"] == len(validation)
+    assert report["bank-b"]["mae_semitones"] == pytest.approx(
+        mean_absolute_error(validation, model)
+    )
+    assert "test" not in report
