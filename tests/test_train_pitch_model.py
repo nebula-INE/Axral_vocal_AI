@@ -82,3 +82,42 @@ def test_label_quality_report_handles_no_labels_without_division_by_zero():
     assert report["overall"]["label_use_rate"] is None
     assert report["overall"]["label_skip_rate"] is None
     assert report["by_split"]["train"]["label_use_rate"] is None
+
+
+def test_target_distribution_reports_skew_and_summary_statistics():
+    from training.train_pitch_model import build_target_distribution_report
+
+    records = [
+        {"voicebank_id": "bank-a", "split": "train", "target": {"points": [
+            {"delta_semitones": -1.0}, {"delta_semitones": 0.0}, {"delta_semitones": 2.0},
+        ]}},
+        {"voicebank_id": "bank-b", "split": "validation", "target": {"points": [
+            {"delta_semitones": 1.0},
+        ]}},
+    ]
+    report = build_target_distribution_report(records)
+
+    overall = report["overall"]
+    assert overall["count"] == 4
+    assert overall["mean"] == pytest.approx(0.5)
+    assert overall["median"] == pytest.approx(0.5)
+    assert overall["min"] == -1.0
+    assert overall["max"] == 2.0
+    assert overall["positive_count"] == 2
+    assert overall["negative_count"] == 1
+    assert overall["zero_count"] == 1
+    assert report["by_split"]["train"]["count"] == 3
+    assert report["by_voicebank"]["bank-b"]["mean"] == 1.0
+    assert "do not measure label correctness" in report["definition"]
+
+
+def test_target_distribution_handles_empty_groups():
+    from training.train_pitch_model import build_target_distribution_report
+
+    report = build_target_distribution_report([
+        {"voicebank_id": "bank-empty", "split": "train", "target": {"points": []}},
+    ])
+    assert report["overall"]["count"] == 0
+    assert report["overall"]["mean"] is None
+    assert report["by_split"]["train"]["p10"] is None
+    assert report["by_voicebank"]["bank-empty"]["zero_count"] == 0
