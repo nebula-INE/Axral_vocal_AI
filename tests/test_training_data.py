@@ -59,6 +59,24 @@ def test_manifest_rejects_unapproved_sources():
     with pytest.raises(DatasetValidationError, match="not approved"):
         validate_records([make_record(permission="review_required")])
 
+@pytest.mark.parametrize("field", ["acquisition_method", "source_reference", "review_date", "review_status"])
+@pytest.mark.parametrize("value", ["", "   ", None])
+def test_manifest_rejects_empty_provenance_fields(field, value):
+    record = make_record()
+    record["provenance"][field] = value
+
+    with pytest.raises(DatasetValidationError, match=f"provenance.{field} must be a non-empty string"):
+        validate_records([record])
+
+
+@pytest.mark.parametrize("review_date", ["2026/10/11", "11-10-2026", "20261011", "not-a-date"])
+def test_manifest_rejects_non_iso_review_dates(review_date):
+    record = make_record()
+    record["provenance"]["review_date"] = review_date
+
+    with pytest.raises(DatasetValidationError, match="review_date must use YYYY-MM-DD format"):
+        validate_records([record])
+
 
 def test_manifest_rejects_voicebank_leakage_across_splits():
     with pytest.raises(DatasetValidationError, match="multiple splits"):
