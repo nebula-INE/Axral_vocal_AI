@@ -109,7 +109,7 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
             delta = _finite_number(point["delta_semitones"], f"{where}.delta_semitones")
             _require(-MAX_TRAINING_DELTA_SEMITONES <= delta <= MAX_TRAINING_DELTA_SEMITONES,
                      f"{where}.delta_semitones must be within +/-{MAX_TRAINING_DELTA_SEMITONES} semitones")
-            _require(time_sec >= 0 and time_sec >= previous_time, f"{where} timestamps must be non-negative and ordered")
+            _require(time_sec >= 0 and time_sec > previous_time, f"{where} timestamps must be non-negative and strictly increasing")
             previous_time = time_sec
         _require(isinstance(target.get("label_source"), str) and bool(target["label_source"].strip()), f"{prefix}: target.label_source is required")
         if "confidence" in target and target["confidence"] is not None:
