@@ -69,7 +69,7 @@ def test_label_quality_report_exposes_skip_rates_by_split_and_voicebank():
     assert report["by_split"]["train"]["label_use_rate"] == pytest.approx(2 / 3)
     assert report["by_split"]["validation"]["label_use_rate"] == pytest.approx(0.5)
     assert report["by_split"]["test"]["label_use_rate"] == 0.0
-    assert report["by_voicebank"]["bank-a"]["train"]["labels_without_voiced_note"] == 1
+    assert report["by_voicebank"]["bank-a"]["train"]["labels_not_mapped"] == 1
     assert "does not measure acoustic correctness" in report["definition"]
 
 
