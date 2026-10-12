@@ -258,3 +258,29 @@ def test_manifest_rejects_duplicate_target_timestamps():
 
     with pytest.raises(DatasetValidationError, match="strictly increasing"):
         validate_records([make_record(target=target)])
+
+
+
+@pytest.mark.parametrize("transformations", [
+    [""],
+    ["   "],
+    [None],
+    [1],
+    [{"name": "normalize"}],
+])
+def test_manifest_rejects_invalid_preprocessing_transformations(transformations):
+    record = make_record()
+    record["preprocessing"]["transformations"] = transformations
+
+    with pytest.raises(DatasetValidationError, match=r"preprocessing.transformations\[0\] must be a non-empty string"):
+        validate_records([record])
+
+
+def test_manifest_accepts_empty_or_named_preprocessing_transformations():
+    empty = make_record("empty-transformations")
+    named = make_record("named-transformations", bank="bank-b")
+    named["preprocessing"]["transformations"] = ["normalize-amplitude", "resample-48k"]
+
+    summary = validate_records([empty, named])
+
+    assert summary["records"] == 2
