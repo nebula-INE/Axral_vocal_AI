@@ -69,7 +69,7 @@ def build_label_quality_report(records, counts, examples):
     by_split = {}
     by_voicebank = {}
     for (split, bank), item in sorted(groups.items()):
-        item["labels_without_voiced_note"] = item["labels_seen"] - item["labels_used"]
+        item["labels_not_mapped"] = item["labels_seen"] - item["labels_used"]
         item["label_use_rate"] = (
             item["labels_used"] / item["labels_seen"] if item["labels_seen"] else None
         )
@@ -78,7 +78,7 @@ def build_label_quality_report(records, counts, examples):
             by_split[split][field] += item[field]
         by_voicebank.setdefault(bank, {})[split] = item
     for item in by_split.values():
-        item["labels_without_voiced_note"] = item["labels_seen"] - item["labels_used"]
+        item["labels_not_mapped"] = item["labels_seen"] - item["labels_used"]
         item["label_use_rate"] = (
             item["labels_used"] / item["labels_seen"] if item["labels_seen"] else None
         )
