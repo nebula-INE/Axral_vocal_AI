@@ -3,16 +3,40 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import platform
 from pathlib import Path
+import subprocess
 import sys
+from datetime import datetime, timezone
+
+import numpy as np
 
 # Running this file directly adds training/ rather than the repository root.
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+
+def _source_revision() -> str | None:
+    """Return an explicitly supplied or locally discoverable source revision."""
+    supplied = os.environ.get("AXRAL_SOURCE_REVISION") or os.environ.get("GITHUB_SHA")
+    if supplied and supplied.strip():
+        return supplied.strip()
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+            text=True, check=True, timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    revision = result.stdout.strip()
+    return revision or None
+
 from axral_vocal_ai.pitch_model import (
+    FEATURE_VERSION,
     examples_from_records,
     compare_with_zero_baseline,
     fit_ridge,
@@ -60,6 +84,15 @@ def main() -> int:
         }
         report = {
             "status": "experimental_training_complete",
+            "run_metadata": {
+                "created_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+                "source_revision": _source_revision(),
+                "python_version": platform.python_version(),
+                "numpy_version": np.__version__,
+                "feature_version": FEATURE_VERSION,
+                "alpha": args.alpha,
+                "manifest_sha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
+            },
             "test_evaluation_included": args.evaluate_test,
             "manifest_validation": summary,
             "label_usage": counts,
@@ -81,6 +114,7 @@ def main() -> int:
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(json.dumps({
             "status": report["status"],
+            "run_metadata": report["run_metadata"],
             "test_evaluation_included": report["test_evaluation_included"],
             "label_usage": counts,
             "usable_examples_by_split": report["usable_examples_by_split"],
