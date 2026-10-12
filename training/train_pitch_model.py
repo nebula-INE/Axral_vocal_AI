@@ -20,6 +20,26 @@ from axral_vocal_ai.pitch_model import (
 from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
 
 
+def assess_validation(evaluation: dict[str, dict[str, float | None]]) -> tuple[str, list[str]]:
+    """Summarize validation performance without treating training completion as quality."""
+    metrics = evaluation.get("validation")
+    if not metrics:
+        return "unavailable", ["Validation metrics are unavailable; do not use this model."]
+
+    improvement = metrics.get("mae_improvement_over_zero_baseline_semitones")
+    if improvement is None:
+        return "unavailable", ["Validation baseline comparison is unavailable; do not use this model."]
+    if improvement > 0:
+        return "better_than_zero_baseline", []
+    if improvement < 0:
+        return "worse_than_zero_baseline", [
+            "Validation MAE is worse than the zero-delta baseline; do not use this model without investigating."
+        ]
+    return "equal_to_zero_baseline", [
+        "Validation MAE does not improve on the zero-delta baseline; there is no demonstrated benefit."
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path, help="metadata-only JSONL manifest")
@@ -58,8 +78,11 @@ def main() -> int:
             split: metrics["zero_delta_baseline_mae_semitones"]
             for split, metrics in evaluation.items()
         }
+        validation_assessment, quality_warnings = assess_validation(evaluation)
         report = {
             "status": "experimental_training_complete",
+            "validation_assessment": validation_assessment,
+            "quality_warnings": quality_warnings,
             "test_evaluation_included": args.evaluate_test,
             "manifest_validation": summary,
             "label_usage": counts,
@@ -81,6 +104,8 @@ def main() -> int:
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(json.dumps({
             "status": report["status"],
+            "validation_assessment": report["validation_assessment"],
+            "quality_warnings": report["quality_warnings"],
             "test_evaluation_included": report["test_evaluation_included"],
             "label_usage": counts,
             "usable_examples_by_split": report["usable_examples_by_split"],
