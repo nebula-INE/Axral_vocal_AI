@@ -124,7 +124,13 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     preprocessing = record["preprocessing"]
     _require(isinstance(preprocessing, dict), f"{prefix}: preprocessing must be an object")
     _require(isinstance(preprocessing.get("tool_version"), str) and bool(preprocessing["tool_version"].strip()), f"{prefix}: preprocessing.tool_version is required")
-    _require(isinstance(preprocessing.get("transformations"), list), f"{prefix}: preprocessing.transformations must be a list")
+    transformations = preprocessing.get("transformations")
+    _require(isinstance(transformations, list), f"{prefix}: preprocessing.transformations must be a list")
+    for index, transformation in enumerate(transformations):
+        _require(
+            isinstance(transformation, str) and bool(transformation.strip()),
+            f"{prefix}: preprocessing.transformations[{index}] must be a non-empty string",
+        )
     return record
 
 
