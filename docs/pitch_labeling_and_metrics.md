@@ -34,7 +34,7 @@ A label record must identify:
 Synthetic fixture labels are only for testing plumbing. They must never be mixed into real-world quality claims without separate reporting.
 
 
-## 2A. Deterministic pitch-track label construction
+## Deterministic pitch-track label construction
 
 The metadata-only helper axral_vocal_ai.pitch_labels.build_pitch_delta_labels creates labels from two already-reviewed pitch tracks. It does not estimate pitch from audio and is not a substitute for human review.
 
