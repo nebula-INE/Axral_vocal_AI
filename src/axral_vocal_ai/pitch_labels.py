@@ -109,3 +109,62 @@ def build_pitch_delta_labels(
             )
         labels.append({"time_sec": ref["time_sec"], "delta_semitones": delta})
     return labels
+
+
+
+def make_training_target(
+    labels: Iterable[Mapping[str, Any]],
+    *,
+    label_source: str,
+    confidence: float | None = None,
+) -> dict[str, Any]:
+    """Wrap reviewed label points in the manifest's training target schema.
+
+    This is the bridge between :func:`build_pitch_delta_labels` and
+    `training_data.validate_record`. It only packages metadata; callers remain
+    responsible for source rights, review evidence, and manifest provenance.
+    Empty labels are rejected because the manifest training schema requires at
+    least one usable target point.
+    """
+    if not isinstance(label_source, str) or not label_source.strip():
+        raise PitchLabelError("label_source must be a non-empty string")
+
+    normalized_confidence: float | None = None
+    if confidence is not None:
+        normalized_confidence = _finite_number(confidence, "confidence")
+        if not 0.0 <= normalized_confidence <= 1.0:
+            raise PitchLabelError("confidence must be in [0, 1]")
+
+    normalized_labels: list[dict[str, float]] = []
+    previous_time = -math.inf
+    for index, label in enumerate(labels):
+        where = f"labels[{index}]"
+        if not isinstance(label, Mapping):
+            raise PitchLabelError(f"{where} must be an object")
+        if "time_sec" not in label or "delta_semitones" not in label:
+            raise PitchLabelError(f"{where} requires time_sec and delta_semitones")
+        time_sec = _finite_number(label["time_sec"], f"{where}.time_sec")
+        delta = _finite_number(label["delta_semitones"], f"{where}.delta_semitones")
+        if time_sec < 0.0 or time_sec <= previous_time:
+            raise PitchLabelError(
+                f"{where}.time_sec must be non-negative and strictly increasing"
+            )
+        if not -MAX_DELTA_SEMITONES <= delta <= MAX_DELTA_SEMITONES:
+            raise PitchLabelError(
+                f"{where}.delta_semitones must be within "
+                f"+/-{MAX_DELTA_SEMITONES} semitones"
+            )
+        normalized_labels.append({"time_sec": time_sec, "delta_semitones": delta})
+        previous_time = time_sec
+
+    if not normalized_labels:
+        raise PitchLabelError("labels must contain at least one usable point")
+
+    target: dict[str, Any] = {
+        "kind": "pitch_delta_semitones",
+        "points": normalized_labels,
+        "label_source": label_source.strip(),
+    }
+    if normalized_confidence is not None:
+        target["confidence"] = normalized_confidence
+    return target
