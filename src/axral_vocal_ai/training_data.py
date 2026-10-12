@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -120,7 +121,21 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     _require(isinstance(provenance, dict), f"{prefix}: provenance must be an object")
     for field in ("acquisition_method", "source_reference", "review_date", "review_status"):
         _require(field in provenance, f"{prefix}: provenance missing {field}")
+        _require(
+            isinstance(provenance[field], str) and bool(provenance[field].strip()),
+            f"{prefix}: provenance.{field} must be a non-empty string",
+        )
     _require(provenance["review_status"] == "approved", f"{prefix}: provenance review_status must be approved")
+    try:
+        parsed_review_date = date.fromisoformat(provenance["review_date"])
+    except ValueError as exc:
+        raise DatasetValidationError(
+            f"{prefix}: provenance.review_date must use YYYY-MM-DD format"
+        ) from exc
+    _require(
+        parsed_review_date.isoformat() == provenance["review_date"],
+        f"{prefix}: provenance.review_date must use YYYY-MM-DD format",
+    )
     preprocessing = record["preprocessing"]
     _require(isinstance(preprocessing, dict), f"{prefix}: preprocessing must be an object")
     _require(isinstance(preprocessing.get("tool_version"), str) and bool(preprocessing["tool_version"].strip()), f"{prefix}: preprocessing.tool_version is required")
