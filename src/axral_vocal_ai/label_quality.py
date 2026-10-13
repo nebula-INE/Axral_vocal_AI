@@ -70,7 +70,7 @@ def audit_label_quality(
             if not overlaps:
                 normalized_notes.append((note_index, start, end))
 
-        mapped: list[tuple[float, float, int]] = []
+        mapped: list[tuple[float, float, int] | None] = []
         flags: list[dict[str, Any]] = []
         for point_index, point in enumerate(points):
             time_sec = float(point["time_sec"])
@@ -88,6 +88,7 @@ def audit_label_quality(
                     "time_sec": time_sec,
                     "severity": "review",
                 })
+                mapped.append(None)
             else:
                 totals["labels_mapped_to_unique_voiced_note"] += 1
                 mapped.append((time_sec, delta, matches[0]))
@@ -103,7 +104,11 @@ def audit_label_quality(
                     "severity": "review",
                 })
 
+        # Compare only truly adjacent labels in the manifest sequence. Do not
+        # bridge over an unmapped label, a rest, or an overlapping-note region.
         for previous, current in zip(mapped, mapped[1:]):
+            if previous is None or current is None:
+                continue
             time_a, delta_a, note_a = previous
             time_b, delta_b, note_b = current
             if note_a != note_b:
