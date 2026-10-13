@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit metadata and pitch-label coverage without opening audio."""
+"""Audit dataset readiness and pitch-label review flags without opening audio."""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from axral_vocal_ai.dataset_audit import audit_dataset
+from axral_vocal_ai.label_quality import audit_label_quality
 from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
 
 
@@ -30,6 +31,7 @@ def main() -> int:
                 if line.strip() and not line.lstrip().startswith("#")
             ]
         report = audit_dataset(records)
+        report["label_quality_review"] = audit_label_quality(records)
         report["manifest_validation"] = validation
         encoded = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         if args.output:
