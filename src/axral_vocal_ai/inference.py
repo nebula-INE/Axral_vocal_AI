@@ -1,6 +1,6 @@
 """File-backed, proposal-only pitch-delta inference runtime.
 
-The runtime emits sparse midpoint proposals only. It never edits a project,
+The runtime emits bounded pitch proposals only. It never edits a project,
 changes a pitch curve, reads audio, or invokes the production renderer.
 """
 from __future__ import annotations
@@ -56,7 +56,28 @@ class PitchDeltaInferenceRuntime:
         return cls(model)
 
     def predict(self, request: PitchRequest) -> PitchResponse:
-        """Return one bounded midpoint proposal for each unambiguous voiced note."""
+        """Return one bounded midpoint proposal per unambiguous voiced note.
+
+        Kept as the backward-compatible sparse API. Use predict_curve() to
+        sample the model's existing note-phase feature across each eligible note.
+        """
+        return self._predict(request, samples_per_note=1)
+
+    def predict_curve(
+        self, request: PitchRequest, *, samples_per_note: int = 9
+    ) -> PitchResponse:
+        """Return a time-varying proposal curve without applying it to a project.
+
+        Samples are evenly spaced strictly inside each eligible note interval.
+        Notes overlapping any other interval are skipped conservatively. The
+        sample count is bounded to avoid accidentally generating huge responses.
+        This is still only a proposal curve: it is not acoustically validated.
+        """
+        if type(samples_per_note) is not int or not 1 <= samples_per_note <= 101:
+            raise ValueError("samples_per_note must be an integer in the range 1..101")
+        return self._predict(request, samples_per_note=samples_per_note)
+
+    def _predict(self, request: PitchRequest, *, samples_per_note: int) -> PitchResponse:
         if not isinstance(request, PitchRequest):
             raise TypeError("request must be a PitchRequest")
         if not request.notes:
@@ -88,23 +109,27 @@ class PitchDeltaInferenceRuntime:
                 warnings.append(f"note {index} skipped: overlapping note intervals")
                 continue
 
-            midpoint = (note.start_sec + note.end_sec) / 2.0
             duration = note.end_sec - note.start_sec
-            features = (
-                1.0,
-                note.midi_note / 127.0,
-                0.5,
-                0.25,
-                duration,
-            )
-            if len(features) != len(FEATURE_NAMES):
-                raise RuntimeError("runtime feature contract is inconsistent")
-            delta = self._model.predict_features(features)
-            if abs(delta) > MAX_PREDICTION_DELTA_SEMITONES:
-                # The model already bounds output; retain a defensive assertion.
-                raise RuntimeError("model output exceeded the pitch-delta safety bound")
-            if delta != 0.0:
-                proposals.append(PitchDeltaPoint(time_sec=midpoint, delta_semitones=delta))
+            for sample_index in range(1, samples_per_note + 1):
+                phase = sample_index / (samples_per_note + 1)
+                time_sec = note.start_sec + duration * phase
+                features = (
+                    1.0,
+                    note.midi_note / 127.0,
+                    phase,
+                    phase * phase,
+                    duration,
+                )
+                if len(features) != len(FEATURE_NAMES):
+                    raise RuntimeError("runtime feature contract is inconsistent")
+                delta = self._model.predict_features(features)
+                if abs(delta) > MAX_PREDICTION_DELTA_SEMITONES:
+                    # The model already bounds output; retain a defensive assertion.
+                    raise RuntimeError("model output exceeded the pitch-delta safety bound")
+                if delta != 0.0:
+                    proposals.append(
+                        PitchDeltaPoint(time_sec=time_sec, delta_semitones=delta)
+                    )
 
         if not proposals:
             response = PitchResponse(
@@ -120,7 +145,6 @@ class PitchDeltaInferenceRuntime:
                 request_id=request.request_id,
             )
 
-        # Treat the same public response gate as any future adapter boundary.
         validate_pitch_response(
             request,
             response,
