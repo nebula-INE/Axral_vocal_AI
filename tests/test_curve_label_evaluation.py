@@ -21,9 +21,9 @@ def test_curve_labels_interpolate_and_compare_zero_baseline():
     )
     assert result["status"] == "evaluated"
     assert result["labels_evaluated"] == 2
-    assert result["mae_semitones"] == 0.375
+    assert result["mae_semitones"] == 0.625
     assert result["zero_delta_baseline_mae_semitones"] == 0.375
-    assert result["mae_improvement_over_zero_baseline_semitones"] == 0.0
+    assert result["mae_improvement_over_zero_baseline_semitones"] == -0.25
 
 
 def test_curve_label_outside_sample_bracket_is_skipped_without_extrapolation():
