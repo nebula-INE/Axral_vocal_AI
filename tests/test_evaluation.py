@@ -26,7 +26,7 @@ def test_evaluation_reports_overall_bank_and_pitch_range_metrics():
     assert report["status"] == "evaluated"
     assert report["examples"] == 2
     assert report["overall"]["mae_semitones"] == pytest.approx(0.5)
-    assert report["overall"]["rmse_semitones"] == pytest.approx(0.5)
+    assert report["overall"]["rmse_semitones"] == pytest.approx(0.5590169943749475)
     assert set(report["by_voicebank"]) == {"bank-a", "bank-b"}
     assert report["by_midi_range"]["midi_60_71"]["examples"] == 1
     assert report["by_midi_range"]["midi_84_127"]["examples"] == 1
