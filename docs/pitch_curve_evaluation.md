@@ -27,3 +27,36 @@ renderer. Synthetic tests verify API behavior and arithmetic only. Before any
 renderer integration, evaluate on rights-cleared real recordings, compare with
 the zero-delta baseline and held-out voicebanks, inspect label quality, and run
 blinded listening tests.
+
+
+## Scoring sampled curves against timestamped labels
+
+For reviewed, rights-cleared labels with `time_sec` and `delta_semitones`,
+the emitted curve can be scored with within-note linear interpolation:
+
+```python
+from axral_vocal_ai.curve_label_evaluation import evaluate_pitch_curve_against_labels
+
+response = runtime.predict_curve(request, samples_per_note=9)
+report = evaluate_pitch_curve_against_labels(
+    request,
+    response,
+    [
+        {"time_sec": 0.42, "delta_semitones": 0.3},
+        {"time_sec": 0.67, "delta_semitones": -0.1},
+    ],
+)
+```
+
+The report includes MAE, zero-delta baseline MAE, and signed improvement
+(baseline MAE minus curve MAE). Labels are skipped when they are not strictly
+inside one eligible non-overlapping note or cannot be bracketed by two samples
+from that same note. No extrapolation is performed at note edges, and points
+from adjacent notes are never used to interpolate a label. A report with no
+evaluable labels is marked `insufficient_coverage`; it must not be interpreted
+as a zero error or a successful model result.
+
+This scores the emitted sampled curve rather than the model's unsampled
+continuous behavior. These metadata metrics are not a substitute for checking
+label provenance, held-out voicebanks, audio quality, or blinded listening
+tests. The function never reads audio or invokes a renderer.
