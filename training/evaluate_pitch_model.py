@@ -47,9 +47,11 @@ def main() -> int:
         with args.manifest.open("r", encoding="utf-8") as stream:
             records = [json.loads(line) for line in stream
                        if line.strip() and not line.lstrip().startswith("#")]
-        examples, label_usage = examples_from_records(records)
-        selected = [example for example in examples if example.split == args.split]
         selected_records = [record for record in records if record.get("split") == args.split]
+        # Build counts and examples only from the requested split; the manifest
+        # gate still validates split isolation across the complete manifest.
+        examples, label_usage = examples_from_records(selected_records)
+        selected = [example for example in examples if example.split == args.split]
         model = _load_model(args.model)
         report = evaluate_stratified(selected, model, split=args.split)
         report["manifest_validation"] = manifest_summary
