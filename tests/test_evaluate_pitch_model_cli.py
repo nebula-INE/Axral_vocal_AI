@@ -108,4 +108,8 @@ def test_evaluation_cli_scopes_label_review_to_requested_split(tmp_path):
     assert report["label_quality_review"]["labels_seen"] == 2
     assert report["label_quality_review"]["records_with_flags"] == 1
     assert "eval-bank-test" not in report["by_voicebank"]
+    assert "eval-bank-test" not in json.dumps(report)
+    assert "records_by_split" not in report["manifest_validation"]
+    assert "voicebanks_by_split" not in report["manifest_validation"]
+    assert report["manifest_validation"]["full_manifest_schema_and_split_isolation_validated"] is True
     assert saved_report["label_quality_review"] == report["label_quality_review"]
