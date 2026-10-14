@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from axral_vocal_ai.evaluation import evaluate_stratified
+from axral_vocal_ai.label_quality import audit_label_quality
 from axral_vocal_ai.pitch_model import LinearPitchDeltaModel, examples_from_records
 from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
 
@@ -48,10 +49,20 @@ def main() -> int:
                        if line.strip() and not line.lstrip().startswith("#")]
         examples, label_usage = examples_from_records(records)
         selected = [example for example in examples if example.split == args.split]
+        selected_records = [record for record in records if record.get("split") == args.split]
         model = _load_model(args.model)
         report = evaluate_stratified(selected, model, split=args.split)
         report["manifest_validation"] = manifest_summary
         report["label_usage"] = label_usage
+        # Keep review flags scoped to the same split as the reported metrics.
+        # This avoids inspecting held-out test labels during validation runs.
+        report["label_quality_review"] = audit_label_quality(selected_records)
+        report["evaluation_scope"] = {
+            "split": args.split,
+            "records_in_split": len(selected_records),
+            "usable_labeled_examples": len(selected),
+            "held_out_test_metrics_included": False,
+        }
         encoded = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
