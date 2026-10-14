@@ -22,7 +22,7 @@ def test_nfkc_normalizes_full_width_latin_but_does_not_rewrite_it_as_phonemes() 
 
 def test_kanji_is_preserved_and_flagged_for_reading_review() -> None:
     result = normalize_japanese_lyric("明日は晴れ")
-    assert result.normalized == "明日ハ晴レ"
+    assert result.normalized == "明日は晴れ"
     assert result.status == "needs_reading"
     assert result.contains_kanji
     assert any("reading is unresolved" in warning for warning in result.warnings)
