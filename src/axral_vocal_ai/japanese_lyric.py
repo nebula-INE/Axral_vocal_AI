@@ -56,8 +56,12 @@ def normalize_japanese_lyric(text: str) -> LyricNormalization:
 
     normalized = unicodedata.normalize("NFKC", text)
     normalized = " ".join(normalized.split())
-    normalized = _hiragana_to_katakana(normalized)
     contains_kanji = any(_is_cjk_ideograph(char) for char in normalized)
+    # Converting kana inside kanji-containing text can corrupt lexical readings
+    # (for example, the particle は in 明日は晴れ). Defer that whole token to
+    # reading resolution instead of making a misleading partial conversion.
+    if not contains_kanji:
+        normalized = _hiragana_to_katakana(normalized)
 
     if not normalized:
         return LyricNormalization(
