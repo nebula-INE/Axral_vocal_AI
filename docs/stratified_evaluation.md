@@ -18,7 +18,7 @@ python training/evaluate_pitch_model.py dataset/manifest.jsonl artifacts/pitch_d
 
 The default split is `test`. Use `validation` during model development; only
 evaluate the held-out test split after model/settings decisions are finalized.
-The evaluator does not train, read audio, synthesize, or modify a project.
+The report also includes a heuristic `label_quality_review` for the requested split only, plus an `evaluation_scope` summary. A validation run therefore does not emit test-split metrics or inspect test-split label-review flags. The evaluator does not train, read audio, synthesize, or modify a project.
 
 ## Metrics
 
@@ -26,7 +26,7 @@ Each group reports example count, mean absolute error (MAE), root mean square
 error (RMSE), and comparison with the zero-delta baseline. Positive MAE
 improvement means the model beats predicting no correction; negative means it
 does worse. Empty pitch bins are explicitly reported with zero examples and
-null metrics rather than being mistaken for successful performance.
+null metrics rather than being mistaken for successful performance. The JSON report includes the manifest validation result, overall label-use counts, split-scoped label-review flags, and output scope metadata alongside the metrics.
 
 Pitch ranges are MIDI 0–47, 48–59, 60–71, 72–83, and 84–127. Voicebank groups
 use the opaque `voicebank_id` from the validated manifest.
