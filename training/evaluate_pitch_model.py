@@ -48,13 +48,19 @@ def main() -> int:
             records = [json.loads(line) for line in stream
                        if line.strip() and not line.lstrip().startswith("#")]
         selected_records = [record for record in records if record.get("split") == args.split]
-        # Build counts and examples only from the requested split; the manifest
-        # gate still validates split isolation across the complete manifest.
+        # Validate the complete manifest for schema and split isolation, but
+        # expose only a non-counting summary in the split-specific report.
+        # This prevents validation reports from revealing held-out split sizes
+        # or voicebank IDs through nested manifest metadata.
         examples, label_usage = examples_from_records(selected_records)
         selected = [example for example in examples if example.split == args.split]
         model = _load_model(args.model)
         report = evaluate_stratified(selected, model, split=args.split)
-        report["manifest_validation"] = manifest_summary
+        report["manifest_validation"] = {
+            "status": manifest_summary["status"],
+            "require_labeled": manifest_summary["require_labeled"],
+            "full_manifest_schema_and_split_isolation_validated": True,
+        }
         report["label_usage"] = label_usage
         # Keep review flags scoped to the same split as the reported metrics.
         # This avoids inspecting held-out test labels during validation runs.
