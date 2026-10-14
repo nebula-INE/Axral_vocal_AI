@@ -63,7 +63,7 @@ def parse_prefix_map(text: str) -> PrefixMapParseResult:
         line = raw.rstrip("\r\n")
         if not line.strip() or line.lstrip().startswith(("#", ";")):
             continue
-        parts = line.split("\\t") if "\\t" in line else re.split(r"\\s+", line.strip())
+        parts = line.split("\t") if "\t" in line else re.split(r"\s+", line.strip())
         parts = [part.strip() for part in parts]
         if len(parts) < 2 or len(parts) > 3:
             issues.append(PrefixMapIssue(line_number, "Expected two or three tab-separated fields.", raw))
