@@ -77,7 +77,7 @@ def test_cp932_voicebank_metadata_is_supported(tmp_path: Path) -> None:
 def test_reports_malformed_existing_wav(tmp_path: Path) -> None:
     (tmp_path / "broken.wav").write_bytes(b"RIFF")
     (tmp_path / "oto.ini").write_text(
-        "broken.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "broken.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     result = analyze_voicebank(tmp_path)
