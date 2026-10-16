@@ -14,6 +14,7 @@ from typing import Any
 
 from axral_vocal_ai.oto_inventory import OtoEntry, parse_oto_ini
 from axral_vocal_ai.prefix_map import PrefixMapEntry, parse_prefix_map
+from axral_vocal_ai.wav_metadata import WavMetadata, inspect_wav
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,13 @@ class AliasPatternEvidence:
 
 
 @dataclass(frozen=True)
+class WavFileAudit:
+    path: str
+    metadata: WavMetadata | None
+    error: str | None = None
+
+
+@dataclass(frozen=True)
 class VoicebankAnalysis:
     root: str
     oto_files: tuple[str, ...]
@@ -41,6 +49,7 @@ class VoicebankAnalysis:
     prefix_entries: tuple[PrefixMapEntry, ...]
     duplicate_aliases: tuple[tuple[str, tuple[str, ...]], ...]
     pattern_evidence: tuple[AliasPatternEvidence, ...]
+    wav_files: tuple[WavFileAudit, ...]
     issues: tuple[VoicebankIssue, ...]
 
     @property
@@ -52,6 +61,8 @@ class VoicebankAnalysis:
             "unique_aliases": len({entry.alias for entry in self.entries}),
             "duplicate_alias_groups": len(self.duplicate_aliases),
             "prefix_map_entries": len(self.prefix_entries),
+            "wav_files_checked": len(self.wav_files),
+            "wav_files_invalid": sum(item.error is not None for item in self.wav_files),
             "errors": sum(issue.severity == "error" for issue in self.issues),
             "warnings": sum(issue.severity == "warning" for issue in self.issues),
         }
@@ -71,6 +82,11 @@ class VoicebankAnalysis:
                 for alias, locations in self.duplicate_aliases
             ],
             "pattern_evidence": [asdict(item) for item in self.pattern_evidence],
+            "wav_files": [
+                {"path": item.path, "metadata": asdict(item.metadata) if item.metadata else None,
+                 "error": item.error}
+                for item in self.wav_files
+            ],
             "issues": [asdict(issue) for issue in self.issues],
         }
 
@@ -167,6 +183,38 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
             entries.append(OtoEntry(entry.source_line, rebased, entry.alias, entry.offset,
                                     entry.consonant, entry.cutoff, entry.preutterance, entry.overlap))
 
+    # Inspect each unique, existing sample once. This is structural metadata
+    # validation only; it does not decode audio or claim phonetic correctness.
+    wav_files: list[WavFileAudit] = []
+    seen_wav_paths: set[str] = set()
+    for entry in entries:
+        relative_wav = entry.wav_filename
+        if relative_wav in seen_wav_paths:
+            continue
+        seen_wav_paths.add(relative_wav)
+        candidate = (root_path / relative_wav).resolve()
+        try:
+            candidate.relative_to(root_path)
+        except ValueError:
+            continue
+        if not candidate.is_file():
+            continue
+        try:
+            metadata = inspect_wav(candidate)
+        except (OSError, ValueError) as exc:
+            wav_files.append(WavFileAudit(relative_wav, None, str(exc)))
+            issues.append(VoicebankIssue(
+                "error", "wav_invalid", relative_wav, None,
+                f"WAV metadata inspection failed: {exc}",
+            ))
+            continue
+        wav_files.append(WavFileAudit(relative_wav, metadata))
+        for code in metadata.issues:
+            issues.append(VoicebankIssue(
+                "warning", f"wav_{code}", relative_wav, None,
+                f"WAV metadata check reported: {code}",
+            ))
+
     for path in prefix_paths:
         relative_path = _relative(root_path, path)
         try:
@@ -219,5 +267,6 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         prefix_entries=tuple(prefix_entries),
         duplicate_aliases=duplicates,
         pattern_evidence=evidence,
+        wav_files=tuple(wav_files),
         issues=tuple(issues),
     )
