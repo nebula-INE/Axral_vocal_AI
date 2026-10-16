@@ -34,8 +34,12 @@ def test_scans_nested_oto_and_rebases_wav_paths(tmp_path: Path) -> None:
     assert result.summary["wav_files_checked"] == 2
     assert result.summary["wav_files_invalid"] == 0
     assert {item.path for item in result.wav_files} == {"a.wav", "voice/sub/i.wav"}
+    assert all(item.signal is not None for item in result.wav_files)
+    assert all("digital_silence" in item.signal.issues for item in result.wav_files)
     assert len(result.prefix_entries) == 1
-    assert json.loads(result.to_json())["schema_version"] == 1
+    report = json.loads(result.to_json())
+    assert report["schema_version"] == 1
+    assert "signal" in report["wav_files"][0]
 
 
 def test_reports_missing_wav_and_duplicate_alias(tmp_path: Path) -> None:
