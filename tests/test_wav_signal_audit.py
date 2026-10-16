@@ -61,3 +61,22 @@ def test_invalid_threshold_is_rejected(tmp_path: Path) -> None:
         assert "near_silence_threshold" in str(exc)
     else:
         raise AssertionError("invalid threshold should raise ValueError")
+
+def test_handles_unsigned_8_bit_pcm_and_stereo_frames(tmp_path: Path) -> None:
+    mono_path = tmp_path / "eight_bit_silence.wav"
+    write_pcm(mono_path, [0] * 32, width=1)
+    mono = inspect_pcm_signal(mono_path, chunk_frames=3)
+    assert mono.status == "ok"
+    assert mono.frames_checked == 32
+    assert mono.peak_normalized == 0.0
+    assert "digital_silence" in mono.issues
+
+    stereo_path = tmp_path / "stereo.wav"
+    write_pcm(stereo_path, [1000, -1000, 2000, -2000, 3000, -3000, 4000, -4000],
+              width=2, channels=2)
+    stereo = inspect_pcm_signal(stereo_path, chunk_frames=1)
+    assert stereo.status == "ok"
+    assert stereo.frames_checked == 4
+    assert stereo.peak_normalized > 0.0
+    assert "digital_silence" not in stereo.issues
+
