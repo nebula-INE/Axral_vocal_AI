@@ -63,8 +63,13 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
             sample_count = 0
             frames_checked = 0
             clipped = False
+            # Bound reads by bytes as well as frames: a malformed file can
+            # declare an extreme channel count, making a frame-only limit huge.
+            bytes_per_frame = width * max(audio.getnchannels(), 1)
+            max_chunk_bytes = 1024 * 1024
+            bounded_chunk_frames = max(1, min(chunk_frames, max_chunk_bytes // bytes_per_frame))
             while True:
-                raw = audio.readframes(chunk_frames)
+                raw = audio.readframes(bounded_chunk_frames)
                 if not raw:
                     break
                 samples = _decode_pcm(raw, width)
