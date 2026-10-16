@@ -210,7 +210,8 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                 f"WAV metadata inspection failed: {exc}",
             ))
             continue
-        signal = inspect_pcm_signal(candidate)
+        signal = (inspect_pcm_signal(candidate) if metadata.audio_format_code == 1 else
+                  WavSignalAudit("unsupported", 0, None, None, ("non_pcm_format_unsupported",)))
         wav_files.append(WavFileAudit(relative_wav, metadata, signal=signal))
         for code in metadata.issues:
             issues.append(VoicebankIssue(
