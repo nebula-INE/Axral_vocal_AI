@@ -63,6 +63,7 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
             sample_count = 0
             frames_checked = 0
             clipped = False
+            malformed_data: set[str] = set()
             # Bound reads by bytes as well as frames: a malformed file can
             # declare an extreme channel count, making a frame-only limit huge.
             bytes_per_frame = width * max(audio.getnchannels(), 1)
@@ -72,7 +73,12 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
                 raw = audio.readframes(bounded_chunk_frames)
                 if not raw:
                     break
+                if len(raw) % width:
+                    malformed_data.add("incomplete_pcm_sample")
                 samples = _decode_pcm(raw, width)
+                channels = max(audio.getnchannels(), 1)
+                if len(samples) % channels:
+                    malformed_data.add("incomplete_sample_frame")
                 if not samples:
                     break
                 for sample in samples:
@@ -84,7 +90,7 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
                     normalized = sample / scale
                     sum_squares += normalized * normalized
                 sample_count += len(samples)
-                frames_checked += len(samples) // max(audio.getnchannels(), 1)
+                frames_checked += len(samples) // channels
     except (wave.Error, EOFError, OSError) as exc:
         return WavSignalAudit("unreadable", 0, None, None, (f"signal_read_failed:{exc}",))
 
@@ -93,7 +99,7 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
 
     peak_normalized = peak / scale
     rms_normalized = math.sqrt(sum_squares / sample_count)
-    issues: list[str] = []
+    issues: list[str] = sorted(malformed_data)
     if peak == 0:
         issues.append("digital_silence")
     elif rms_normalized < near_silence_threshold:
