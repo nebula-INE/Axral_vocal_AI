@@ -82,3 +82,21 @@ def test_end_to_end_pipeline_does_not_resolve_duplicate_alias_silently(
     assert resolved.status == "ambiguous"
     assert len(resolved.candidates) == 2
     assert any("no candidate was selected" in issue for issue in resolved.issues)
+
+
+
+def test_absolute_wav_path_is_rejected_by_end_to_end_audit(tmp_path: Path) -> None:
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    outside = tmp_path / "outside.wav"
+    write_pcm_wav(outside, [1000, -1000] * 64)
+    (root / "oto.ini").write_text(
+        f"{outside}=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert any(issue.code == "absolute_wav_path" for issue in analysis.issues)
+    assert analysis.summary["errors"] >= 1
+    # Absolute paths are never accepted as an in-bank relative sample path.
+    assert analysis.entries[0].wav_filename == str(outside)
