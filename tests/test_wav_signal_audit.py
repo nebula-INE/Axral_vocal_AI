@@ -96,3 +96,49 @@ def test_reports_truncated_pcm_sample_instead_of_silently_ignoring_it(tmp_path: 
     result = inspect_pcm_signal(path)
     assert result.status == "ok"
     assert "incomplete_pcm_sample" in result.issues
+
+
+
+def test_flags_near_silence_without_calling_it_digital_silence(tmp_path: Path) -> None:
+    path = tmp_path / "quiet.wav"
+    write_pcm(path, [1, -1, 2, -2] * 20, width=2)
+    result = inspect_pcm_signal(path, near_silence_threshold=0.001)
+    assert result.status == "ok"
+    assert result.rms_normalized is not None
+    assert 0.0 < result.rms_normalized < 0.001
+    assert "near_silence" in result.issues
+    assert "digital_silence" not in result.issues
+
+
+def test_supports_32_bit_pcm_and_bounded_chunk_reads(tmp_path: Path) -> None:
+    path = tmp_path / "32_bit.wav"
+    write_pcm(path, [0, (1 << 30), -(1 << 30), (1 << 31) - 1], width=4)
+    result = inspect_pcm_signal(path, chunk_frames=1)
+    assert result.status == "ok"
+    assert result.frames_checked == 4
+    assert result.peak_normalized == ((1 << 31) - 1) / float(1 << 31)
+    assert "clipping_suspected" in result.issues
+
+
+def test_reports_truncated_stereo_sample_frame(tmp_path: Path) -> None:
+    path = tmp_path / "truncated_stereo.wav"
+    write_pcm(path, [100, -100, 200, -200], width=2, channels=2)
+    raw = bytearray(path.read_bytes())
+    # Header declares six payload bytes, but only five are physically present.
+    raw[40:44] = struct.pack("<I", 6)
+    raw[4:8] = struct.pack("<I", len(raw) - 8)
+    raw.append(0x7F)
+    path.write_bytes(raw)
+
+    result = inspect_pcm_signal(path)
+    assert result.status == "ok"
+    assert "truncated_data_chunk" in result.issues
+    assert "incomplete_pcm_sample" in result.issues
+    assert "incomplete_sample_frame" in result.issues
+
+
+def test_rejects_non_riff_input_as_unreadable(tmp_path: Path) -> None:
+    path = tmp_path / "not_a_wave.wav"
+    path.write_bytes(b"not a RIFF/WAVE file")
+    result = inspect_pcm_signal(path)
+    assert result.status == "unreadable"
