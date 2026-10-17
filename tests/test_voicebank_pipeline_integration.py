@@ -115,3 +115,26 @@ def test_windows_drive_wav_path_is_rejected_on_any_host(tmp_path: Path) -> None:
     assert analysis.summary["errors"] >= 1
     assert analysis.entries[0].wav_filename.replace(chr(92), "/") == "C:/outside/voice.wav"
 
+
+def test_invalid_wav_is_reported_without_aborting_other_samples(tmp_path: Path) -> None:
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    write_pcm_wav(root / "valid.wav", [1000, -1000] * 64)
+    (root / "broken.wav").write_bytes(b"not a RIFF/WAVE file")
+    (root / "oto.ini").write_text(
+        "valid.wav=あ,0,100,-100,20,10\\n"
+        "broken.wav=い,0,100,-100,20,10\\n",
+        encoding="utf-8",
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert analysis.summary["oto_entries"] == 2
+    assert analysis.summary["wav_files_checked"] == 2
+    assert analysis.summary["wav_files_invalid"] == 1
+    assert any(issue.code == "wav_invalid" for issue in analysis.issues)
+    audits_by_path = {item.path: item for item in analysis.wav_files}
+    assert audits_by_path["broken.wav"].metadata is None
+    assert audits_by_path["broken.wav"].error is not None
+    assert audits_by_path["valid.wav"].metadata is not None
+    assert audits_by_path["valid.wav"].signal is not None
