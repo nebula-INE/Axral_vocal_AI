@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
@@ -154,7 +155,20 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
 
     oto_paths: list[Path] = []
     prefix_paths: list[Path] = []
-    for directory, dirnames, filenames in __import__("os").walk(root_path):
+    issues: list[VoicebankIssue] = []
+
+    def record_walk_error(exc: OSError) -> None:
+        failed_path = Path(exc.filename) if exc.filename else root_path
+        try:
+            relative_path = _relative(root_path, failed_path.resolve())
+        except (ValueError, OSError):
+            relative_path = str(exc.filename or root_path)
+        issues.append(VoicebankIssue(
+            "error", "directory_scan_failed", relative_path, None,
+            f"Could not scan directory: {exc}",
+        ))
+
+    for directory, dirnames, filenames in os.walk(root_path, onerror=record_walk_error):
         dirnames[:] = sorted(name for name in dirnames if name not in {".git", "__pycache__"})
         for filename in sorted(filenames):
             lowered = filename.casefold()
@@ -168,7 +182,6 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
     prefix_paths.sort()
     entries: list[OtoEntry] = []
     prefix_entries: list[PrefixMapEntry] = []
-    issues: list[VoicebankIssue] = []
 
     for path in oto_paths:
         relative_path = _relative(root_path, path)
