@@ -256,7 +256,7 @@ def test_missing_sample_is_reported_and_cannot_resolve_while_valid_sample_surviv
     write_pcm_wav(root / "valid.wav", [700, -700] * 64)
     (root / "oto.ini").write_text(
         "valid.wav=あ,0,100,-100,20,10\n"
-        "missing.wav=い,0,100,-100,20,10\\n",
+        "missing.wav=い,0,100,-100,20,10" + chr(10),
         encoding="utf-8",
     )
 
