@@ -91,7 +91,7 @@ def test_absolute_wav_path_is_rejected_by_end_to_end_audit(tmp_path: Path) -> No
     outside = tmp_path / "outside.wav"
     write_pcm_wav(outside, [1000, -1000] * 64)
     (root / "oto.ini").write_text(
-        f"{outside}=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        f"{outside}=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     analysis = analyze_voicebank(root)
