@@ -22,7 +22,7 @@ const helperMatch = clientSource.match(
 );
 assert.ok(helperMatch, 'production buildPitchCurveHz helper was not found');
 const helperSource = helperMatch[0].replace(/\r?\n\r?\nfunction silentFrames$/, '\nexport { buildPitchCurveHz };');
-const bridgeSource = 'import { parsePitchBend, smoothPitchBendPoints } from ' +
+const bridgeSource = 'import { parsePitchBend, smoothPitchBendPoints, generateUtauPortamentoPoints } from ' +
   JSON.stringify(utilityUrl) + ';\n' + helperSource;
 const compiledBridge = ts.transpileModule(bridgeSource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
