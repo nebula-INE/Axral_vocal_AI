@@ -122,8 +122,8 @@ def test_invalid_wav_is_reported_without_aborting_other_samples(tmp_path: Path) 
     write_pcm_wav(root / "valid.wav", [1000, -1000] * 64)
     (root / "broken.wav").write_bytes(b"not a RIFF/WAVE file")
     (root / "oto.ini").write_text(
-        "valid.wav=あ,0,100,-100,20,10\\n"
-        "broken.wav=い,0,100,-100,20,10\\n",
+        "valid.wav=あ,0,100,-100,20,10\n"
+        "broken.wav=い,0,100,-100,20,10\n",
         encoding="utf-8",
     )
 
