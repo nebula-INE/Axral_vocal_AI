@@ -5,6 +5,8 @@ from pathlib import Path
 import struct
 import wave
 
+import pytest
+
 from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 from axral_vocal_ai.voicebank_alias import resolve_utau_alias
 
@@ -155,3 +157,24 @@ def test_parent_directory_wav_path_cannot_escape_voicebank_root(tmp_path: Path) 
     # A file outside the root must not be inspected as a voicebank sample.
     assert analysis.wav_files == ()
 
+
+
+def test_symlinked_wav_cannot_escape_voicebank_root(tmp_path: Path) -> None:
+    """A relative filename must not bypass root checks through a symlink."""
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    outside = tmp_path / "outside.wav"
+    write_pcm_wav(outside, [1000, -1000] * 64)
+    try:
+        (root / "linked.wav").symlink_to(outside)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink creation is unavailable on this platform: {exc}")
+    (root / "oto.ini").write_text(
+        "linked.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert any(issue.code == "wav_path_escape" for issue in analysis.issues)
+    # The target outside the bank must never be opened by the audit pipeline.
+    assert analysis.wav_files == ()
