@@ -138,3 +138,20 @@ def test_invalid_wav_is_reported_without_aborting_other_samples(tmp_path: Path) 
     assert audits_by_path["broken.wav"].error is not None
     assert audits_by_path["valid.wav"].metadata is not None
     assert audits_by_path["valid.wav"].signal is not None
+
+def test_parent_directory_wav_path_cannot_escape_voicebank_root(tmp_path: Path) -> None:
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    outside = tmp_path / "outside.wav"
+    write_pcm_wav(outside, [1000, -1000] * 64)
+    (root / "oto.ini").write_text(
+        "../outside.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert any(issue.code == "wav_path_escape" for issue in analysis.issues)
+    assert analysis.summary["errors"] >= 1
+    # A file outside the root must not be inspected as a voicebank sample.
+    assert analysis.wav_files == ()
+
