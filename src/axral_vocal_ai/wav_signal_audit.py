@@ -42,6 +42,48 @@ def _decode_pcm(raw: bytes, sample_width: int) -> list[int]:
     raise ValueError(f"Unsupported PCM sample width: {sample_width} bytes")
 
 
+def _inspect_data_chunk_layout(path: str | Path, sample_width: int,
+                               channels: int) -> set[str]:
+    """Inspect RIFF chunk lengths without loading sample data into memory.
+
+    wave.readframes returns only complete declared frames, which can hide a
+    physically truncated data chunk. Inspect its boundary separately.
+    """
+    issues: set[str] = set()
+    try:
+        with open(path, "rb") as stream:
+            stream.seek(0, 2)
+            file_size = stream.tell()
+            stream.seek(0)
+            header = stream.read(12)
+            if len(header) != 12 or header[:4] != b"RIFF" or header[8:12] != b"WAVE":
+                return issues
+            offset = 12
+            while offset + 8 <= file_size:
+                stream.seek(offset)
+                chunk_header = stream.read(8)
+                if len(chunk_header) != 8:
+                    break
+                chunk_id = chunk_header[:4]
+                declared_size = struct.unpack("<I", chunk_header[4:])[0]
+                data_start = offset + 8
+                if chunk_id == b"data":
+                    available = max(0, min(declared_size, file_size - data_start))
+                    if available < declared_size:
+                        issues.add("truncated_data_chunk")
+                    if available % sample_width:
+                        issues.add("incomplete_pcm_sample")
+                    if available % (sample_width * max(channels, 1)):
+                        issues.add("incomplete_sample_frame")
+                    if declared_size % sample_width:
+                        issues.add("declared_data_size_not_sample_aligned")
+                    return issues
+                offset = data_start + declared_size + (declared_size & 1)
+    except OSError:
+        return issues
+    return issues
+
+
 def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.001,
                         chunk_frames: int = 8192) -> WavSignalAudit:
     """Compute peak/RMS for PCM WAV in bounded chunks, without loading all audio."""
@@ -57,16 +99,17 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
             width = audio.getsampwidth()
             if width not in (1, 2, 3, 4):
                 return WavSignalAudit("unsupported", 0, None, None, ("pcm_sample_width_unsupported",))
+            channels = max(audio.getnchannels(), 1)
+            malformed_data = _inspect_data_chunk_layout(path, width, channels)
             scale = float(1 << (width * 8 - 1))
             peak = 0
             sum_squares = 0.0
             sample_count = 0
             frames_checked = 0
             clipped = False
-            malformed_data: set[str] = set()
-            # Bound reads by bytes as well as frames: a malformed file can
-            # declare an extreme channel count, making a frame-only limit huge.
-            bytes_per_frame = width * max(audio.getnchannels(), 1)
+            # Bound reads by bytes as well as frames: malformed channel counts
+            # must not turn a frame-based limit into an unbounded allocation.
+            bytes_per_frame = width * channels
             max_chunk_bytes = 1024 * 1024
             bounded_chunk_frames = max(1, min(chunk_frames, max_chunk_bytes // bytes_per_frame))
             while True:
@@ -76,7 +119,6 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
                 if len(raw) % width:
                     malformed_data.add("incomplete_pcm_sample")
                 samples = _decode_pcm(raw, width)
-                channels = max(audio.getnchannels(), 1)
                 if len(samples) % channels:
                     malformed_data.add("incomplete_sample_frame")
                 if not samples:
@@ -95,7 +137,7 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
         return WavSignalAudit("unreadable", 0, None, None, (f"signal_read_failed:{exc}",))
 
     if sample_count == 0:
-        return WavSignalAudit("empty", frames_checked, 0.0, 0.0, ("no_audio_samples",))
+        return WavSignalAudit("empty", frames_checked, 0.0, 0.0, tuple(sorted(malformed_data | {"no_audio_samples"})))
 
     peak_normalized = peak / scale
     rms_normalized = math.sqrt(sum_squares / sample_count)
