@@ -110,3 +110,20 @@ def test_reports_missing_padding_for_odd_sized_data_chunk(tmp_path: Path) -> Non
 
     assert "missing_chunk_padding" in result.issues
     assert "data_size_not_aligned_to_sample_frames" in result.issues
+
+def test_does_not_parse_chunks_after_a_chunk_crosses_riff_boundary(tmp_path: Path) -> None:
+    path = tmp_path / "fmt-crosses-boundary.wav"
+    fmt = struct.pack("<HHIIHH", 1, 1, 44100, 88200, 2, 16)
+    # A fmt chunk declares more bytes than the RIFF container allows. The
+    # physically present bytes after the boundary must not make this valid.
+    fmt_header = b"fmt " + struct.pack("<I", len(fmt) + 16)
+    data_chunk = b"data" + struct.pack("<I", 4) + bytes(4)
+    riff_payload = b"WAVE" + fmt_header + fmt + data_chunk
+    declared_riff_size = 4 + len(fmt_header) + len(fmt)
+    path.write_bytes(
+        b"RIFF" + struct.pack("<I", declared_riff_size) + riff_payload + bytes(16)
+    )
+
+    with pytest.raises(ValueError, match="data chunk"):
+        inspect_wav(path)
+
