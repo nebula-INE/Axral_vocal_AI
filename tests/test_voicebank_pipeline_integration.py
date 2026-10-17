@@ -331,3 +331,25 @@ def test_directory_scan_errors_are_reported_without_aborting_scan(
     # The scan still reports accessible root-level files after a subtree fails.
     assert analysis.oto_files == ("oto.ini",)
     assert analysis.summary["errors"] >= 1
+
+
+def test_conflicting_boundaries_across_prefix_maps_are_reported(tmp_path: Path) -> None:
+    root = tmp_path / "voicebank"
+    nested = root / "subbank"
+    nested.mkdir(parents=True)
+    (root / "oto.ini").write_text(
+        "sample.wav=あ,0,100,-100,20,10" + chr(10), encoding="utf-8"
+    )
+    (root / "prefix.map").write_text("C4\t\t_ROOT" + chr(10), encoding="utf-8")
+    (nested / "prefix.map").write_text("C4\t\t_NESTED" + chr(10), encoding="utf-8")
+
+    analysis = analyze_voicebank(root)
+
+    conflicts = [
+        issue for issue in analysis.issues
+        if issue.code == "prefix_map_boundary_conflict"
+    ]
+    assert len(conflicts) == 1
+    assert conflicts[0].path == "subbank/prefix.map"
+    assert "60" in conflicts[0].message
+    assert "prefix.map" in conflicts[0].message
