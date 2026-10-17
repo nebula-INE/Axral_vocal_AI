@@ -293,3 +293,10 @@ def test_manifest_rejects_duplicate_target_timestamps():
 
     with pytest.raises(DatasetValidationError, match="strictly increasing"):
         validate_records([make_record(target=target)])
+
+def test_manifest_rejects_numeric_values_that_overflow_float_conversion():
+    record = make_record()
+    record["input"]["notes"][0]["midi_note"] = 10**10000
+
+    with pytest.raises(DatasetValidationError, match="must be finite"):
+        validate_records([record])
