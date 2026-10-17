@@ -84,7 +84,7 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
         start = _finite_number(note["start_sec"], f"{where}.start_sec")
         end = _finite_number(note["end_sec"], f"{where}.end_sec")
         midi = _finite_number(note["midi_note"], f"{where}.midi_note")
-        _require(start >= 0 and end >= start, f"{where} has invalid time bounds")
+        _require(start >= 0 and end > start, f"{where} must have non-negative start and positive duration")
         _require(start >= previous_start, f"{prefix}: notes must be ordered by start_sec")
         _require(0 <= midi <= 127, f"{where}.midi_note must be in range 0..127")
         _require(isinstance(note["lyric"], str), f"{where}.lyric must be a string")
