@@ -185,6 +185,7 @@ def test_manifest_accepts_training_delta_at_safe_range_boundary(delta):
     [
         (-0.01, 0.4),
         (0.3, 0.2),
+        (0.2, 0.2),
         (float("nan"), 0.4),
         (0.0, float("inf")),
     ],
