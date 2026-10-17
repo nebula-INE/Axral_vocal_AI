@@ -92,9 +92,10 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
             _require(note["voiced"] is None or isinstance(note["voiced"], bool), f"{where}.voiced must be bool or null")
         previous_start = start
 
-    # Labels may occur at the final note endpoint (some editors emit an
-    # endpoint sample), but must not extend beyond the note timeline. Internal
-    # gaps are allowed here and are handled conservatively by feature mapping.
+    # Labels may occur at the first/final note endpoints (some editors emit
+    # endpoint samples), but must stay within the note timeline. Internal gaps
+    # are allowed here and handled conservatively by feature mapping.
+    note_timeline_start = min(float(note["start_sec"]) for note in notes)
     note_timeline_end = max(float(note["end_sec"]) for note in notes)
 
     target = record["target"]
@@ -115,6 +116,8 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
             _require(-MAX_TRAINING_DELTA_SEMITONES <= delta <= MAX_TRAINING_DELTA_SEMITONES,
                      f"{where}.delta_semitones must be within +/-{MAX_TRAINING_DELTA_SEMITONES} semitones")
             _require(time_sec >= 0 and time_sec > previous_time, f"{where} timestamps must be non-negative and strictly increasing")
+            _require(time_sec >= note_timeline_start,
+                     f"{where}.time_sec must not precede the note timeline start ({note_timeline_start})")
             _require(time_sec <= note_timeline_end,
                      f"{where}.time_sec must not exceed the note timeline end ({note_timeline_end})")
             previous_time = time_sec
