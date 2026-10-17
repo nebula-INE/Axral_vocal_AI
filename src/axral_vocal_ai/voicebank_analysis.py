@@ -65,8 +65,11 @@ class VoicebankAnalysis:
             "prefix_map_entries": len(self.prefix_entries),
             "wav_files_checked": len(self.wav_files),
             "wav_files_invalid": sum(item.error is not None for item in self.wav_files),
+            # Unsupported formats are informational: they were not decoded,
+            # so they must not inflate the count of detected signal findings.
             "wav_files_with_signal_issues": sum(
-                bool(item.signal and item.signal.issues) for item in self.wav_files
+                bool(item.signal and any(not code.endswith("_unsupported") for code in item.signal.issues))
+                for item in self.wav_files
             ),
             "wav_files_digital_silence": sum(
                 bool(item.signal and "digital_silence" in item.signal.issues)
