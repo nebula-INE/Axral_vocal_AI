@@ -88,7 +88,7 @@ def test_reports_data_chunk_larger_than_declared_riff_boundary(tmp_path: Path) -
     # declared payload is not part of the container even if bytes follow it.
     riff_payload = b"WAVE" + fmt_chunk + data_header
     trailing = bytes(4096)
-    path.write_bytes(b"RIFF" + struct.pack("<I", len(riff_payload) - 4) + riff_payload + trailing)
+    path.write_bytes(b"RIFF" + struct.pack("<I", len(riff_payload)) + riff_payload + trailing)
 
     result = inspect_wav(path)
 
@@ -96,19 +96,17 @@ def test_reports_data_chunk_larger_than_declared_riff_boundary(tmp_path: Path) -
     assert result.data_bytes == 4096
 
 
-def test_reports_missing_padding_for_odd_sized_chunk(tmp_path: Path) -> None:
+def test_reports_missing_padding_for_odd_sized_data_chunk(tmp_path: Path) -> None:
     path = tmp_path / "missing-padding.wav"
     fmt = struct.pack("<HHIIHH", 1, 1, 44100, 88200, 2, 16)
-    # A one-byte ancillary chunk must be followed by a pad byte. Omit it,
-    # then include valid fmt/data chunks within the declared RIFF size.
-    odd_chunk = b"JUNK" + struct.pack("<I", 1) + b"x"
     fmt_chunk = b"fmt " + struct.pack("<I", len(fmt)) + fmt
-    data = bytes(8)
-    data_chunk = b"data" + struct.pack("<I", len(data)) + data
-    chunks = odd_chunk + fmt_chunk + data_chunk
+    # The odd-sized data chunk ends at the declared RIFF boundary without
+    # its required pad byte.
+    data_chunk = b"data" + struct.pack("<I", 1) + b"x"
+    chunks = fmt_chunk + data_chunk
     path.write_bytes(b"RIFF" + struct.pack("<I", len(chunks) + 4) + b"WAVE" + chunks)
 
     result = inspect_wav(path)
 
     assert "missing_chunk_padding" in result.issues
-
+    assert "data_size_not_aligned_to_sample_frames" in result.issues
