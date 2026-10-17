@@ -113,5 +113,5 @@ def test_windows_drive_wav_path_is_rejected_on_any_host(tmp_path: Path) -> None:
 
     assert any(issue.code == "absolute_wav_path" for issue in analysis.issues)
     assert analysis.summary["errors"] >= 1
-    assert analysis.entries[0].wav_filename.replace("\\\\", "/") == "C:/outside/voice.wav"
+    assert analysis.entries[0].wav_filename.replace(chr(92), "/") == "C:/outside/voice.wav"
 
