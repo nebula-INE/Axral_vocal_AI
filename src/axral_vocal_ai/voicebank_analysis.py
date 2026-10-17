@@ -65,6 +65,21 @@ class VoicebankAnalysis:
             "prefix_map_entries": len(self.prefix_entries),
             "wav_files_checked": len(self.wav_files),
             "wav_files_invalid": sum(item.error is not None for item in self.wav_files),
+            "wav_files_with_signal_issues": sum(
+                bool(item.signal and item.signal.issues) for item in self.wav_files
+            ),
+            "wav_files_digital_silence": sum(
+                bool(item.signal and "digital_silence" in item.signal.issues)
+                for item in self.wav_files
+            ),
+            "wav_files_near_silence": sum(
+                bool(item.signal and "near_silence" in item.signal.issues)
+                for item in self.wav_files
+            ),
+            "wav_files_clipping_suspected": sum(
+                bool(item.signal and "clipping_suspected" in item.signal.issues)
+                for item in self.wav_files
+            ),
             "errors": sum(issue.severity == "error" for issue in self.issues),
             "warnings": sum(issue.severity == "warning" for issue in self.issues),
         }
