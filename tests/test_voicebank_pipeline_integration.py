@@ -145,7 +145,7 @@ def test_parent_directory_wav_path_cannot_escape_voicebank_root(tmp_path: Path) 
     outside = tmp_path / "outside.wav"
     write_pcm_wav(outside, [1000, -1000] * 64)
     (root / "oto.ini").write_text(
-        "../outside.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "../outside.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     analysis = analyze_voicebank(root)
