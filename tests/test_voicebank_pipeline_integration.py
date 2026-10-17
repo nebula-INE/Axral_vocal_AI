@@ -64,6 +64,31 @@ def test_voicebank_scan_to_pitch_aware_alias_resolution_and_json_report(
     assert report["wav_files"][0]["signal"]["status"] == "ok"
 
 
+
+def test_windows_separators_in_relative_oto_paths_work_cross_platform(tmp_path: Path) -> None:
+    """Windows-authored relative paths should resolve on POSIX hosts too."""
+    root = tmp_path / "voicebank"
+    nested = root / "voice"
+    samples = nested / "samples"
+    write_pcm_wav(samples / "a.wav", [1000, -1000] * 64)
+    (nested / "oto.ini").write_text(
+        "samples\\\\a.wav=あ,0,100,-100,20,10" + chr(10),
+        encoding="utf-8",
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert analysis.entries[0].wav_filename == "voice/samples/a.wav"
+    assert not any(
+        issue.code in {"absolute_wav_path", "wav_path_escape", "wav_missing"}
+        for issue in analysis.issues
+    )
+    assert analysis.summary["wav_files_checked"] == 1
+    resolved = resolve_utau_alias("あ", 60, analysis.entries, voicebank_root=root)
+    assert resolved.status == "resolved"
+    assert resolved.candidates[0].wav_path == (samples / "a.wav").resolve()
+
+
 def test_end_to_end_pipeline_does_not_resolve_duplicate_alias_silently(
     tmp_path: Path,
 ) -> None:
