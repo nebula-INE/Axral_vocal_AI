@@ -170,7 +170,7 @@ def test_symlinked_wav_cannot_escape_voicebank_root(tmp_path: Path) -> None:
     except (OSError, NotImplementedError) as exc:
         pytest.skip(f"symlink creation is unavailable on this platform: {exc}")
     (root / "oto.ini").write_text(
-        "linked.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "linked.wav=あ,0,100,-100,20,10" + chr(10), encoding="utf-8"
     )
 
     analysis = analyze_voicebank(root)
