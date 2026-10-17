@@ -254,7 +254,7 @@ def test_manifest_rejects_invalid_label_confidence(confidence):
 
 def test_manifest_allows_target_at_final_note_endpoint():
     target = make_target()
-    target["points"][1]["time_sec"] = 1.0
+    target["points"][1]["time_sec"] = 0.4
 
     summary = validate_records([make_record(target=target)])
 
@@ -263,7 +263,7 @@ def test_manifest_allows_target_at_final_note_endpoint():
 
 def test_manifest_rejects_target_after_final_note_endpoint():
     target = make_target()
-    target["points"][1]["time_sec"] = 1.01
+    target["points"][1]["time_sec"] = 0.41
 
     with pytest.raises(DatasetValidationError, match="must not exceed the note timeline end"):
         validate_records([make_record(target=target)])
