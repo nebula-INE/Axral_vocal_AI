@@ -178,3 +178,35 @@ def test_symlinked_wav_cannot_escape_voicebank_root(tmp_path: Path) -> None:
     assert any(issue.code == "wav_path_escape" for issue in analysis.issues)
     # The target outside the bank must never be opened by the audit pipeline.
     assert analysis.wav_files == ()
+
+
+def test_cp932_voicebank_paths_and_utf8_bom_prefix_map_are_supported(tmp_path: Path) -> None:
+    """Japanese Windows voicebanks may use CP932 while prefix.map has a UTF-8 BOM."""
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    sample_name = "音源.wav"
+    write_pcm_wav(root / sample_name, [1200, -1200] * 64)
+
+    # CP932 is common in legacy Japanese UTAU banks; preserve Japanese paths
+    # and aliases rather than silently dropping or corrupting these entries.
+    (root / "oto.ini").write_bytes(
+        f"{sample_name}=あ,0,100,-100,20,10\n".encode("cp932")
+    )
+    (root / "prefix.map").write_bytes(
+        b"\xef\xbb\xbf" + "C4\t-\t_F4\n".encode("utf-8")
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert analysis.entries[0].wav_filename == sample_name
+    assert analysis.entries[0].alias == "あ"
+    assert analysis.prefix_entries
+    assert analysis.prefix_entries[0].boundary == 60
+    assert analysis.prefix_entries[0].suffix == "_F4"
+    assert analysis.summary["wav_files_checked"] == 1
+    assert analysis.summary["wav_files_invalid"] == 0
+    assert not any(
+        issue.code in {"oto_parse_issue", "prefix_map_parse_issue"}
+        for issue in analysis.issues
+    )
+
