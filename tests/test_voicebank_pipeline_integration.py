@@ -210,3 +210,41 @@ def test_cp932_voicebank_paths_and_utf8_bom_prefix_map_are_supported(tmp_path: P
         for issue in analysis.issues
     )
 
+def test_duplicate_aliases_across_nested_oto_files_remain_ambiguous(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "voicebank"
+    first = root / "append"
+    second = root / "prefix"
+    write_pcm_wav(first / "a.wav", [900, -900] * 64)
+    write_pcm_wav(second / "a.wav", [1800, -1800] * 64)
+    (first / "oto.ini").write_text(
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+    (second / "oto.ini").write_text(
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(root)
+    resolved = resolve_utau_alias(
+        "あ", 60, analysis.entries, voicebank_root=root
+    )
+
+    assert analysis.summary["oto_files"] == 2
+    assert analysis.summary["oto_entries"] == 2
+    assert analysis.summary["wav_files_checked"] == 2
+    assert analysis.summary["duplicate_alias_groups"] == 1
+    assert {entry.wav_filename for entry in analysis.entries} == {
+        "append/a.wav",
+        "prefix/a.wav",
+    }
+    assert resolved.status == "ambiguous"
+    assert {candidate.wav_path for candidate in resolved.candidates} == {
+        (root / "append/a.wav").resolve(),
+        (root / "prefix/a.wav").resolve(),
+    }
+    duplicate_issues = [
+        issue for issue in analysis.issues if issue.code == "duplicate_alias"
+    ]
+    assert len(duplicate_issues) == 1
+
