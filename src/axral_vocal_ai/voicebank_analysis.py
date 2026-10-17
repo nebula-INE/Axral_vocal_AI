@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
@@ -154,7 +155,20 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
 
     oto_paths: list[Path] = []
     prefix_paths: list[Path] = []
-    for directory, dirnames, filenames in __import__("os").walk(root_path):
+    issues: list[VoicebankIssue] = []
+
+    def record_walk_error(exc: OSError) -> None:
+        failed_path = Path(exc.filename) if exc.filename else root_path
+        try:
+            relative_path = _relative(root_path, failed_path.resolve())
+        except (ValueError, OSError):
+            relative_path = str(exc.filename or root_path)
+        issues.append(VoicebankIssue(
+            "error", "directory_scan_failed", relative_path, None,
+            f"Could not scan directory: {exc}",
+        ))
+
+    for directory, dirnames, filenames in os.walk(root_path, onerror=record_walk_error):
         dirnames[:] = sorted(name for name in dirnames if name not in {".git", "__pycache__"})
         for filename in sorted(filenames):
             lowered = filename.casefold()
@@ -168,7 +182,8 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
     prefix_paths.sort()
     entries: list[OtoEntry] = []
     prefix_entries: list[PrefixMapEntry] = []
-    issues: list[VoicebankIssue] = []
+    first_prefix_boundary_file: dict[int, str] = {}
+    reported_cross_file_boundaries: set[tuple[int, str]] = set()
 
     for path in oto_paths:
         relative_path = _relative(root_path, path)
@@ -254,6 +269,16 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                                          "Nested prefix.map found; entries are combined for inspection, but confirm which map the target renderer uses."))
         for issue in parsed.issues:
             issues.append(VoicebankIssue("warning", "prefix_map_parse_issue", relative_path, issue.line_number, issue.message))
+        for entry in parsed.entries:
+            first_file = first_prefix_boundary_file.setdefault(entry.boundary, relative_path)
+            conflict_key = (entry.boundary, relative_path)
+            if first_file != relative_path and conflict_key not in reported_cross_file_boundaries:
+                issues.append(VoicebankIssue(
+                    "warning", "prefix_map_boundary_conflict", relative_path, None,
+                    f"Note boundary {entry.boundary} is also declared in {first_file}; "
+                    "prefix.map files are combined for inspection, so selection may be ambiguous.",
+                ))
+                reported_cross_file_boundaries.add(conflict_key)
         prefix_entries.extend(parsed.entries)
 
     aliases: dict[str, list[str]] = defaultdict(list)

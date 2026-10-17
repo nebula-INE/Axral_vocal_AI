@@ -64,3 +64,13 @@ def test_ignores_comments_and_blank_lines() -> None:
 def test_non_string_input_raises_type_error() -> None:
     with pytest.raises(TypeError):
         parse_prefix_map(None)  # type: ignore[arg-type]
+
+
+def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() -> None:
+    result = parse_prefix_map("C4\t\t_FIRST\nC4\t\t_LAST\n")
+
+    assert len(result.entries) == 2
+    assert len(result.issues) == 1
+    assert result.issues[0].line_number == 2
+    assert "Duplicate note boundary 60" in result.issues[0].message
+    assert select_prefix_map(result.entries, 60).suffix == "_LAST"

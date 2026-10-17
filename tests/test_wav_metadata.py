@@ -78,3 +78,52 @@ def test_reports_declared_riff_size_larger_than_file(tmp_path: Path) -> None:
     result = inspect_wav(path)
 
     assert "riff_size_exceeds_file" in result.issues
+
+def test_reports_data_chunk_larger_than_declared_riff_boundary(tmp_path: Path) -> None:
+    path = tmp_path / "oversized-data.wav"
+    fmt = struct.pack("<HHIIHH", 1, 1, 44100, 88200, 2, 16)
+    fmt_chunk = b"fmt " + struct.pack("<I", len(fmt)) + fmt
+    data_header = b"data" + struct.pack("<I", 4096)
+    # The RIFF boundary ends immediately after the data header, so the
+    # declared payload is not part of the container even if bytes follow it.
+    riff_payload = b"WAVE" + fmt_chunk + data_header
+    trailing = bytes(4096)
+    path.write_bytes(b"RIFF" + struct.pack("<I", len(riff_payload)) + riff_payload + trailing)
+
+    result = inspect_wav(path)
+
+    assert "chunk_size_exceeds_riff_boundary" in result.issues
+    assert result.data_bytes == 4096
+
+
+def test_reports_missing_padding_for_odd_sized_data_chunk(tmp_path: Path) -> None:
+    path = tmp_path / "missing-padding.wav"
+    fmt = struct.pack("<HHIIHH", 1, 1, 44100, 88200, 2, 16)
+    fmt_chunk = b"fmt " + struct.pack("<I", len(fmt)) + fmt
+    # The odd-sized data chunk ends at the declared RIFF boundary without
+    # its required pad byte.
+    data_chunk = b"data" + struct.pack("<I", 1) + b"x"
+    chunks = fmt_chunk + data_chunk
+    path.write_bytes(b"RIFF" + struct.pack("<I", len(chunks) + 4) + b"WAVE" + chunks)
+
+    result = inspect_wav(path)
+
+    assert "missing_chunk_padding" in result.issues
+    assert "data_size_not_aligned_to_sample_frames" in result.issues
+
+def test_does_not_parse_chunks_after_a_chunk_crosses_riff_boundary(tmp_path: Path) -> None:
+    path = tmp_path / "fmt-crosses-boundary.wav"
+    fmt = struct.pack("<HHIIHH", 1, 1, 44100, 88200, 2, 16)
+    # A fmt chunk declares more bytes than the RIFF container allows. The
+    # physically present bytes after the boundary must not make this valid.
+    fmt_header = b"fmt " + struct.pack("<I", len(fmt) + 16)
+    data_chunk = b"data" + struct.pack("<I", 4) + bytes(4)
+    riff_payload = b"WAVE" + fmt_header + fmt + data_chunk
+    declared_riff_size = 4 + len(fmt_header) + len(fmt)
+    path.write_bytes(
+        b"RIFF" + struct.pack("<I", declared_riff_size) + riff_payload + bytes(16)
+    )
+
+    with pytest.raises(ValueError, match="data chunk"):
+        inspect_wav(path)
+

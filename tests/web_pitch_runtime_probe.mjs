@@ -18,11 +18,11 @@ const utilityUrl = 'data:text/javascript;base64,' + Buffer.from(compiledUtility,
 
 const clientSource = readFileSync(resolve(root, 'src/voseCoreClient.ts'), 'utf8');
 const helperMatch = clientSource.match(
-  /function buildPitchCurveHz\(note: any, frameCount: number, durationMs: number\): number\[\] \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction silentFrames/
+  /function buildPitchCurveHz\([\s\S]*?\): number\[\] \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction silentFrames/
 );
 assert.ok(helperMatch, 'production buildPitchCurveHz helper was not found');
 const helperSource = helperMatch[0].replace(/\r?\n\r?\nfunction silentFrames$/, '\nexport { buildPitchCurveHz };');
-const bridgeSource = 'import { parsePitchBend, smoothPitchBendPoints } from ' +
+const bridgeSource = 'import { parsePitchBend, smoothPitchBendPoints, generateUtauPortamentoPoints } from ' +
   JSON.stringify(utilityUrl) + ';\n' + helperSource;
 const compiledBridge = ts.transpileModule(bridgeSource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
