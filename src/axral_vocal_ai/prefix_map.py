@@ -59,6 +59,7 @@ def parse_prefix_map(text: str) -> PrefixMapParseResult:
 
     entries: list[PrefixMapEntry] = []
     issues: list[PrefixMapIssue] = []
+    first_line_by_boundary: dict[int, int] = {}
     for line_number, raw in enumerate(text.splitlines(), start=1):
         line = raw.rstrip("\r\n")
         if not line.strip() or line.lstrip().startswith(("#", ";")):
@@ -72,6 +73,17 @@ def parse_prefix_map(text: str) -> PrefixMapParseResult:
         if boundary is None or not 0 <= boundary <= 127:
             issues.append(PrefixMapIssue(line_number, "Invalid or out-of-range note boundary.", raw))
             continue
+        if boundary in first_line_by_boundary:
+            issues.append(
+                PrefixMapIssue(
+                    line_number,
+                    f"Duplicate note boundary {boundary}; the last row wins during selection "
+                    f"(first declared on line {first_line_by_boundary[boundary]}).",
+                    raw,
+                )
+            )
+        else:
+            first_line_by_boundary[boundary] = line_number
         if len(parts) == 2:
             prefix, suffix = "", parts[1]
         else:
