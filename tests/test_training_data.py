@@ -185,6 +185,7 @@ def test_manifest_accepts_training_delta_at_safe_range_boundary(delta):
     [
         (-0.01, 0.4),
         (0.3, 0.2),
+        (0.2, 0.2),
         (float("nan"), 0.4),
         (0.0, float("inf")),
     ],
@@ -252,9 +253,50 @@ def test_manifest_rejects_invalid_label_confidence(confidence):
 
 
 
+def test_manifest_allows_target_at_final_note_endpoint():
+    target = make_target()
+    target["points"][1]["time_sec"] = 0.4
+
+    summary = validate_records([make_record(target=target)])
+
+    assert summary["status"] == "valid"
+
+
+def test_manifest_rejects_target_after_final_note_endpoint():
+    target = make_target()
+    target["points"][1]["time_sec"] = 0.41
+
+    with pytest.raises(DatasetValidationError, match="must not exceed the note timeline end"):
+        validate_records([make_record(target=target)])
+
+
+def test_manifest_allows_target_at_first_note_endpoint():
+    target = make_target()
+    target["points"][0]["time_sec"] = 0.0
+
+    summary = validate_records([make_record(target=target)])
+
+    assert summary["status"] == "valid"
+
+
+def test_manifest_rejects_target_before_first_note_start():
+    record = make_record(target=make_target())
+    record["input"]["notes"][0]["start_sec"] = 0.1
+
+    with pytest.raises(DatasetValidationError, match="must not precede the note timeline start"):
+        validate_records([record])
+
+
 def test_manifest_rejects_duplicate_target_timestamps():
     target = make_target()
     target["points"][1]["time_sec"] = target["points"][0]["time_sec"]
 
     with pytest.raises(DatasetValidationError, match="strictly increasing"):
         validate_records([make_record(target=target)])
+
+def test_manifest_rejects_numeric_values_that_overflow_float_conversion():
+    record = make_record()
+    record["input"]["notes"][0]["midi_note"] = 10**10000
+
+    with pytest.raises(DatasetValidationError, match="must be finite"):
+        validate_records([record])

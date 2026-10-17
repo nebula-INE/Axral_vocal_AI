@@ -27,7 +27,10 @@ def _require(condition: bool, message: str) -> None:
 
 def _finite_number(value: Any, label: str) -> float:
     _require(isinstance(value, (int, float)) and not isinstance(value, bool), f"{label} must be numeric")
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        raise DatasetValidationError(f"{label} must be finite") from None
     _require(math.isfinite(number), f"{label} must be finite")
     return number
 
@@ -76,6 +79,8 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     notes = input_data.get("notes")
     _require(isinstance(notes, list) and bool(notes), f"{prefix}: input.notes must be a non-empty list")
     previous_start = -math.inf
+    note_starts: list[float] = []
+    note_ends: list[float] = []
     for index, note in enumerate(notes):
         where = f"{prefix}: input.notes[{index}]"
         _require(isinstance(note, dict), f"{where} must be an object")
@@ -84,13 +89,23 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
         start = _finite_number(note["start_sec"], f"{where}.start_sec")
         end = _finite_number(note["end_sec"], f"{where}.end_sec")
         midi = _finite_number(note["midi_note"], f"{where}.midi_note")
-        _require(start >= 0 and end >= start, f"{where} has invalid time bounds")
+        _require(start >= 0 and end > start, f"{where} must have non-negative start and positive duration")
         _require(start >= previous_start, f"{prefix}: notes must be ordered by start_sec")
         _require(0 <= midi <= 127, f"{where}.midi_note must be in range 0..127")
         _require(isinstance(note["lyric"], str), f"{where}.lyric must be a string")
         if "voiced" in note:
             _require(note["voiced"] is None or isinstance(note["voiced"], bool), f"{where}.voiced must be bool or null")
         previous_start = start
+        note_starts.append(start)
+        note_ends.append(end)
+
+    # Use the already validated finite numbers; converting raw values again
+    # could leak OverflowError for extremely large JSON integers.
+    # Labels may occur at the first/final note endpoints (some editors emit
+    # endpoint samples), but must stay within the note timeline. Internal gaps
+    # are allowed here and handled conservatively by feature mapping.
+    note_timeline_start = min(note_starts)
+    note_timeline_end = max(note_ends)
 
     target = record["target"]
     if require_labeled:
@@ -110,6 +125,10 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
             _require(-MAX_TRAINING_DELTA_SEMITONES <= delta <= MAX_TRAINING_DELTA_SEMITONES,
                      f"{where}.delta_semitones must be within +/-{MAX_TRAINING_DELTA_SEMITONES} semitones")
             _require(time_sec >= 0 and time_sec > previous_time, f"{where} timestamps must be non-negative and strictly increasing")
+            _require(time_sec >= note_timeline_start,
+                     f"{where}.time_sec must not precede the note timeline start ({note_timeline_start})")
+            _require(time_sec <= note_timeline_end,
+                     f"{where}.time_sec must not exceed the note timeline end ({note_timeline_end})")
             previous_time = time_sec
         _require(isinstance(target.get("label_source"), str) and bool(target["label_source"].strip()), f"{prefix}: target.label_source is required")
         if "confidence" in target and target["confidence"] is not None:
