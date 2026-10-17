@@ -34,8 +34,12 @@ def test_scans_nested_oto_and_rebases_wav_paths(tmp_path: Path) -> None:
     assert result.summary["wav_files_checked"] == 2
     assert result.summary["wav_files_invalid"] == 0
     assert {item.path for item in result.wav_files} == {"a.wav", "voice/sub/i.wav"}
+    assert all(item.signal is not None for item in result.wav_files)
+    assert all("digital_silence" in item.signal.issues for item in result.wav_files)
     assert len(result.prefix_entries) == 1
-    assert json.loads(result.to_json())["schema_version"] == 1
+    report = json.loads(result.to_json())
+    assert report["schema_version"] == 1
+    assert "signal" in report["wav_files"][0]
 
 
 def test_reports_missing_wav_and_duplicate_alias(tmp_path: Path) -> None:
@@ -73,6 +77,27 @@ def test_cp932_voicebank_metadata_is_supported(tmp_path: Path) -> None:
     result = analyze_voicebank(tmp_path)
     assert result.entries[0].alias == "あ"
 
+
+
+def test_deduplicates_wav_audits_and_summarizes_signal_findings(tmp_path: Path) -> None:
+    # Two aliases can reference the same sample; audit the file once, not once per alias.
+    (tmp_path / "oto.ini").write_text(
+        "same.wav=あ,0,100,-100,20,10\nsame.wav=い,0,100,-100,20,10\n",
+        encoding="utf-8",
+    )
+    write_silent_wav(tmp_path / "same.wav", frames=32)
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.summary["oto_entries"] == 2
+    assert result.summary["wav_files_checked"] == 1
+    assert result.summary["wav_files_with_signal_issues"] == 1
+    assert result.summary["wav_files_digital_silence"] == 1
+    assert result.summary["wav_files_near_silence"] == 0
+    assert result.summary["wav_files_clipping_suspected"] == 0
+    report = json.loads(result.to_json())
+    assert report["summary"]["wav_files_digital_silence"] == 1
+    assert report["wav_files"][0]["signal"]["issues"] == ["digital_silence"]
 
 def test_reports_malformed_existing_wav(tmp_path: Path) -> None:
     (tmp_path / "broken.wav").write_bytes(b"RIFF")

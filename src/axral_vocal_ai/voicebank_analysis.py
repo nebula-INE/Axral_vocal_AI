@@ -15,6 +15,7 @@ from typing import Any
 from axral_vocal_ai.oto_inventory import OtoEntry, parse_oto_ini
 from axral_vocal_ai.prefix_map import PrefixMapEntry, parse_prefix_map
 from axral_vocal_ai.wav_metadata import WavMetadata, inspect_wav
+from axral_vocal_ai.wav_signal_audit import WavSignalAudit, inspect_pcm_signal
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class WavFileAudit:
     path: str
     metadata: WavMetadata | None
     error: str | None = None
+    signal: WavSignalAudit | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +65,24 @@ class VoicebankAnalysis:
             "prefix_map_entries": len(self.prefix_entries),
             "wav_files_checked": len(self.wav_files),
             "wav_files_invalid": sum(item.error is not None for item in self.wav_files),
+            # Unsupported formats are informational: they were not decoded,
+            # so they must not inflate the count of detected signal findings.
+            "wav_files_with_signal_issues": sum(
+                bool(item.signal and any(not code.endswith("_unsupported") for code in item.signal.issues))
+                for item in self.wav_files
+            ),
+            "wav_files_digital_silence": sum(
+                bool(item.signal and "digital_silence" in item.signal.issues)
+                for item in self.wav_files
+            ),
+            "wav_files_near_silence": sum(
+                bool(item.signal and "near_silence" in item.signal.issues)
+                for item in self.wav_files
+            ),
+            "wav_files_clipping_suspected": sum(
+                bool(item.signal and "clipping_suspected" in item.signal.issues)
+                for item in self.wav_files
+            ),
             "errors": sum(issue.severity == "error" for issue in self.issues),
             "warnings": sum(issue.severity == "warning" for issue in self.issues),
         }
@@ -84,7 +104,7 @@ class VoicebankAnalysis:
             "pattern_evidence": [asdict(item) for item in self.pattern_evidence],
             "wav_files": [
                 {"path": item.path, "metadata": asdict(item.metadata) if item.metadata else None,
-                 "error": item.error}
+                 "error": item.error, "signal": asdict(item.signal) if item.signal else None}
                 for item in self.wav_files
             ],
             "issues": [asdict(issue) for issue in self.issues],
@@ -208,12 +228,19 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                 f"WAV metadata inspection failed: {exc}",
             ))
             continue
-        wav_files.append(WavFileAudit(relative_wav, metadata))
+        signal = (inspect_pcm_signal(candidate) if metadata.audio_format_code == 1 else
+                  WavSignalAudit("unsupported", 0, None, None, ("non_pcm_format_unsupported",)))
+        wav_files.append(WavFileAudit(relative_wav, metadata, signal=signal))
         for code in metadata.issues:
             issues.append(VoicebankIssue(
                 "warning", f"wav_{code}", relative_wav, None,
                 f"WAV metadata check reported: {code}",
             ))
+        for code in signal.issues:
+            severity = "info" if code.endswith("_unsupported") else "warning"
+            issue_code = "wav_" + code.split(":", 1)[0]
+            issues.append(VoicebankIssue(severity, issue_code, relative_wav, None,
+                                         "WAV signal check reported: " + code))
 
     for path in prefix_paths:
         relative_path = _relative(root_path, path)
