@@ -248,3 +248,33 @@ def test_duplicate_aliases_across_nested_oto_files_remain_ambiguous(
     ]
     assert len(duplicate_issues) == 1
 
+def test_missing_sample_is_reported_and_cannot_resolve_while_valid_sample_survives(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    write_pcm_wav(root / "valid.wav", [700, -700] * 64)
+    (root / "oto.ini").write_text(
+        "valid.wav=あ,0,100,-100,20,10\\n"
+        "missing.wav=い,0,100,-100,20,10\\n",
+        encoding="utf-8",
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert analysis.summary["oto_entries"] == 2
+    assert analysis.summary["wav_files_checked"] == 1
+    assert analysis.summary["wav_files_invalid"] == 0
+    assert any(
+        issue.code == "wav_missing" and "missing.wav" in issue.message
+        for issue in analysis.issues
+    )
+    assert {item.path for item in analysis.wav_files} == {"valid.wav"}
+
+    valid = resolve_utau_alias("あ", 60, analysis.entries, voicebank_root=root)
+    missing = resolve_utau_alias("い", 60, analysis.entries, voicebank_root=root)
+    assert valid.status == "resolved"
+    assert valid.candidates[0].wav_path == (root / "valid.wav").resolve()
+    assert missing.status == "invalid_sample_path"
+    assert missing.candidates == ()
+    assert any("missing.wav" in issue for issue in missing.issues)
