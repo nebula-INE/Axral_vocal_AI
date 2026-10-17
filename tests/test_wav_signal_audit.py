@@ -124,10 +124,10 @@ def test_reports_truncated_stereo_sample_frame(tmp_path: Path) -> None:
     path = tmp_path / "truncated_stereo.wav"
     write_pcm(path, [100, -100, 200, -200], width=2, channels=2)
     raw = bytearray(path.read_bytes())
-    # Header declares six payload bytes, but only five are physically present.
+    # Header declares six payload bytes, but truncate the physical payload to five.
     raw[40:44] = struct.pack("<I", 6)
+    raw = raw[:49]  # 44-byte header plus five payload bytes
     raw[4:8] = struct.pack("<I", len(raw) - 8)
-    raw.append(0x7F)
     path.write_bytes(raw)
 
     result = inspect_pcm_signal(path)
