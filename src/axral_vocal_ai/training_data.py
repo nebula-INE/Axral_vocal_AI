@@ -27,7 +27,10 @@ def _require(condition: bool, message: str) -> None:
 
 def _finite_number(value: Any, label: str) -> float:
     _require(isinstance(value, (int, float)) and not isinstance(value, bool), f"{label} must be numeric")
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        raise DatasetValidationError(f"{label} must be finite") from None
     _require(math.isfinite(number), f"{label} must be finite")
     return number
 
