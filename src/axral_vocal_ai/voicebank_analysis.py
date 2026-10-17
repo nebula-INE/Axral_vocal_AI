@@ -182,6 +182,8 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
     prefix_paths.sort()
     entries: list[OtoEntry] = []
     prefix_entries: list[PrefixMapEntry] = []
+    first_prefix_boundary_file: dict[int, str] = {}
+    reported_cross_file_boundaries: set[tuple[int, str]] = set()
 
     for path in oto_paths:
         relative_path = _relative(root_path, path)
@@ -267,6 +269,16 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                                          "Nested prefix.map found; entries are combined for inspection, but confirm which map the target renderer uses."))
         for issue in parsed.issues:
             issues.append(VoicebankIssue("warning", "prefix_map_parse_issue", relative_path, issue.line_number, issue.message))
+        for entry in parsed.entries:
+            first_file = first_prefix_boundary_file.setdefault(entry.boundary, relative_path)
+            conflict_key = (entry.boundary, relative_path)
+            if first_file != relative_path and conflict_key not in reported_cross_file_boundaries:
+                issues.append(VoicebankIssue(
+                    "warning", "prefix_map_boundary_conflict", relative_path, None,
+                    f"Note boundary {entry.boundary} is also declared in {first_file}; "
+                    "prefix.map files are combined for inspection, so selection may be ambiguous.",
+                ))
+                reported_cross_file_boundaries.add(conflict_key)
         prefix_entries.extend(parsed.entries)
 
     aliases: dict[str, list[str]] = defaultdict(list)
