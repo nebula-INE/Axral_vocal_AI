@@ -7,6 +7,7 @@ import wave
 
 import pytest
 
+import axral_vocal_ai.voicebank_analysis as voicebank_analysis
 from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 from axral_vocal_ai.voicebank_alias import resolve_utau_alias
 
@@ -303,3 +304,30 @@ def test_missing_sample_is_reported_and_cannot_resolve_while_valid_sample_surviv
     assert missing.status == "invalid_sample_path"
     assert missing.candidates == ()
     assert any("missing.wav" in issue for issue in missing.issues)
+
+
+def test_directory_scan_errors_are_reported_without_aborting_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    (root / "oto.ini").write_text(
+        "missing.wav=あ,0,100,-100,20,10" + chr(10), encoding="utf-8"
+    )
+    real_walk = voicebank_analysis.os.walk
+
+    def walk_with_error(path: Path, *, onerror):
+        onerror(PermissionError(13, "Permission denied", str(root / "restricted")))
+        yield from real_walk(path)
+
+    monkeypatch.setattr(voicebank_analysis.os, "walk", walk_with_error)
+
+    analysis = analyze_voicebank(root)
+
+    scan_issues = [issue for issue in analysis.issues if issue.code == "directory_scan_failed"]
+    assert len(scan_issues) == 1
+    assert scan_issues[0].path == "restricted"
+    assert scan_issues[0].severity == "error"
+    # The scan still reports accessible root-level files after a subtree fails.
+    assert analysis.oto_files == ("oto.ini",)
+    assert analysis.summary["errors"] >= 1
