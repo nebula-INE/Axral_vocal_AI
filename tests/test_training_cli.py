@@ -101,3 +101,27 @@ def test_training_cli_evaluates_test_only_with_explicit_opt_in(tmp_path):
     assert report["test_evaluation_included"] is True
     assert set(report["evaluation_by_split"]) == {"train", "validation", "test"}
     assert "test" in report["mae_semitones"]
+
+
+
+def test_training_cli_refuses_to_overwrite_input_manifest(tmp_path):
+    manifest = _manifest(tmp_path)
+    original = manifest.read_text(encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            str(manifest),
+            "--output",
+            str(manifest),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "output path must differ from manifest path" in result.stderr
+    assert manifest.read_text(encoding="utf-8") == original
