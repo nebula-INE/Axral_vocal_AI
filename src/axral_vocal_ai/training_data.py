@@ -79,6 +79,8 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     notes = input_data.get("notes")
     _require(isinstance(notes, list) and bool(notes), f"{prefix}: input.notes must be a non-empty list")
     previous_start = -math.inf
+    note_starts: list[float] = []
+    note_ends: list[float] = []
     for index, note in enumerate(notes):
         where = f"{prefix}: input.notes[{index}]"
         _require(isinstance(note, dict), f"{where} must be an object")
@@ -94,12 +96,16 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
         if "voiced" in note:
             _require(note["voiced"] is None or isinstance(note["voiced"], bool), f"{where}.voiced must be bool or null")
         previous_start = start
+        note_starts.append(start)
+        note_ends.append(end)
 
+    # Use the already validated finite numbers; converting raw values again
+    # could leak OverflowError for extremely large JSON integers.
     # Labels may occur at the first/final note endpoints (some editors emit
     # endpoint samples), but must stay within the note timeline. Internal gaps
     # are allowed here and handled conservatively by feature mapping.
-    note_timeline_start = min(float(note["start_sec"]) for note in notes)
-    note_timeline_end = max(float(note["end_sec"]) for note in notes)
+    note_timeline_start = min(note_starts)
+    note_timeline_end = max(note_ends)
 
     target = record["target"]
     if require_labeled:
