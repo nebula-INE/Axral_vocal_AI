@@ -100,3 +100,18 @@ def test_absolute_wav_path_is_rejected_by_end_to_end_audit(tmp_path: Path) -> No
     assert analysis.summary["errors"] >= 1
     # Absolute paths are never accepted as an in-bank relative sample path.
     assert analysis.entries[0].wav_filename == str(outside)
+
+def test_windows_drive_wav_path_is_rejected_on_any_host(tmp_path: Path) -> None:
+    """Windows absolute paths must not become valid relative paths on POSIX."""
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    (root / "oto.ini").write_text(
+        "C:\\outside\\voice.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(root)
+
+    assert any(issue.code == "absolute_wav_path" for issue in analysis.issues)
+    assert analysis.summary["errors"] >= 1
+    assert analysis.entries[0].wav_filename == "C:\\outside\\voice.wav"
+
