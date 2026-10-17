@@ -106,7 +106,7 @@ def test_windows_drive_wav_path_is_rejected_on_any_host(tmp_path: Path) -> None:
     root = tmp_path / "voicebank"
     root.mkdir()
     (root / "oto.ini").write_text(
-        "C:\\outside\\voice.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "C:\\outside\\voice.wav=あ,0,100,-100,20,10" + chr(10), encoding="utf-8"
     )
 
     analysis = analyze_voicebank(root)
