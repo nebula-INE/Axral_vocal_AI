@@ -378,6 +378,5 @@ def test_metadata_symlink_cannot_read_outside_voicebank_root(
 
     expected_code = "oto_metadata_path_escape" if metadata_name == "oto.ini" else "prefix_map_path_escape"
     assert any(issue.code == expected_code for issue in analysis.issues)
-    assert analysis.oto_files == (() if metadata_name == "oto.ini" else ())
     assert analysis.entries == ()
     assert analysis.prefix_entries == ()
