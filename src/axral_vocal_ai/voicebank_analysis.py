@@ -103,11 +103,11 @@ class VoicebankAnalysis:
             "warnings": sum(issue.severity == "warning" for issue in self.issues),
         }
 
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-ready report; paths are relative to the scanned root."""
+    def to_dict(self, *, include_root_path: bool = True) -> dict[str, Any]:
+        """Return a JSON-ready report, optionally omitting the local root path."""
         return {
             "schema_version": 1,
-            "root": self.root,
+            "root": self.root if include_root_path else None,
             "summary": self.summary,
             "oto_files": list(self.oto_files),
             "prefix_map_files": list(self.prefix_map_files),
@@ -126,8 +126,12 @@ class VoicebankAnalysis:
             "issues": [asdict(issue) for issue in self.issues],
         }
 
-    def to_json(self, *, indent: int = 2) -> str:
-        return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
+    def to_json(self, *, indent: int = 2, include_root_path: bool = True) -> str:
+        return json.dumps(
+            self.to_dict(include_root_path=include_root_path),
+            ensure_ascii=False,
+            indent=indent,
+        )
 
 
 def _read_text(path: Path) -> str:
