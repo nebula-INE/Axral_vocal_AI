@@ -62,6 +62,21 @@ def test_cli_writes_report_file_and_fails_on_errors_by_default(
     assert report["issues"]
 
 
+def test_cli_fail_on_warning_returns_one_when_warnings_exist(
+    tmp_path: Path, capsys
+) -> None:
+    root = tmp_path / "voicebank"
+    make_voicebank(root)
+
+    status = main([str(root), "--fail-on", "warning"])
+    output = capsys.readouterr()
+
+    report = json.loads(output.out)
+    assert report["summary"]["warnings"] >= 1
+    assert status == 1
+    assert output.err == ""
+
+
 def test_cli_fail_on_warning_can_be_disabled(tmp_path: Path, capsys) -> None:
     root = tmp_path / "voicebank"
     make_voicebank(root, broken=True)
