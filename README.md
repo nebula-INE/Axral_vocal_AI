@@ -18,6 +18,17 @@ This repository is intended for AI-specific source code, training/evaluation too
 - Evaluate unseen voicebanks, not only voicebanks used for training.
 - Make changes incrementally and validate audio quality before integration.
 
+## Voicebank audit
+
+Install the package in editable mode and run the read-only audit against a local voicebank:
+
+```sh
+python -m pip install -e .
+python -m axral_vocal_ai.voicebank_audit_cli "/path/to/voicebank" --output audit.json
+```
+
+The CLI inventories `oto.ini` and `prefix.map`, checks referenced WAV paths and structure, and reports basic PCM signal findings. It does not modify the bank or render audio. Review warnings and compare alias/pitch resolution with VO-SE_vocal before calling a bank compatible. See [the real voicebank validation gate](docs/real_voicebank_validation.md). Do not commit restricted voicebank assets or reports containing sensitive filenames/aliases.
+
 ## Initial implementation order
 
 1. Audit the existing VO-SE_vocal AI, voicebank parsing, PrefixMap, phoneme/alias resolution, and pitch editing interfaces.
