@@ -134,7 +134,21 @@ def inspect_wav(path: str | Path) -> WavMetadata:
     if block_align > 0 and data_bytes % block_align:
         issues.append("data_size_not_aligned_to_sample_frames")
 
-    duration = data_bytes / byte_rate if byte_rate > 0 else None
+    # The declared data size is useful diagnostic evidence, but it is not a
+    # trustworthy duration when the RIFF container or a chunk is truncated.
+    duration_is_trustworthy = not any(
+        issue in issues
+        for issue in (
+            "riff_size_exceeds_file",
+            "chunk_size_exceeds_riff_boundary",
+            "chunk_truncated",
+        )
+    )
+    duration = (
+        data_bytes / byte_rate
+        if byte_rate > 0 and duration_is_trustworthy
+        else None
+    )
     return WavMetadata(
         path=wav_path.as_posix(),
         file_size_bytes=file_size,
