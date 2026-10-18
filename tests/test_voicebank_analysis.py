@@ -159,3 +159,26 @@ def test_utf8_voicebank_metadata_is_not_misread_as_cp932(tmp_path: Path) -> None
 
     assert result.entries[0].alias == "こんにちは"
     assert not any(issue.code == "oto_parse_issue" for issue in result.issues)
+
+
+def test_nested_prefix_map_is_reported_as_audit_only_not_runtime_equivalence(tmp_path: Path) -> None:
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    write_silent_wav(tmp_path / "a.wav")
+    (tmp_path / "prefix.map").write_text("C4\\t-\\t_ROOT\\n", encoding="utf-8")
+    nested = tmp_path / "voice"
+    nested.mkdir()
+    (nested / "prefix.map").write_text("C4\\t-\\t_NESTED\\n", encoding="utf-8")
+
+    result = analyze_voicebank(tmp_path)
+
+    codes = [issue.code for issue in result.issues]
+    assert "nested_prefix_map" in codes
+    assert "prefix_map_boundary_conflict" in codes
+    # Inventory keeps both rows for inspection; callers must not treat this
+    # combined list as the renderer's actual map-loading behavior.
+    assert [(entry.boundary, entry.suffix) for entry in result.prefix_entries] == [
+        (60, "_ROOT"),
+        (60, "_NESTED"),
+    ]
