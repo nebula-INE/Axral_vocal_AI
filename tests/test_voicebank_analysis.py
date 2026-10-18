@@ -47,7 +47,7 @@ def test_resolves_wav_path_case_insensitively_like_vo_se(tmp_path: Path) -> None
     actual_dir.mkdir()
     write_silent_wav(actual_dir / "Audio.WAV")
     (tmp_path / "oto.ini").write_text(
-        "subvoice/audio.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "subvoice/audio.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     result = analyze_voicebank(tmp_path)
