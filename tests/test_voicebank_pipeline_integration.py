@@ -353,3 +353,31 @@ def test_conflicting_boundaries_across_prefix_maps_are_reported(tmp_path: Path) 
     assert conflicts[0].path == "subbank/prefix.map"
     assert "60" in conflicts[0].message
     assert "prefix.map" in conflicts[0].message
+
+
+@pytest.mark.parametrize("metadata_name", ["oto.ini", "prefix.map"])
+def test_metadata_symlink_cannot_read_outside_voicebank_root(
+    tmp_path: Path, metadata_name: str
+) -> None:
+    """Metadata symlinks must not let the audit ingest files outside the bank."""
+    root = tmp_path / "voicebank"
+    root.mkdir()
+    outside = tmp_path / f"external-{metadata_name}"
+    outside.write_text(
+        "sample.wav=あ,0,100,-100,20,10\\n"
+        if metadata_name == "oto.ini"
+        else "C4\\t\\t_F4\\n",
+        encoding="utf-8",
+    )
+    try:
+        (root / metadata_name).symlink_to(outside)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink creation is unavailable on this platform: {exc}")
+
+    analysis = analyze_voicebank(root)
+
+    expected_code = "oto_metadata_path_escape" if metadata_name == "oto.ini" else "prefix_map_path_escape"
+    assert any(issue.code == expected_code for issue in analysis.issues)
+    assert analysis.oto_files == (() if metadata_name == "oto.ini" else ())
+    assert analysis.entries == ()
+    assert analysis.prefix_entries == ()
