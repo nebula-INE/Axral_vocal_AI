@@ -123,3 +123,19 @@ def test_cli_returns_two_when_root_is_a_file(tmp_path: Path, capsys) -> None:
     assert output.out == ""
     assert "voicebank audit failed:" in output.err
 
+def test_cli_can_redact_absolute_voicebank_root_from_report(
+    tmp_path: Path, capsys
+) -> None:
+    root = tmp_path / "private-voicebank-location"
+    make_voicebank(root)
+
+    status = main([str(root), "--redact-root"])
+    output = capsys.readouterr()
+
+    assert status == 0
+    report = json.loads(output.out)
+    assert report["root"] is None
+    assert str(root) not in output.out
+    assert report["oto_files"] == ["oto.ini"]
+    assert output.err == ""
+
