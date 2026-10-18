@@ -182,3 +182,25 @@ def test_nested_prefix_map_is_reported_as_audit_only_not_runtime_equivalence(tmp
         (60, "_ROOT"),
         (60, "_NESTED"),
     ]
+
+
+def test_reports_duplicate_alias_across_root_and_nested_oto_files(tmp_path: Path) -> None:
+    (tmp_path / "oto.ini").write_text(
+        "root.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    write_silent_wav(tmp_path / "root.wav")
+    nested = tmp_path / "voice"
+    nested.mkdir()
+    (nested / "oto.ini").write_text(
+        "nested.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    write_silent_wav(nested / "nested.wav")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.summary["oto_files"] == 2
+    assert result.summary["oto_entries"] == 2
+    assert result.summary["duplicate_alias_groups"] == 1
+    duplicate = next(item for item in result.duplicate_aliases if item[0] == "あ")
+    assert len(duplicate[1]) == 2
+    assert any(issue.code == "duplicate_alias" for issue in result.issues)
