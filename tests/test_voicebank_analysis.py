@@ -119,7 +119,7 @@ def test_reports_malformed_existing_wav(tmp_path: Path) -> None:
 def test_utf8_voicebank_metadata_is_not_misread_as_cp932(tmp_path: Path) -> None:
     """Valid UTF-8 should win over CP932 when both decoders accept the bytes."""
     (tmp_path / "oto.ini").write_text(
-        "hello.wav=こんにちは,0,100,-100,20,10\\n", encoding="utf-8"
+        "hello.wav=こんにちは,0,100,-100,20,10\n", encoding="utf-8"
     )
     write_silent_wav(tmp_path / "hello.wav")
 
