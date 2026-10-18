@@ -61,7 +61,8 @@ def _inspect_data_chunk_layout(path: str | Path, sample_width: int,
             # A chunk is part of the WAV container only if it falls within
             # the RIFF-declared boundary. Bytes physically trailing the RIFF
             # payload must not make an oversized data chunk look complete.
-            riff_end = min(file_size, struct.unpack("<I", header[4:8])[0] + 8)
+            declared_riff_end = struct.unpack("<I", header[4:8])[0] + 8
+            riff_end = min(file_size, declared_riff_end)
             offset = 12
             while offset + 8 <= riff_end:
                 stream.seek(offset)
@@ -75,6 +76,8 @@ def _inspect_data_chunk_layout(path: str | Path, sample_width: int,
                     available = max(0, min(declared_size, riff_end - data_start))
                     if available < declared_size:
                         issues.add("truncated_data_chunk")
+                        if file_size > declared_riff_end and data_start + declared_size > declared_riff_end:
+                            issues.add("data_payload_outside_riff_boundary")
                     if available % sample_width:
                         issues.add("incomplete_pcm_sample")
                     if available % (sample_width * max(channels, 1)):
@@ -105,6 +108,13 @@ def inspect_pcm_signal(path: str | Path, *, near_silence_threshold: float = 0.00
                 return WavSignalAudit("unsupported", 0, None, None, ("pcm_sample_width_unsupported",))
             channels = max(audio.getnchannels(), 1)
             malformed_data = _inspect_data_chunk_layout(path, width, channels)
+            if "data_payload_outside_riff_boundary" in malformed_data:
+                # wave.open/readframes may consume physical trailing bytes even
+                # though they are not part of the declared RIFF container.
+                # Do not let those bytes contaminate peak/RMS diagnostics.
+                return WavSignalAudit(
+                    "malformed", 0, None, None, tuple(sorted(malformed_data))
+                )
             scale = float(1 << (width * 8 - 1))
             peak = 0
             sum_squares = 0.0
