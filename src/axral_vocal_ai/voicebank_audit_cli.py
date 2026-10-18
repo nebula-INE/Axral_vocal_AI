@@ -24,6 +24,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="write the JSON report to this file instead of standard output",
     )
     parser.add_argument(
+        "--redact-root",
+        action="store_true",
+        help="omit the local voicebank root path from the JSON report before sharing it",
+    )
+    parser.add_argument(
         "--fail-on",
         choices=("never", "warning", "error"),
         default="error",
@@ -40,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"voicebank audit failed: {exc}", file=sys.stderr)
         return 2
 
-    report = analysis.to_json(indent=2)
+    report = analysis.to_json(indent=2, include_root_path=not args.redact_root)
     if args.output is None:
         print(report)
     else:
