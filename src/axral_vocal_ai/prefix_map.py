@@ -102,7 +102,10 @@ def select_prefix_map(entries: Sequence[PrefixMapEntry], note_num: int) -> Prefi
         return None
     tone = max(0, min(127, int(round(note_num))))
     selected = None
-    for entry in entries:
+    # Callers may construct entries directly rather than using parse_prefix_map().
+    # Sort stably so unsorted inputs still follow lower-boundary semantics and
+    # the last declared row wins when boundaries are duplicated.
+    for entry in sorted(entries, key=lambda item: item.boundary):
         if entry.boundary > tone:
             break
         selected = entry
