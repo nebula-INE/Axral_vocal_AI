@@ -145,6 +145,37 @@ def _relative(root: Path, path: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
+def _resolve_case_insensitive(root: Path, candidate: Path) -> Path:
+    """Resolve an existing path with VO-SE's case-insensitive component fallback.
+
+    Exact filesystem matches always win. The fallback is only used when a
+    component's spelling differs; ambiguous case-folded matches are not guessed.
+    """
+    if candidate.is_file():
+        return candidate
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError:
+        return candidate
+
+    current = root
+    for component in relative.parts:
+        if component in ("", "."):
+            continue
+        try:
+            matches = sorted(
+                child for child in current.iterdir()
+                if child.name.casefold() == component.casefold()
+            )
+        except OSError:
+            return candidate
+        if len(matches) != 1:
+            return candidate
+        current = matches[0]
+
+    return current if current.is_file() else candidate
+
+
 def _alias_pattern(alias: str) -> str:
     """Classify spelling shape only; this is evidence, not a bank diagnosis."""
     parts = alias.strip().split()
@@ -226,6 +257,14 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                                                  f"WAV path escapes voicebank root: {filename}"))
                     rebased = filename
                 else:
+                    candidate = _resolve_case_insensitive(root_path, candidate)
+                    try:
+                        candidate.resolve().relative_to(root_path)
+                    except ValueError:
+                        issues.append(VoicebankIssue("error", "wav_path_escape", relative_path, entry.source_line,
+                                                     f"WAV path resolves outside voicebank root: {filename}"))
+                        rebased = filename
+                        continue
                     rebased = candidate.relative_to(root_path).as_posix()
                     if not candidate.is_file():
                         issues.append(VoicebankIssue("error", "wav_missing", relative_path, entry.source_line,
