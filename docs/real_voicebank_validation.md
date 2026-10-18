@@ -17,6 +17,14 @@ From a checkout with the package importable (for example, after `python -m pip i
 python -m axral_vocal_ai.voicebank_audit_cli "/path/to/voicebank" --output audit.json
 ```
 
+For a report that omits the absolute voicebank root and keeps WAV metadata paths relative, use:
+
+```sh
+python -m axral_vocal_ai.voicebank_audit_cli "/path/to/voicebank" --output audit.json --redact-root
+```
+
+Root redaction is not full anonymization: aliases, relative sample names, and issue details may still identify a voicebank. Review the report before sharing it.
+
 Exit status:
 - `0`: no findings at the selected threshold (default: errors only); inspect warnings and informational findings too.
 - `1`: one or more findings met `--fail-on` threshold.
