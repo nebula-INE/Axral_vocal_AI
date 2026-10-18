@@ -155,3 +155,20 @@ def test_data_chunk_must_fit_inside_declared_riff_boundary(tmp_path: Path) -> No
     result = inspect_pcm_signal(path)
 
     assert "truncated_data_chunk" in result.issues
+
+
+def test_does_not_audit_physical_bytes_outside_riff_container(tmp_path: Path) -> None:
+    path = tmp_path / "outside-riff.wav"
+    write_pcm(path, [1200, -1200], width=2)
+    raw = bytearray(path.read_bytes())
+    # Keep non-silent sample bytes physically present, but exclude the entire
+    # data payload from the RIFF container's declared boundary.
+    raw[4:8] = struct.pack("<I", 36)
+    path.write_bytes(raw)
+
+    result = inspect_pcm_signal(path)
+
+    assert result.status == "malformed"
+    assert result.frames_checked == 0
+    assert result.peak_normalized is None
+    assert "data_payload_outside_riff_boundary" in result.issues
