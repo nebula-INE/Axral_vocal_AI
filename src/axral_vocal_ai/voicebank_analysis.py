@@ -264,11 +264,12 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                         issues.append(VoicebankIssue("error", "wav_path_escape", relative_path, entry.source_line,
                                                      f"WAV path resolves outside voicebank root: {filename}"))
                         rebased = filename
-                        continue
-                    rebased = candidate.relative_to(root_path).as_posix()
-                    if not candidate.is_file():
-                        issues.append(VoicebankIssue("error", "wav_missing", relative_path, entry.source_line,
-                                                     f"WAV file not found: {rebased}"))
+                        candidate = None
+                    else:
+                        rebased = candidate.relative_to(root_path).as_posix()
+                        if not candidate.is_file():
+                            issues.append(VoicebankIssue("error", "wav_missing", relative_path, entry.source_line,
+                                                         f"WAV file not found: {rebased}"))
             entries.append(OtoEntry(entry.source_line, rebased, entry.alias, entry.offset,
                                     entry.consonant, entry.cutoff, entry.preutterance, entry.overlap))
 
