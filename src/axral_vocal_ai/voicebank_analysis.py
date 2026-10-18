@@ -65,7 +65,22 @@ class VoicebankAnalysis:
             "duplicate_alias_groups": len(self.duplicate_aliases),
             "prefix_map_entries": len(self.prefix_entries),
             "wav_files_checked": len(self.wav_files),
-            "wav_files_invalid": sum(item.error is not None for item in self.wav_files),
+            "wav_files_invalid": sum(
+                item.error is not None
+                or bool(
+                    item.metadata
+                    and any(
+                        code in item.metadata.issues
+                        for code in (
+                            "riff_size_exceeds_file",
+                            "chunk_size_exceeds_riff_boundary",
+                            "chunk_truncated",
+                            "missing_chunk_padding",
+                        )
+                    )
+                )
+                for item in self.wav_files
+            ),
             # Unsupported formats are informational: they were not decoded,
             # so they must not inflate the count of detected signal findings.
             "wav_files_with_signal_issues": sum(
