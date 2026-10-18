@@ -114,3 +114,16 @@ def test_reports_malformed_existing_wav(tmp_path: Path) -> None:
     assert report["wav_files"][0]["path"] == "broken.wav"
     assert report["wav_files"][0]["metadata"] is None
     assert report["wav_files"][0]["error"]
+
+
+def test_utf8_voicebank_metadata_is_not_misread_as_cp932(tmp_path: Path) -> None:
+    """Valid UTF-8 should win over CP932 when both decoders accept the bytes."""
+    (tmp_path / "oto.ini").write_text(
+        "hello.wav=こんにちは,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    write_silent_wav(tmp_path / "hello.wav")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries[0].alias == "こんにちは"
+    assert not any(issue.code == "oto_parse_issue" for issue in result.issues)
