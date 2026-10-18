@@ -142,3 +142,16 @@ def test_rejects_non_riff_input_as_unreadable(tmp_path: Path) -> None:
     path.write_bytes(b"not a RIFF/WAVE file")
     result = inspect_pcm_signal(path)
     assert result.status == "unreadable"
+
+def test_data_chunk_must_fit_inside_declared_riff_boundary(tmp_path: Path) -> None:
+    path = tmp_path / "trailing_data_outside_riff.wav"
+    write_pcm(path, [1200, -1200], width=2)
+    raw = bytearray(path.read_bytes())
+    # Keep the physical samples after the data header, but declare the RIFF
+    # container to end immediately before those samples.
+    raw[4:8] = struct.pack("<I", 36)
+    path.write_bytes(raw)
+
+    result = inspect_pcm_signal(path)
+
+    assert "truncated_data_chunk" in result.issues
