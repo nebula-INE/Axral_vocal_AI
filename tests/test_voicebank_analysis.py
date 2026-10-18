@@ -42,6 +42,21 @@ def test_scans_nested_oto_and_rebases_wav_paths(tmp_path: Path) -> None:
     assert "signal" in report["wav_files"][0]
 
 
+def test_resolves_wav_path_case_insensitively_like_vo_se(tmp_path: Path) -> None:
+    actual_dir = tmp_path / "SubVoice"
+    actual_dir.mkdir()
+    write_silent_wav(actual_dir / "Audio.WAV")
+    (tmp_path / "oto.ini").write_text(
+        "subvoice/audio.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries[0].wav_filename == "SubVoice/Audio.WAV"
+    assert result.summary["wav_files_checked"] == 1
+    assert not any(issue.code == "wav_missing" for issue in result.issues)
+
+
 def test_reports_missing_wav_and_duplicate_alias(tmp_path: Path) -> None:
     (tmp_path / "oto.ini").write_text(
         "missing.wav=あ,0,100,-100,20,10\nother.wav=あ,0,100,-100,20,10\n",
