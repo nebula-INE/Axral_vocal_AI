@@ -36,6 +36,16 @@ def test_selects_last_boundary_not_above_note() -> None:
     assert select_prefix_map(result.entries, 127).suffix == "_F4"
 
 
+def test_selects_correct_boundary_from_unsorted_entries() -> None:
+    entries = [
+        PrefixMapEntry(boundary=65, prefix="", suffix="_F4"),
+        PrefixMapEntry(boundary=24, prefix="", suffix="_C1"),
+    ]
+
+    assert select_prefix_map(entries, 60).suffix == "_C1"
+    assert select_prefix_map(entries, 65).suffix == "_F4"
+
+
 def test_applies_prefix_and_suffix_to_complete_alias() -> None:
     result = parse_prefix_map("C4\tC4/\t_C4\n")
     assert map_alias("a い", 60, result.entries) == "C4/a い_C4"
