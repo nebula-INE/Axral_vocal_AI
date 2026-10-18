@@ -234,6 +234,14 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
     for path in oto_paths:
         relative_path = _relative(root_path, path)
         try:
+            path.resolve().relative_to(root_path)
+        except (ValueError, OSError):
+            issues.append(VoicebankIssue(
+                "error", "oto_metadata_path_escape", relative_path, None,
+                "oto.ini resolves outside the voicebank root; external metadata is not read.",
+            ))
+            continue
+        try:
             parsed = parse_oto_ini(_read_text(path))
         except (OSError, UnicodeError) as exc:
             issues.append(VoicebankIssue("error", "oto_read_failed", relative_path, None, str(exc)))
@@ -314,6 +322,14 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
 
     for path in prefix_paths:
         relative_path = _relative(root_path, path)
+        try:
+            path.resolve().relative_to(root_path)
+        except (ValueError, OSError):
+            issues.append(VoicebankIssue(
+                "error", "prefix_map_path_escape", relative_path, None,
+                "prefix.map resolves outside the voicebank root; external metadata is not read.",
+            ))
+            continue
         try:
             parsed = parse_prefix_map(_read_text(path))
         except (OSError, UnicodeError) as exc:
