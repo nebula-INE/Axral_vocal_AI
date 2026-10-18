@@ -118,7 +118,7 @@ class VoicebankAnalysis:
 def _read_text(path: Path) -> str:
     """Read common Japanese Windows voicebank encodings without data loss."""
     raw = path.read_bytes()
-    for encoding in ("utf-8-sig", "cp932", "utf-8"):
+    for encoding in ("utf-8-sig", "utf-8", "cp932"):
         try:
             return raw.decode(encoding)
         except UnicodeDecodeError:
