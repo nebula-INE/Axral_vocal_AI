@@ -163,13 +163,13 @@ def test_utf8_voicebank_metadata_is_not_misread_as_cp932(tmp_path: Path) -> None
 
 def test_nested_prefix_map_is_reported_as_audit_only_not_runtime_equivalence(tmp_path: Path) -> None:
     (tmp_path / "oto.ini").write_text(
-        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
     write_silent_wav(tmp_path / "a.wav")
-    (tmp_path / "prefix.map").write_text("C4\\t-\\t_ROOT\\n", encoding="utf-8")
+    (tmp_path / "prefix.map").write_text("C4\t-\t_ROOT\n", encoding="utf-8")
     nested = tmp_path / "voice"
     nested.mkdir()
-    (nested / "prefix.map").write_text("C4\\t-\\t_NESTED\\n", encoding="utf-8")
+    (nested / "prefix.map").write_text("C4\t-\t_NESTED\n", encoding="utf-8")
 
     result = analyze_voicebank(tmp_path)
 
