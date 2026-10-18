@@ -95,3 +95,31 @@ def test_cli_returns_two_for_missing_voicebank(tmp_path: Path, capsys) -> None:
     assert status == 2
     assert output.out == ""
     assert "voicebank audit failed:" in output.err
+
+def test_cli_returns_two_when_report_destination_cannot_be_created(
+    tmp_path: Path, capsys
+) -> None:
+    root = tmp_path / "voicebank"
+    make_voicebank(root)
+    blocker = tmp_path / "not-a-directory"
+    blocker.write_text("file blocks parent directory", encoding="utf-8")
+
+    status = main([str(root), "--output", str(blocker / "audit.json")])
+    output = capsys.readouterr()
+
+    assert status == 2
+    assert output.out == ""
+    assert "could not write report:" in output.err
+
+
+def test_cli_returns_two_when_root_is_a_file(tmp_path: Path, capsys) -> None:
+    root_file = tmp_path / "not-a-voicebank-directory"
+    root_file.write_text("not a directory", encoding="utf-8")
+
+    status = main([str(root_file)])
+    output = capsys.readouterr()
+
+    assert status == 2
+    assert output.out == ""
+    assert "voicebank audit failed:" in output.err
+
