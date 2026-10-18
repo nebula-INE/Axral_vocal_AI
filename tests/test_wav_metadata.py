@@ -78,6 +78,7 @@ def test_reports_declared_riff_size_larger_than_file(tmp_path: Path) -> None:
     result = inspect_wav(path)
 
     assert "riff_size_exceeds_file" in result.issues
+    assert result.duration_seconds is None
 
 def test_reports_data_chunk_larger_than_declared_riff_boundary(tmp_path: Path) -> None:
     path = tmp_path / "oversized-data.wav"
@@ -94,6 +95,7 @@ def test_reports_data_chunk_larger_than_declared_riff_boundary(tmp_path: Path) -
 
     assert "chunk_size_exceeds_riff_boundary" in result.issues
     assert result.data_bytes == 4096
+    assert result.duration_seconds is None
 
 
 def test_reports_missing_padding_for_odd_sized_data_chunk(tmp_path: Path) -> None:
