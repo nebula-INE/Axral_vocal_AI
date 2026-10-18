@@ -119,8 +119,18 @@ class VoicebankAnalysis:
             ],
             "pattern_evidence": [asdict(item) for item in self.pattern_evidence],
             "wav_files": [
-                {"path": item.path, "metadata": asdict(item.metadata) if item.metadata else None,
-                 "error": item.error, "signal": asdict(item.signal) if item.signal else None}
+                {
+                    "path": item.path,
+                    "metadata": (
+                        {**asdict(item.metadata), "path": item.path}
+                        if item.metadata else None
+                    ),
+                    "error": (
+                        item.error.replace(self.root + os.sep, "")
+                        if not include_root_path and item.error else item.error
+                    ),
+                    "signal": asdict(item.signal) if item.signal else None,
+                }
                 for item in self.wav_files
             ],
             "issues": [asdict(issue) for issue in self.issues],
