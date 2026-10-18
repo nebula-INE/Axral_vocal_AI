@@ -86,11 +86,11 @@ def test_reports_truncated_pcm_sample_instead_of_silently_ignoring_it(tmp_path: 
     path = tmp_path / "truncated.wav"
     write_pcm(path, [1200], width=2)
     raw = bytearray(path.read_bytes())
-    # Declare a four-byte data payload, but leave only three payload bytes.
-    # The physical file is truncated by one byte relative to its WAV header.
+    # Declare a four-byte data payload, but keep only three payload bytes
+    # inside the RIFF container. The last byte is a partial 16-bit PCM sample.
     raw[40:44] = struct.pack("<I", 4)
-    raw[4:8] = struct.pack("<I", len(raw) - 8)
     raw.append(0x7F)
+    raw[4:8] = struct.pack("<I", len(raw) - 8)
     path.write_bytes(raw)
 
     result = inspect_pcm_signal(path)
