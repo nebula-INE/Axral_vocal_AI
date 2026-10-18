@@ -99,6 +99,23 @@ def test_deduplicates_wav_audits_and_summarizes_signal_findings(tmp_path: Path) 
     assert report["summary"]["wav_files_digital_silence"] == 1
     assert report["wav_files"][0]["signal"]["issues"] == ["digital_silence"]
 
+def test_summary_counts_truncated_riff_as_invalid_wav(tmp_path: Path) -> None:
+    path = tmp_path / "truncated.wav"
+    write_silent_wav(path)
+    raw = bytearray(path.read_bytes())
+    struct.pack_into("<I", raw, 4, len(raw) + 100)
+    path.write_bytes(raw)
+    (tmp_path / "oto.ini").write_text(
+        "truncated.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.summary["wav_files_checked"] == 1
+    assert result.summary["wav_files_invalid"] == 1
+    assert any(issue.code == "wav_riff_size_exceeds_file" for issue in result.issues)
+
+
 def test_reports_malformed_existing_wav(tmp_path: Path) -> None:
     (tmp_path / "broken.wav").write_bytes(b"RIFF")
     (tmp_path / "oto.ini").write_text(
