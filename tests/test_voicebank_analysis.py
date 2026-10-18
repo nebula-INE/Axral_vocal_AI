@@ -106,7 +106,7 @@ def test_summary_counts_truncated_riff_as_invalid_wav(tmp_path: Path) -> None:
     struct.pack_into("<I", raw, 4, len(raw) + 100)
     path.write_bytes(raw)
     (tmp_path / "oto.ini").write_text(
-        "truncated.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "truncated.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     result = analyze_voicebank(tmp_path)
