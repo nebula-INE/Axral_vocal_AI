@@ -58,8 +58,12 @@ def _inspect_data_chunk_layout(path: str | Path, sample_width: int,
             header = stream.read(12)
             if len(header) != 12 or header[:4] != b"RIFF" or header[8:12] != b"WAVE":
                 return issues
+            # A chunk is part of the WAV container only if it falls within
+            # the RIFF-declared boundary. Bytes physically trailing the RIFF
+            # payload must not make an oversized data chunk look complete.
+            riff_end = min(file_size, struct.unpack("<I", header[4:8])[0] + 8)
             offset = 12
-            while offset + 8 <= file_size:
+            while offset + 8 <= riff_end:
                 stream.seek(offset)
                 chunk_header = stream.read(8)
                 if len(chunk_header) != 8:
@@ -68,7 +72,7 @@ def _inspect_data_chunk_layout(path: str | Path, sample_width: int,
                 declared_size = struct.unpack("<I", chunk_header[4:])[0]
                 data_start = offset + 8
                 if chunk_id == b"data":
-                    available = max(0, min(declared_size, file_size - data_start))
+                    available = max(0, min(declared_size, riff_end - data_start))
                     if available < declared_size:
                         issues.add("truncated_data_chunk")
                     if available % sample_width:
