@@ -186,13 +186,13 @@ def test_nested_prefix_map_is_reported_as_audit_only_not_runtime_equivalence(tmp
 
 def test_reports_duplicate_alias_across_root_and_nested_oto_files(tmp_path: Path) -> None:
     (tmp_path / "oto.ini").write_text(
-        "root.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "root.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
     write_silent_wav(tmp_path / "root.wav")
     nested = tmp_path / "voice"
     nested.mkdir()
     (nested / "oto.ini").write_text(
-        "nested.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "nested.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
     write_silent_wav(nested / "nested.wav")
 
