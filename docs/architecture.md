@@ -149,6 +149,23 @@ Response rules:
 - Applying the result creates a separate editable proposal. The original notes and pitch curve remain recoverable; AI-off or any validation failure leaves the established project/render path unchanged.
 - The first integration should use a deterministic stub and contract tests before any trained model is connected.
 
+
+### Implementation alignment gate (required before runtime integration)
+
+The repository already contains an internal Python contract in `src/axral_vocal_ai/contracts.py` and safety validation in `src/axral_vocal_ai/response_validation.py`. These are **not yet equivalent** to the wire-format proposal above:
+
+| Field | Existing Python contract | Proposed wire contract |
+| --- | --- | --- |
+| Version | integer `1` | string `"1.0"` |
+| Time units | seconds (`start_sec`, `end_sec`, `time_sec`) | milliseconds (`start_ms`, note-relative `time_ms`) |
+| Pitch delta units | semitones (`delta_semitones`) | cents (`delta_cents`) |
+| Result grouping | one flat `pitch_deltas` sequence | per-note `note_results` keyed by `note_id` |
+| Status vocabulary | `ok`, `no_change`, `rejected` | request-level `ok`, `partial`, `needs_review`, `error` plus per-note status |
+
+Do not pass either representation directly to the other or silently relabel the current Python schema as wire v1. Before connecting inference to any caller, choose and implement an explicit, tested adapter (including unit conversion, note identity, and status mapping) or revise the wire proposal to match the implementation. The adapter must reject unsupported versions and invalid/non-finite values; it must not clamp unsafe output or mutate source notes.
+
+The existing Python contract and response validator are useful foundations, and their current tests remain relevant. This alignment gate is a compatibility requirement, not authorization to change the VO-SE_vocal renderer, export, WAV writing, synthesis, timing, pitch shifting, or audio processing.
+
 ## Safety and compatibility invariants
 
 1. AI disabled means the existing render path is used without AI modifications.
