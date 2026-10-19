@@ -74,7 +74,9 @@ def test_builder_rejects_missing_alias_instead_of_guessing(tmp_path):
 ])
 def test_builder_rejects_absolute_or_traversing_sample_paths(tmp_path, unsafe_path):
     entry = OtoEntry(1, unsafe_path, "あ", 0, 0, 0, 0, 0)
-    with pytest.raises(WireRequestBuildError, match="safe voicebank-relative path"):
+    # The analysis resolver can reject unsafe paths before the wire builder's
+    # own relative-path guard runs. Both paths must fail closed.
+    with pytest.raises(WireRequestBuildError, match="invalid_sample_path|safe voicebank-relative path"):
         build_wire_request(_analysis(tmp_path, entries=(entry,)), _notes(),
                            profile_id="bank", profile_version="1")
 
