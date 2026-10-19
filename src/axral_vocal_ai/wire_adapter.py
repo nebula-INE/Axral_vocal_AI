@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, Mapping
 
-from .contracts import PitchDeltaPoint, PitchRequest, PitchResponse, SCHEMA_VERSION
+from .contracts import PitchDeltaPoint, PitchNote, PitchRequest, PitchResponse, SCHEMA_VERSION
 from .response_validation import validate_pitch_response
 
 WIRE_VERSION = "1.0"
@@ -157,27 +157,19 @@ def adapt_wire_response(
         missing = sorted(set(notes_by_id) - seen)
         raise ValueError(f"missing note results: {', '.join(missing)}")
 
-    internal_notes = []
-    for note_id, note in notes_by_id.items():
-        start_sec = float(note["start_ms"]) / 1000.0
-        duration_sec = float(note["duration_ms"]) / 1000.0
-        internal_notes.append({
-            "note_id": note_id,
-            "start_sec": start_sec,
-            "end_sec": start_sec + duration_sec,
-            "midi_note": note["midi_note"],
-            "lyric": note.get("lyric", ""),
-            "resolved_alias": note.get("resolved_alias"),
-            "voiced": note.get("voiced"),
-        })
-    # Internal contract does not retain note IDs, so construct it in wire order.
+    # Internal contract does not retain note IDs; preserve the request's note
+    # order while constructing the validation context.
     internal_request = PitchRequest(
         notes=tuple(
-            __import__("axral_vocal_ai.contracts", fromlist=["PitchNote"]).PitchNote(
-                item["start_sec"], item["end_sec"], item["midi_note"],
-                item["lyric"], item["resolved_alias"], item["voiced"]
+            PitchNote(
+                start_sec=float(note["start_ms"]) / 1000.0,
+                end_sec=(float(note["start_ms"]) + float(note["duration_ms"])) / 1000.0,
+                midi_note=note["midi_note"],
+                lyric=note.get("lyric", ""),
+                resolved_alias=note.get("resolved_alias"),
+                voiced=note.get("voiced"),
             )
-            for item in internal_notes
+            for note in notes_by_id.values()
         ),
         request_id=request_id,
         schema_version=SCHEMA_VERSION,
