@@ -92,7 +92,7 @@ def adapt_wire_response(
 
     notes_by_id = _wire_notes(request)
     status = response.get("status")
-    if status not in _WIRE_STATUSES:
+    if not isinstance(status, str) or status not in _WIRE_STATUSES:
         raise ValueError("unsupported wire response status")
     if status != "ok":
         raise ValueError(f"wire response status '{status}' requires review; no changes accepted")
@@ -118,7 +118,7 @@ def adapt_wire_response(
         seen.add(note_id)
         note = notes_by_id[note_id]
         note_status = result.get("status")
-        if note_status not in _NOTE_STATUSES:
+        if not isinstance(note_status, str) or note_status not in _NOTE_STATUSES:
             raise ValueError(f"note_results[{index}] has unsupported status")
         if note_status != "ok":
             raise ValueError(f"note {note_id} status '{note_status}' requires review")
@@ -174,6 +174,9 @@ def adapt_wire_response(
         request_id=request_id,
         schema_version=SCHEMA_VERSION,
     )
+    # Wire note_results may arrive in any order. The internal contract is a
+    # single time-series, so normalize the converted points by absolute time.
+    points.sort(key=lambda point: point.time_sec)
     internal_status = "ok" if points else "no_change"
     internal_response = PitchResponse(
         status=internal_status,
