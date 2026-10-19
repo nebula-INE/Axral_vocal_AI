@@ -254,7 +254,7 @@ def deterministic_wire_stub(wire_request: Dict[str, Any]) -> Dict[str, Any]:
     request_id = request.get("request_id")
     if not isinstance(request_id, str) or not request_id:
         raise ValueError("request_id must be a non-empty string")
-    notes = _wire_notes(request)
+    notes = _validate_wire_request(request)
     return {
         "contract": RESPONSE_CONTRACT,
         "schema_version": WIRE_VERSION,
