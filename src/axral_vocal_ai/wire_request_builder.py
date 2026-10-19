@@ -6,8 +6,9 @@ Ambiguous alias or prefix-map selection fails closed instead of guessing.
 """
 from __future__ import annotations
 
+import math
 from collections import Counter
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
@@ -25,6 +26,15 @@ class WireRequestBuildError(ValueError):
         super().__init__(message)
         self.note_id = note_id
         self.status = status
+
+
+def _nonnegative_finite(value: Any, field: str, *, note_id: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise WireRequestBuildError(f"{field} must be a finite non-negative number", note_id=note_id)
+    result = float(value)
+    if not math.isfinite(result) or result < 0:
+        raise WireRequestBuildError(f"{field} must be a finite non-negative number", note_id=note_id)
+    return result
 
 
 def build_wire_request(
@@ -46,8 +56,10 @@ def build_wire_request(
         raise WireRequestBuildError("profile_id must be a non-empty string")
     if not isinstance(profile_version, str) or not profile_version.strip():
         raise WireRequestBuildError("profile_version must be a non-empty string")
-    if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not 0 <= strength <= 1:
-        raise WireRequestBuildError("strength must be a number in [0, 1]")
+    if request_id is not None and (not isinstance(request_id, str) or not request_id.strip()):
+        raise WireRequestBuildError("request_id must be a non-empty string when supplied")
+    if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not math.isfinite(float(strength)) or not 0 <= strength <= 1:
+        raise WireRequestBuildError("strength must be a finite number in [0, 1]")
     if not isinstance(notes, Sequence) or isinstance(notes, (str, bytes)):
         raise WireRequestBuildError("notes must be a sequence")
 
@@ -66,18 +78,30 @@ def build_wire_request(
         )
 
     wire_notes: list[dict[str, Any]] = []
+    seen_note_ids: set[str] = set()
     for index, raw_note in enumerate(notes):
         if not isinstance(raw_note, Mapping):
             raise WireRequestBuildError(f"notes[{index}] must be a mapping")
         note_id = raw_note.get("note_id")
         if not isinstance(note_id, str) or not note_id.strip():
             raise WireRequestBuildError(f"notes[{index}].note_id must be a non-empty string")
+        if note_id in seen_note_ids:
+            raise WireRequestBuildError(f"duplicate note_id in request: {note_id}", note_id=note_id)
+        seen_note_ids.add(note_id)
         alias = raw_note.get("alias")
         midi = raw_note.get("midi_note")
         if not isinstance(alias, str) or not alias:
             raise WireRequestBuildError("alias must be a non-empty string", note_id=note_id)
         if type(midi) is not int or not 0 <= midi <= 127:
             raise WireRequestBuildError("midi_note must be an integer in 0..127", note_id=note_id)
+        start_ms = _nonnegative_finite(raw_note.get("start_ms"), "start_ms", note_id=note_id)
+        duration_ms = _nonnegative_finite(raw_note.get("duration_ms"), "duration_ms", note_id=note_id)
+        voiced = raw_note.get("voiced", True)
+        if not isinstance(voiced, bool):
+            raise WireRequestBuildError("voiced must be a boolean", note_id=note_id)
+        lyric = raw_note.get("lyric", alias)
+        if not isinstance(lyric, str):
+            raise WireRequestBuildError("lyric must be a string", note_id=note_id)
 
         resolution = resolve_utau_alias(
             alias, midi, analysis.entries, analysis.prefix_entries, analysis.root
@@ -90,8 +114,14 @@ def build_wire_request(
             )
         candidate = resolution.candidates[0]
         entry = candidate.entry
-        relative = PurePosixPath(entry.wav_filename)
-        if relative.is_absolute() or ".." in relative.parts or not entry.wav_filename:
+        filename = entry.wav_filename
+        relative = PurePosixPath(filename) if isinstance(filename, str) else PurePosixPath(".")
+        windows_path = PureWindowsPath(filename) if isinstance(filename, str) else PureWindowsPath(".")
+        if (
+            not isinstance(filename, str) or not filename.strip()
+            or relative.is_absolute() or windows_path.is_absolute() or windows_path.drive
+            or "\\" in filename or ".." in relative.parts or relative.as_posix() in {"", "."}
+        ):
             raise WireRequestBuildError(
                 f"note {note_id}: sample path is not a safe voicebank-relative path",
                 note_id=note_id,
@@ -100,12 +130,12 @@ def build_wire_request(
         wire_note: dict[str, Any] = {
             "note_id": note_id,
             "midi_note": midi,
-            "start_ms": raw_note.get("start_ms"),
-            "duration_ms": raw_note.get("duration_ms"),
-            "lyric": raw_note.get("lyric", alias),
+            "start_ms": start_ms,
+            "duration_ms": duration_ms,
+            "lyric": lyric,
             "resolved_alias": resolution.mapped_alias,
             "sample_ref": f"voicebank://{profile_id}/{relative.as_posix()}",
-            "voiced": raw_note.get("voiced", True),
+            "voiced": voiced,
         }
         if "baseline_pitch" in raw_note:
             wire_note["baseline_pitch"] = raw_note["baseline_pitch"]
