@@ -84,3 +84,26 @@ def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() 
     assert result.issues[0].line_number == 2
     assert "Duplicate note boundary 60" in result.issues[0].message
     assert select_prefix_map(result.entries, 60).suffix == "_LAST"
+
+
+@pytest.mark.parametrize(
+    ("note_num", "expected_suffix"),
+    [
+        (59, "_LOW"),   # one semitone below the F4 boundary
+        (60, "_LOW"),   # boundary from C4 remains selected
+        (64, "_LOW"),   # last semitone below F4
+        (65, "_HIGH"),  # exact F4 boundary switches the subbank
+        (66, "_HIGH"),  # one semitone above F4
+    ],
+)
+def test_prefix_selection_is_stable_below_at_and_above_boundary(
+    note_num: int, expected_suffix: str
+) -> None:
+    """Match VO-SE's lower-boundary selection at both sides of a pitch split."""
+    result = parse_prefix_map("C4\t\t_LOW\nF4\t\t_HIGH\n")
+
+    selected = select_prefix_map(result.entries, note_num)
+
+    assert selected is not None
+    assert selected.suffix == expected_suffix
+    assert map_alias("あ", note_num, result.entries) == "あ" + expected_suffix
