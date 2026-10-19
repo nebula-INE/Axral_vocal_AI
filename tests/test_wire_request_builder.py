@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from axral_vocal_ai.oto_inventory import OtoEntry
@@ -68,3 +66,34 @@ def test_builder_rejects_missing_alias_instead_of_guessing(tmp_path):
     with pytest.raises(WireRequestBuildError, match="missing_alias") as exc:
         build_wire_request(_analysis(tmp_path), notes, profile_id="bank", profile_version="1")
     assert exc.value.status == "error"
+
+
+@pytest.mark.parametrize("unsafe_path", [
+    "/tmp/a.wav", "../a.wav", "sub/../../a.wav", r"C:\\voicebank\\a.wav",
+    r"sub\\a.wav", r"\\\\server\\share\\a.wav",
+])
+def test_builder_rejects_absolute_or_traversing_sample_paths(tmp_path, unsafe_path):
+    entry = OtoEntry(1, unsafe_path, "あ", 0, 0, 0, 0, 0)
+    with pytest.raises(WireRequestBuildError, match="safe voicebank-relative path"):
+        build_wire_request(_analysis(tmp_path, entries=(entry,)), _notes(),
+                           profile_id="bank", profile_version="1")
+
+
+@pytest.mark.parametrize("field,value", [
+    ("start_ms", float("nan")), ("start_ms", -1), ("duration_ms", float("inf")),
+    ("duration_ms", True), ("voiced", "yes"), ("lyric", 3),
+])
+def test_builder_rejects_malformed_note_metadata(tmp_path, field, value):
+    notes = _notes()
+    notes[0][field] = value
+    with pytest.raises(WireRequestBuildError):
+        build_wire_request(_analysis(tmp_path), notes, profile_id="bank", profile_version="1")
+
+
+def test_builder_rejects_duplicate_note_ids_and_blank_request_id(tmp_path):
+    notes = _notes() * 2
+    with pytest.raises(WireRequestBuildError, match="duplicate note_id"):
+        build_wire_request(_analysis(tmp_path), notes, profile_id="bank", profile_version="1")
+    with pytest.raises(WireRequestBuildError, match="request_id"):
+        build_wire_request(_analysis(tmp_path), _notes(), profile_id="bank",
+                           profile_version="1", request_id=" ")
