@@ -103,6 +103,14 @@ class VoicebankAnalysis:
             "warnings": sum(issue.severity == "warning" for issue in self.issues),
         }
 
+    def _redact_root_text(self, value: str | None) -> str | None:
+        """Remove the absolute voicebank root from diagnostic text before sharing."""
+        if value is None:
+            return None
+        if not self.root:
+            return value
+        return value.replace(self.root + os.sep, "").replace(self.root, ".")
+
     def to_dict(self, *, include_root_path: bool = True) -> dict[str, Any]:
         """Return a JSON-ready report, optionally omitting the local root path."""
         return {
@@ -126,14 +134,24 @@ class VoicebankAnalysis:
                         if item.metadata else None
                     ),
                     "error": (
-                        item.error.replace(self.root + os.sep, "")
-                        if not include_root_path and item.error else item.error
+                        self._redact_root_text(item.error)
+                        if not include_root_path else item.error
                     ),
                     "signal": asdict(item.signal) if item.signal else None,
                 }
                 for item in self.wav_files
             ],
-            "issues": [asdict(issue) for issue in self.issues],
+            "issues": [
+                (
+                    {
+                        **asdict(issue),
+                        "path": self._redact_root_text(issue.path),
+                        "message": self._redact_root_text(issue.message),
+                    }
+                    if not include_root_path else asdict(issue)
+                )
+                for issue in self.issues
+            ],
         }
 
     def to_json(self, *, indent: int = 2, include_root_path: bool = True) -> str:
