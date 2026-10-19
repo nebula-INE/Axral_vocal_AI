@@ -62,6 +62,58 @@ def _wire_notes(request: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     return indexed
 
 
+def _validate_wire_request(request: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    """Validate request metadata before accepting or stubbing an inference response."""
+    notes = _validate_wire_request(request)
+    voicebank = _object(request.get("voicebank"), "request voicebank")
+    for field in ("profile_id", "profile_version"):
+        value = voicebank.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"request voicebank.{field} must be a non-empty string")
+    if voicebank.get("alias_resolution_status") != "resolved":
+        raise ValueError("request voicebank alias resolution must be resolved")
+
+    controls = _object(request.get("controls"), "request controls")
+    features = controls.get("enabled_features")
+    if not isinstance(features, list) or any(not isinstance(item, str) for item in features):
+        raise ValueError("request controls.enabled_features must be a list of strings")
+    if len(features) != len(set(features)) or any(item != "pitch_delta" for item in features):
+        raise ValueError("request controls.enabled_features contains duplicate or unsupported features")
+    strength = _finite_number(controls.get("strength"), "request controls.strength")
+    if not 0.0 <= strength <= 1.0:
+        raise ValueError("request controls.strength must be in [0, 1]")
+
+    for note_id, note in notes.items():
+        alias = note.get("resolved_alias")
+        if not isinstance(alias, str) or not alias:
+            raise ValueError(f"note {note_id} must have a non-empty resolved_alias")
+        sample_ref = note.get("sample_ref")
+        if not isinstance(sample_ref, str) or not sample_ref.strip():
+            raise ValueError(f"note {note_id} must have a non-empty opaque sample_ref")
+        # sample_ref is an opaque local identifier, never a filesystem path.
+        normalized_ref = sample_ref.replace("\\\\", "/")
+        if normalized_ref.startswith("/") or (len(normalized_ref) >= 2 and normalized_ref[1] == ":"):
+            raise ValueError(f"note {note_id} sample_ref must not be an absolute path")
+        if "baseline_pitch" in note:
+            baseline = note["baseline_pitch"]
+            if not isinstance(baseline, list):
+                raise ValueError(f"note {note_id} baseline_pitch must be a list")
+            previous_ms = -math.inf
+            duration_ms = _finite_number(note["duration_ms"], f"note {note_id} duration_ms")
+            for point_index, raw_point in enumerate(baseline):
+                point = _object(raw_point, f"note {note_id} baseline_pitch[{point_index}]")
+                time_ms = _finite_number(point.get("time_ms"), "baseline_pitch time_ms")
+                hz = _finite_number(point.get("hz"), "baseline_pitch hz")
+                if time_ms < previous_ms:
+                    raise ValueError(f"note {note_id} baseline_pitch must be time-ordered")
+                if time_ms < 0 or time_ms > duration_ms:
+                    raise ValueError(f"note {note_id} baseline_pitch falls outside note duration")
+                if hz <= 0:
+                    raise ValueError(f"note {note_id} baseline_pitch hz must be greater than zero")
+                previous_ms = time_ms
+    return notes
+
+
 def adapt_wire_response(
     wire_request: Dict[str, Any],
     wire_response: Dict[str, Any],
@@ -90,7 +142,7 @@ def adapt_wire_response(
     if response.get("request_id") != request_id:
         raise ValueError("response request_id is missing or does not match request")
 
-    notes_by_id = _wire_notes(request)
+    notes_by_id = _validate_wire_request(request)
     status = response.get("status")
     if not isinstance(status, str) or status not in _WIRE_STATUSES:
         raise ValueError("unsupported wire response status")
