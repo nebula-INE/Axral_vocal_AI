@@ -204,3 +204,21 @@ def test_reports_duplicate_alias_across_root_and_nested_oto_files(tmp_path: Path
     duplicate = next(item for item in result.duplicate_aliases if item[0] == "あ")
     assert len(duplicate[1]) == 2
     assert any(issue.code == "duplicate_alias" for issue in result.issues)
+
+
+
+def test_redact_root_removes_absolute_path_from_all_issue_fields(tmp_path: Path) -> None:
+    broken = tmp_path / "broken.wav"
+    broken.write_bytes(b"RIFF")
+    (tmp_path / "oto.ini").write_text(
+        "broken.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+    report = json.loads(result.to_json(include_root_path=False))
+    serialized = json.dumps(report, ensure_ascii=False)
+
+    assert str(tmp_path) not in serialized
+    assert report["root"] is None
+    assert report["wav_files"][0]["error"] is not None
+    assert any(issue["code"] == "wav_invalid" for issue in report["issues"])
