@@ -162,9 +162,16 @@ The repository already contains an internal Python contract in `src/axral_vocal_
 | Result grouping | one flat `pitch_deltas` sequence | per-note `note_results` keyed by `note_id` |
 | Status vocabulary | `ok`, `no_change`, `rejected` | request-level `ok`, `partial`, `needs_review`, `error` plus per-note status |
 
-Do not pass either representation directly to the other or silently relabel the current Python schema as wire v1. Before connecting inference to any caller, choose and implement an explicit, tested adapter (including unit conversion, note identity, and status mapping) or revise the wire proposal to match the implementation. The adapter must reject unsupported versions and invalid/non-finite values; it must not clamp unsafe output or mutate source notes.
+The compatibility choice for this branch is an **explicit adapter**, not a silent schema rewrite. `src/axral_vocal_ai/wire_adapter.py` converts wire v1 pitch proposals into the existing internal contract:
+- note-relative milliseconds become absolute seconds using the matching request note's start time;
+- cents become semitones by dividing by 100;
+- stable `note_id` values are checked against the request, including duplicate, unknown, and missing IDs;
+- unsupported versions, request-ID mismatches, warnings, partial/review/error statuses, invalid confidence, out-of-range points, non-finite values, and unsafe pitch deltas are rejected rather than clamped;
+- a deterministic no-op stub is provided for contract plumbing only. It is not a trained model and makes no audio.
 
-The existing Python contract and response validator are useful foundations, and their current tests remain relevant. This alignment gate is a compatibility requirement, not authorization to change the VO-SE_vocal renderer, export, WAV writing, synthesis, timing, pitch shifting, or audio processing.
+The internal flat pitch contract cannot faithfully represent partial per-note outcomes, so the adapter rejects those responses as a whole rather than silently dropping notes. The adapter returns a proposal only; it does not mutate source notes or call VO-SE_vocal.
+
+Automated adapter tests are in `tests/test_wire_adapter.py`. This is an AI-repository-only integration seam. It is not authorization to change the VO-SE_vocal renderer, export, WAV writing, synthesis, timing, pitch shifting, or audio processing.
 
 ## Safety and compatibility invariants
 
