@@ -64,7 +64,7 @@ def _wire_notes(request: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
 
 def _validate_wire_request(request: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     """Validate request metadata before accepting or stubbing an inference response."""
-    notes = _validate_wire_request(request)
+    notes = _wire_notes(request)
     voicebank = _object(request.get("voicebank"), "request voicebank")
     for field in ("profile_id", "profile_version"):
         value = voicebank.get(field)
@@ -91,7 +91,7 @@ def _validate_wire_request(request: Mapping[str, Any]) -> dict[str, Mapping[str,
         if not isinstance(sample_ref, str) or not sample_ref.strip():
             raise ValueError(f"note {note_id} must have a non-empty opaque sample_ref")
         # sample_ref is an opaque local identifier, never a filesystem path.
-        normalized_ref = sample_ref.replace("\\\\", "/")
+        normalized_ref = sample_ref.replace("\\", "/")
         if normalized_ref.startswith("/") or (len(normalized_ref) >= 2 and normalized_ref[1] == ":"):
             raise ValueError(f"note {note_id} sample_ref must not be an absolute path")
         if "baseline_pitch" in note:
