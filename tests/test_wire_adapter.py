@@ -161,3 +161,37 @@ def test_wire_adapter_normalizes_note_result_order_to_absolute_time_order():
     assert [(point.time_sec, point.delta_semitones) for point in adapted.pitch_deltas] == [
         (0.1, 0.5), (0.3, -0.25), (0.7, 1.0)
     ]
+
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda request: request["voicebank"].update(alias_resolution_status="ambiguous"),
+         "alias resolution must be resolved"),
+        (lambda request: request["controls"].update(strength=1.1),
+         "strength must be in"),
+        (lambda request: request["notes"][0].update(sample_ref="/private/voice.wav"),
+         "sample_ref must not be an absolute path"),
+        (lambda request: request["notes"][0].update(resolved_alias=""),
+         "resolved_alias"),
+        (lambda request: request["notes"][0].update(
+            baseline_pitch=[{"time_ms": 100.0, "hz": 440.0},
+                            {"time_ms": 50.0, "hz": 442.0}]),
+         "baseline_pitch must be time-ordered"),
+        (lambda request: request["controls"].update(enabled_features=["pitch_delta", "pitch_delta"]),
+         "duplicate or unsupported features"),
+    ],
+)
+def test_wire_adapter_rejects_unsafe_request_metadata(mutate, message):
+    request = _request()
+    mutate(request)
+    with pytest.raises(ValueError, match=message):
+        adapt_wire_response(request, _response())
+
+
+def test_wire_stub_validates_request_metadata_before_returning_noop():
+    request = _request()
+    request["notes"][0]["sample_ref"] = "C:\\voicebank\\a.wav"
+    with pytest.raises(ValueError, match="absolute path"):
+        deterministic_wire_stub(request)
