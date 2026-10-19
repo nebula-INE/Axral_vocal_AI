@@ -136,3 +136,28 @@ def test_wire_adapter_rejects_duplicate_request_ids_and_does_not_mutate_inputs()
     adapt_wire_response(request, response)
     assert request == original_request
     assert response == original_response
+
+
+
+@pytest.mark.parametrize("bad_status", [[], {}, None, True])
+def test_wire_adapter_rejects_non_string_status_values(bad_status):
+    response = _response()
+    response["status"] = bad_status
+    with pytest.raises(ValueError, match="unsupported wire response status"):
+        adapt_wire_response(_request(), response)
+
+    response = _response()
+    response["note_results"][0]["status"] = bad_status
+    with pytest.raises(ValueError, match="unsupported status"):
+        adapt_wire_response(_request(), response)
+
+
+def test_wire_adapter_normalizes_note_result_order_to_absolute_time_order():
+    request = _request()
+    response = _response()
+    response["note_results"].reverse()
+
+    adapted = adapt_wire_response(request, response)
+    assert [(point.time_sec, point.delta_semitones) for point in adapted.pitch_deltas] == [
+        (0.1, 0.5), (0.3, -0.25), (0.7, 1.0)
+    ]
