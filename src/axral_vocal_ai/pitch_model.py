@@ -115,6 +115,43 @@ class LinearPitchDeltaModel:
         bounded = min(MAX_PREDICTION_DELTA_SEMITONES, max(-MAX_PREDICTION_DELTA_SEMITONES, result))
         return float(bounded)
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "LinearPitchDeltaModel":
+        """Load a model artifact only when its schema and safety contract match.
+
+        This validates metadata/weights; it does not establish model quality or
+        permit renderer integration.
+        """
+        if not isinstance(payload, dict):
+            raise ValueError("model artifact must be an object")
+        if payload.get("schema_version") != 1:
+            raise ValueError("unsupported model artifact schema_version")
+        if payload.get("model_type") != "linear_ridge_pitch_delta":
+            raise ValueError("unsupported model_type")
+        if payload.get("feature_version") != FEATURE_VERSION:
+            raise ValueError("unsupported feature_version")
+        if payload.get("feature_names") != list(FEATURE_NAMES):
+            raise ValueError("model feature_names do not match this runtime")
+        if payload.get("target_kind") != "pitch_delta_semitones":
+            raise ValueError("unsupported target_kind")
+        safety = payload.get("safety")
+        expected_safety = {
+            "proposal_only": True,
+            "waveform_generation": False,
+            "production_renderer_integration": False,
+        }
+        if safety != expected_safety:
+            raise ValueError("model artifact safety contract is missing or incompatible")
+        raw_weights = payload.get("weights")
+        if not isinstance(raw_weights, list) or len(raw_weights) != len(FEATURE_NAMES):
+            raise ValueError("model weights must match the feature count")
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in raw_weights):
+            raise ValueError("model weights must be numeric")
+        weights = tuple(float(value) for value in raw_weights)
+        if not all(np.isfinite(value) for value in weights):
+            raise ValueError("model weights must be finite")
+        return cls(weights=weights)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "model_type": self.model_type,
