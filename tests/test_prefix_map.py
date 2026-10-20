@@ -76,6 +76,13 @@ def test_non_string_input_raises_type_error() -> None:
         parse_prefix_map(None)  # type: ignore[arg-type]
 
 
+def test_extremely_long_octave_field_is_reported_not_raised() -> None:
+    result = parse_prefix_map("C" + ("9" * 5000) + "\\t_SUFFIX")
+    assert result.entries == ()
+    assert len(result.issues) == 1
+    assert "Invalid or out-of-range note boundary" in result.issues[0].message
+
+
 def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() -> None:
     result = parse_prefix_map("C4\t\t_FIRST\nC4\t\t_LAST\n")
 
