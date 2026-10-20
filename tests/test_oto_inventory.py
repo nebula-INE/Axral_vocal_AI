@@ -56,3 +56,11 @@ def test_reports_malformed_entries_instead_of_silently_dropping_them(line: str) 
 def test_non_string_input_raises_type_error() -> None:
     with pytest.raises(TypeError):
         parse_oto_ini(None)  # type: ignore[arg-type]
+
+
+def test_accepts_utf8_bom_at_start_of_file() -> None:
+    result = parse_oto_ini("\\ufeffa.wav=a,0,1,-1,0,0")
+    assert result.issues == ()
+    assert len(result.entries) == 1
+    assert result.entries[0].wav_filename == "a.wav"
+    assert result.entries[0].alias == "a"
