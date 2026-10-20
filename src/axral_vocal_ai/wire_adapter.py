@@ -185,9 +185,12 @@ def adapt_wire_response(
             raise ValueError(f"note_results[{index}] has unsupported status")
         if note_status not in {"ok", "no_change"}:
             raise ValueError(f"note {note_id} status '{note_status}' requires review")
-        confidence = _finite_number(result.get("confidence"), f"note_results[{index}].confidence")
-        if not 0.0 <= confidence <= 1.0:
-            raise ValueError(f"note_results[{index}].confidence must be in [0, 1]")
+        # The wire contract makes confidence optional; when supplied, it
+        # must still be finite and bounded rather than silently coerced.
+        if "confidence" in result:
+            confidence = _finite_number(result["confidence"], f"note_results[{index}].confidence")
+            if not 0.0 <= confidence <= 1.0:
+                raise ValueError(f"note_results[{index}].confidence must be in [0, 1]")
         note_warnings = result.get("warnings", [])
         if not isinstance(note_warnings, list) or any(not isinstance(item, str) for item in note_warnings):
             raise ValueError(f"note_results[{index}].warnings must be a list of strings")
