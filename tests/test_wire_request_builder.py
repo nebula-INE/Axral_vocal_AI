@@ -36,6 +36,17 @@ def test_builder_emits_valid_wire_metadata_without_absolute_sample_path(tmp_path
     assert deterministic_wire_stub(request)["request_id"] == "test-1"
 
 
+@pytest.mark.parametrize("profile_id", [
+    "../other", "bank/child", r"bank\\child", "bank?query", "bank#fragment",
+    "white space", ".", "..", "",
+])
+def test_builder_rejects_unsafe_profile_id_in_sample_uri(tmp_path, profile_id):
+    with pytest.raises(WireRequestBuildError, match="profile_id"):
+        build_wire_request(
+            _analysis(tmp_path), _notes(), profile_id=profile_id, profile_version="1"
+        )
+
+
 def test_builder_fails_closed_for_duplicate_aliases(tmp_path):
     entries = (
         OtoEntry(1, "a.wav", "あ", 0, 0, 0, 0, 0),
