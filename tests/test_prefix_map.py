@@ -77,7 +77,7 @@ def test_non_string_input_raises_type_error() -> None:
 
 
 def test_extremely_long_octave_field_is_reported_not_raised() -> None:
-    result = parse_prefix_map("C" + ("9" * 5000) + "\\t_SUFFIX")
+    result = parse_prefix_map("C" + ("9" * 5000) + "\t_SUFFIX")
     assert result.entries == ()
     assert len(result.issues) == 1
     assert "Invalid or out-of-range note boundary" in result.issues[0].message
