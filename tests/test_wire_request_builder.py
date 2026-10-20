@@ -143,3 +143,22 @@ def test_builder_rejects_duplicate_note_ids_and_blank_request_id(tmp_path):
     with pytest.raises(WireRequestBuildError, match="request_id"):
         build_wire_request(_analysis(tmp_path), _notes(), profile_id="bank",
                            profile_version="1", request_id=" ")
+
+
+
+def test_builder_rejects_integers_too_large_for_float_conversion(tmp_path):
+    notes = _notes()
+    notes[0]["start_ms"] = 10**400
+    with pytest.raises(WireRequestBuildError, match="start_ms"):
+        build_wire_request(_analysis(tmp_path), notes, profile_id="bank", profile_version="1")
+
+    notes = _notes()
+    notes[0]["baseline_pitch"] = [{"time_ms": 10**400, "hz": 440}]
+    with pytest.raises(WireRequestBuildError, match="baseline_pitch"):
+        build_wire_request(_analysis(tmp_path), notes, profile_id="bank", profile_version="1")
+
+    with pytest.raises(WireRequestBuildError, match="strength"):
+        build_wire_request(
+            _analysis(tmp_path), _notes(), profile_id="bank", profile_version="1",
+            strength=10**400,
+        )
