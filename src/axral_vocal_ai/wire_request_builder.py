@@ -7,6 +7,7 @@ Ambiguous alias or prefix-map selection fails closed instead of guessing.
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
@@ -54,6 +55,15 @@ def build_wire_request(
     """
     if not isinstance(profile_id, str) or not profile_id.strip():
         raise WireRequestBuildError("profile_id must be a non-empty string")
+    # profile_id is interpolated into the URI authority component. Keep it to
+    # one conservative identifier segment so callers cannot inject URI syntax.
+    if (
+        profile_id in {".", ".."}
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", profile_id)
+    ):
+        raise WireRequestBuildError(
+            "profile_id must be a 1-128 character URI-safe identifier"
+        )
     if not isinstance(profile_version, str) or not profile_version.strip():
         raise WireRequestBuildError("profile_version must be a non-empty string")
     if request_id is not None and (not isinstance(request_id, str) or not request_id.strip()):
