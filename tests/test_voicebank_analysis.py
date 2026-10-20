@@ -228,7 +228,7 @@ def test_rejects_symlinked_wav_that_resolves_outside_voicebank(tmp_path: Path) -
 def test_does_not_read_symlinked_oto_ini_outside_voicebank(tmp_path: Path) -> None:
     outside = tmp_path.parent / f"{tmp_path.name}-outside-oto.ini"
     outside.write_text(
-        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
     try:
         (tmp_path / "oto.ini").symlink_to(outside)
