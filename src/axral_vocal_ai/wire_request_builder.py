@@ -132,6 +132,7 @@ def build_wire_request(
 
     wire_notes: list[dict[str, Any]] = []
     seen_note_ids: set[str] = set()
+    previous_start_ms = -math.inf
     for index, raw_note in enumerate(notes):
         if not isinstance(raw_note, Mapping):
             raise WireRequestBuildError(f"notes[{index}] must be a mapping")
@@ -148,6 +149,11 @@ def build_wire_request(
         if type(midi) is not int or not 0 <= midi <= 127:
             raise WireRequestBuildError("midi_note must be an integer in 0..127", note_id=note_id)
         start_ms = _nonnegative_finite(raw_note.get("start_ms"), "start_ms", note_id=note_id)
+        if start_ms < previous_start_ms:
+            raise WireRequestBuildError(
+                "notes must be ordered by start_ms", note_id=note_id
+            )
+        previous_start_ms = start_ms
         duration_ms = _nonnegative_finite(raw_note.get("duration_ms"), "duration_ms", note_id=note_id)
         voiced = raw_note.get("voiced", True)
         if not isinstance(voiced, bool):
