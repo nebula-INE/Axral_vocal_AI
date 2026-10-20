@@ -144,7 +144,7 @@ Response rules:
 - `status` is one of `ok`, `partial`, `needs_review`, or `error`; each note result is independently traceable by `note_id`.
 - `delta_cents` is a relative pitch-expression delta, not an absolute pitch and not rendered audio. Times are note-relative milliseconds.
 - Results must not include a replacement MIDI note, alias, sample path, waveform, rendered WAV, or mutated project data.
-- `confidence`, when present, is finite and in `[0, 1]`. Missing/low-confidence or invalid results require review, not silent coercion.
+- `confidence` is optional; when present, it must be finite and in `[0, 1]`. If omitted, confidence is unknown and must not be treated as a high-confidence result; any product policy that requires confidence must route it to review. Invalid supplied values require review, not silent coercion.
 - The caller validates finite values, time ordering, note-duration bounds, output note IDs, and version compatibility before presenting or applying any result.
 - Applying the result creates a separate editable proposal. The original notes and pitch curve remain recoverable; AI-off or any validation failure leaves the established project/render path unchanged.
 - The first integration should use a deterministic stub and contract tests before any trained model is connected.
