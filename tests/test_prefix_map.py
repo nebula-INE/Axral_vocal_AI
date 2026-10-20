@@ -20,7 +20,7 @@ def test_note_name_to_midi(name: str, expected: int | None) -> None:
 
 
 def test_parses_legacy_suffix_rows_and_three_column_rows() -> None:
-    result = parse_prefix_map("\ufeffC4\t-\t_C4\n")
+    result = parse_prefix_map("C1\t_C4\nF4\tC4/\t-\n")
     assert result.issues == ()
     assert result.entries == (
         PrefixMapEntry(boundary=24, prefix="", suffix="_C4"),
@@ -92,8 +92,9 @@ def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() 
     assert "Duplicate note boundary 60" in result.issues[0].message
     assert select_prefix_map(result.entries, 60).suffix == "_LAST"
 
+
 def test_accepts_utf8_bom_at_start_of_file() -> None:
-    result = parse_prefix_map("\ufeffC4\\t-\\t_C4\\n")
+    result = parse_prefix_map("\ufeffC4\t-\t_C4\n")
 
     assert result.issues == ()
     assert result.entries == (PrefixMapEntry(boundary=60, prefix="", suffix="_C4"),)
