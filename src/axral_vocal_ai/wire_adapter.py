@@ -148,6 +148,12 @@ def adapt_wire_response(
         raise ValueError("response request_id is missing or does not match request")
 
     notes_by_id = _validate_wire_request(request)
+    model = _object(response.get("model"), "response model")
+    for field in ("model_id", "model_version"):
+        value = model.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"response model.{field} must be a non-empty string")
+
     status = response.get("status")
     if not isinstance(status, str) or status not in _WIRE_STATUSES:
         raise ValueError("unsupported wire response status")
