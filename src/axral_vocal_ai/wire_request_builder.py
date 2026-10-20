@@ -29,11 +29,21 @@ class WireRequestBuildError(ValueError):
         self.status = status
 
 
-def _nonnegative_finite(value: Any, field: str, *, note_id: str) -> float:
+def _finite_float(value: Any, field: str, *, note_id: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise WireRequestBuildError(f"{field} must be a finite non-negative number", note_id=note_id)
-    result = float(value)
-    if not math.isfinite(result) or result < 0:
+        raise WireRequestBuildError(f"{field} must be finite", note_id=note_id)
+    try:
+        result = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise WireRequestBuildError(f"{field} must be finite", note_id=note_id) from exc
+    if not math.isfinite(result):
+        raise WireRequestBuildError(f"{field} must be finite", note_id=note_id)
+    return result
+
+
+def _nonnegative_finite(value: Any, field: str, *, note_id: str) -> float:
+    result = _finite_float(value, f"{field} must be a finite non-negative number", note_id=note_id)
+    if result < 0:
         raise WireRequestBuildError(f"{field} must be a finite non-negative number", note_id=note_id)
     return result
 
@@ -51,18 +61,12 @@ def _validated_baseline_pitch(value: Any, duration_ms: float, *, note_id: str) -
             )
         time_ms = point.get("time_ms")
         hz = point.get("hz")
-        if (
-            isinstance(time_ms, bool) or not isinstance(time_ms, (int, float))
-            or not math.isfinite(float(time_ms))
-        ):
-            raise WireRequestBuildError(
-                f"baseline_pitch[{index}].time_ms must be finite", note_id=note_id
-            )
-        if isinstance(hz, bool) or not isinstance(hz, (int, float)) or not math.isfinite(float(hz)):
-            raise WireRequestBuildError(
-                f"baseline_pitch[{index}].hz must be finite", note_id=note_id
-            )
-        time_value, hz_value = float(time_ms), float(hz)
+        time_value = _finite_float(
+            time_ms, f"baseline_pitch[{index}].time_ms", note_id=note_id
+        )
+        hz_value = _finite_float(
+            hz, f"baseline_pitch[{index}].hz", note_id=note_id
+        )
         if time_value < previous_ms:
             raise WireRequestBuildError("baseline_pitch must be time-ordered", note_id=note_id)
         if time_value < 0 or time_value > duration_ms:
@@ -106,7 +110,8 @@ def build_wire_request(
         raise WireRequestBuildError("profile_version must be a non-empty string")
     if request_id is not None and (not isinstance(request_id, str) or not request_id.strip()):
         raise WireRequestBuildError("request_id must be a non-empty string when supplied")
-    if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not math.isfinite(float(strength)) or not 0 <= strength <= 1:
+    strength_value = _finite_float(strength, "strength", note_id="<request>")
+    if not 0 <= strength_value <= 1:
         raise WireRequestBuildError("strength must be a finite number in [0, 1]")
     if not isinstance(notes, Sequence) or isinstance(notes, (str, bytes)):
         raise WireRequestBuildError("notes must be a sequence")
@@ -201,5 +206,5 @@ def build_wire_request(
             "alias_resolution_status": "resolved",
         },
         "notes": wire_notes,
-        "controls": {"enabled_features": ["pitch_delta"], "strength": float(strength)},
+        "controls": {"enabled_features": ["pitch_delta"], "strength": strength_value},
     }
