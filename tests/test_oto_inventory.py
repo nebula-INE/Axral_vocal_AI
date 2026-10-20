@@ -59,7 +59,7 @@ def test_non_string_input_raises_type_error() -> None:
 
 
 def test_accepts_utf8_bom_at_start_of_file() -> None:
-    result = parse_oto_ini("\\ufeffa.wav=a,0,1,-1,0,0")
+    result = parse_oto_ini("\ufeffa.wav=a,0,1,-1,0,0")
     assert result.issues == ()
     assert len(result.entries) == 1
     assert result.entries[0].wav_filename == "a.wav"
