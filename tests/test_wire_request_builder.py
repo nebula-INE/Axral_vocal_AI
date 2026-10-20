@@ -136,6 +136,34 @@ def test_builder_copies_valid_baseline_pitch_without_mutating_input(tmp_path):
     assert baseline == [{"time_ms": 0, "hz": 261.6256}, {"time_ms": 250, "hz": 261.6256}]
 
 
+
+def test_builder_rejects_notes_out_of_start_time_order(tmp_path):
+    notes = [
+        {"note_id": "later", "midi_note": 60, "start_ms": 100, "duration_ms": 250,
+         "alias": "あ"},
+        {"note_id": "earlier", "midi_note": 60, "start_ms": 50, "duration_ms": 250,
+         "alias": "あ"},
+    ]
+    with pytest.raises(WireRequestBuildError, match="ordered by start_ms") as exc:
+        build_wire_request(
+            _analysis(tmp_path), notes, profile_id="bank", profile_version="1"
+        )
+    assert exc.value.note_id == "earlier"
+
+
+def test_builder_allows_notes_with_same_start_time(tmp_path):
+    notes = [
+        {"note_id": "n1", "midi_note": 60, "start_ms": 50, "duration_ms": 250,
+         "alias": "あ"},
+        {"note_id": "n2", "midi_note": 60, "start_ms": 50, "duration_ms": 250,
+         "alias": "あ"},
+    ]
+    request = build_wire_request(
+        _analysis(tmp_path), notes, profile_id="bank", profile_version="1"
+    )
+    assert [note["note_id"] for note in request["notes"]] == ["n1", "n2"]
+
+
 def test_builder_rejects_duplicate_note_ids_and_blank_request_id(tmp_path):
     notes = _notes() * 2
     with pytest.raises(WireRequestBuildError, match="duplicate note_id"):
