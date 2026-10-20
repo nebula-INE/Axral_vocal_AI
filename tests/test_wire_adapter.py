@@ -221,3 +221,22 @@ def test_wire_adapter_rejects_sample_ref_path_traversal(sample_ref):
     request["notes"][0]["sample_ref"] = sample_ref
     with pytest.raises(ValueError, match="path traversal"):
         deterministic_wire_stub(request)
+
+
+def test_wire_adapter_accepts_no_change_for_individual_note():
+    request = _request()
+    response = _response()
+    response["note_results"][0]["status"] = "no_change"
+    response["note_results"][0]["pitch_delta"] = []
+    adapted = adapt_wire_response(request, response)
+    assert adapted.status == "ok"
+    assert [(point.time_sec, point.delta_semitones) for point in adapted.pitch_deltas] == [
+        (0.7, 1.0)
+    ]
+
+
+def test_wire_adapter_rejects_pitch_deltas_on_no_change_note():
+    response = _response()
+    response["note_results"][0]["status"] = "no_change"
+    with pytest.raises(ValueError, match="no_change status cannot contain pitch deltas"):
+        adapt_wire_response(_request(), response)
