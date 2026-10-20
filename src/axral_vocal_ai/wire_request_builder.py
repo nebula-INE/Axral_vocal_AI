@@ -42,7 +42,7 @@ def _finite_float(value: Any, field: str, *, note_id: str) -> float:
 
 
 def _nonnegative_finite(value: Any, field: str, *, note_id: str) -> float:
-    result = _finite_float(value, f"{field} must be a finite non-negative number", note_id=note_id)
+    result = _finite_float(value, field, note_id=note_id)
     if result < 0:
         raise WireRequestBuildError(f"{field} must be a finite non-negative number", note_id=note_id)
     return result
