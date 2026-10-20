@@ -27,7 +27,10 @@ def _object(value: Any, name: str) -> Mapping[str, Any]:
 def _finite_number(value: Any, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be a finite number")
-    result = float(value)
+    try:
+        result = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError(f"{name} must be a finite number") from exc
     if not math.isfinite(result):
         raise ValueError(f"{name} must be a finite number")
     return result
