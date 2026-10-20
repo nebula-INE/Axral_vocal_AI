@@ -8,6 +8,7 @@ It does not decode audio or synthesize sound.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Sequence
 
@@ -71,9 +72,13 @@ def resolve_utau_alias(
         raise TypeError("alias must be a string")
     if not isinstance(note_num, (int, float)) or isinstance(note_num, bool):
         raise TypeError("note_num must be a MIDI note number")
-    if not 0 <= float(note_num) <= 127:
-        raise ValueError("note_num must be between 0 and 127")
-    mapped_alias = map_alias(alias, int(round(note_num)), prefix_entries)
+    try:
+        numeric_note = float(note_num)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("note_num must be a finite MIDI note number between 0 and 127") from exc
+    if not math.isfinite(numeric_note) or not 0 <= numeric_note <= 127:
+        raise ValueError("note_num must be a finite MIDI note number between 0 and 127")
+    mapped_alias = map_alias(alias, int(round(numeric_note)), prefix_entries)
     matching = [entry for entry in oto_entries if entry.alias == mapped_alias]
     issues: list[str] = []
     candidates: list[AliasCandidate] = []
