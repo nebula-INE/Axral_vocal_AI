@@ -212,3 +212,25 @@ def test_builder_percent_encodes_uri_delimiters_in_sample_path(tmp_path):
         "voicebank://local-bank/sub%20dir/a%23b%3F.wav"
     )
     assert deterministic_wire_stub(request)["status"] == "ok"
+
+
+
+def test_builder_percent_encodes_unicode_and_literal_percent_in_sample_path(tmp_path):
+    relative = "音源/あ%20.wav"
+    sample = tmp_path / relative
+    sample.parent.mkdir(parents=True)
+    sample.write_bytes(b"metadata-only-test-file")
+    entry = OtoEntry(1, relative, "あ", 0, 0, 0, 0, 0)
+    analysis = VoicebankAnalysis(
+        root=str(tmp_path), oto_files=("oto.ini",), prefix_map_files=(),
+        entries=(entry,), prefix_entries=(), duplicate_aliases=(),
+        pattern_evidence=(), wav_files=(), issues=(),
+    )
+
+    request = build_wire_request(
+        analysis, _notes(), profile_id="local-bank", profile_version="1"
+    )
+    assert request["notes"][0]["sample_ref"] == (
+        "voicebank://local-bank/%E9%9F%B3%E6%BA%90/%E3%81%82%2520.wav"
+    )
+    assert deterministic_wire_stub(request)["status"] == "ok"
