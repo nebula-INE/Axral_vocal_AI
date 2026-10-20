@@ -75,6 +75,21 @@ def test_wire_adapter_rejects_mismatched_request_id():
         adapt_wire_response(_request(), response)
 
 
+@pytest.mark.parametrize(
+    ("model", "message"),
+    [
+        (None, "response model must be an object"),
+        ({}, "response model.model_id"),
+        ({"model_id": "test-model", "model_version": " "}, "response model.model_version"),
+    ],
+)
+def test_wire_adapter_rejects_missing_or_invalid_model_metadata(model, message):
+    response = _response()
+    response["model"] = model
+    with pytest.raises(ValueError, match=message):
+        adapt_wire_response(_request(), response)
+
+
 def test_wire_adapter_rejects_duplicate_and_unknown_note_ids():
     response = _response()
     response["note_results"][1]["note_id"] = "n1"
