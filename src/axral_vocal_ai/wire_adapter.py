@@ -97,6 +97,8 @@ def _validate_wire_request(request: Mapping[str, Any]) -> dict[str, Mapping[str,
         normalized_ref = sample_ref.replace("\\", "/")
         if normalized_ref.startswith("/") or (len(normalized_ref) >= 2 and normalized_ref[1] == ":"):
             raise ValueError(f"note {note_id} sample_ref must not be an absolute path")
+        if ".." in normalized_ref.split("/"):
+            raise ValueError(f"note {note_id} sample_ref must not contain path traversal")
         if "baseline_pitch" in note:
             baseline = note["baseline_pitch"]
             if not isinstance(baseline, list):
