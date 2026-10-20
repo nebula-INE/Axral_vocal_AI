@@ -244,7 +244,7 @@ def test_does_not_read_symlinked_oto_ini_outside_voicebank(tmp_path: Path) -> No
 def test_report_without_root_path_redacts_local_paths_from_nested_errors(tmp_path: Path) -> None:
     (tmp_path / "broken.wav").write_bytes(b"RIFF")
     (tmp_path / "oto.ini").write_text(
-        "broken.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "broken.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     result = analyze_voicebank(tmp_path)
