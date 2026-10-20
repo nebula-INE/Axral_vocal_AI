@@ -254,3 +254,22 @@ def test_report_without_root_path_redacts_local_paths_from_nested_errors(tmp_pat
     assert str(tmp_path) not in json.dumps(report, ensure_ascii=False)
     assert any(item["error"] for item in report["wav_files"])
 
+def test_reports_and_skips_symlinked_voicebank_directory(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-linked-bank"
+    outside.mkdir()
+    (outside / "oto.ini").write_text(
+        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    link = tmp_path / "linked"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlink creation is unavailable on this platform")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries == ()
+    assert result.summary["oto_files"] == 0
+    issue = next(item for item in result.issues if item.code == "directory_symlink_skipped")
+    assert issue.path == "linked"
+    assert "not scanned" in issue.message
