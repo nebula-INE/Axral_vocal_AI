@@ -60,3 +60,18 @@ def test_missing_alias_is_explicit() -> None:
 def test_invalid_note_number_is_rejected(note_num: float) -> None:
     with pytest.raises(ValueError):
         resolve_utau_alias("あ", note_num, [])
+
+def test_symlink_loop_is_rejected_without_crashing(tmp_path: Path) -> None:
+    loop = tmp_path / "loop.wav"
+    try:
+        loop.symlink_to("loop.wav")
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    result = resolve_utau_alias(
+        "あ", 60, [oto(1, "loop.wav", "あ")], voicebank_root=tmp_path
+    )
+
+    assert result.status == "invalid_sample_path"
+    assert result.candidates == ()
+    assert any("absolute or escapes" in issue for issue in result.issues)
