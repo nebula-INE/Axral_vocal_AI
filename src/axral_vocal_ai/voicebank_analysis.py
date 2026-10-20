@@ -104,8 +104,8 @@ class VoicebankAnalysis:
         }
 
     def to_dict(self, *, include_root_path: bool = True) -> dict[str, Any]:
-        """Return a JSON-ready report, optionally omitting the local root path."""
-        return {
+        """Return a JSON-ready report, optionally redacting local filesystem paths."""
+        report = {
             "schema_version": 1,
             "root": self.root if include_root_path else None,
             "summary": self.summary,
@@ -135,6 +135,32 @@ class VoicebankAnalysis:
             ],
             "issues": [asdict(issue) for issue in self.issues],
         }
+        if include_root_path:
+            return report
+
+        # Redact the root wherever it appears, not only in the top-level field.
+        # Exception messages from filesystem operations can otherwise leak the
+        # user's local directory through issue/wav error strings.
+        roots = {
+            self.root,
+            self.root.replace("/", "\\"),
+            self.root.replace("\\", "/"),
+        }
+
+        def redact(value: Any) -> Any:
+            if isinstance(value, str):
+                for root in roots:
+                    if root:
+                        value = value.replace(root, "<voicebank>")
+                return value
+            if isinstance(value, list):
+                return [redact(item) for item in value]
+            if isinstance(value, dict):
+                return {key: redact(item) for key, item in value.items()}
+            return value
+
+        report["root"] = None
+        return redact(report)
 
     def to_json(self, *, indent: int = 2, include_root_path: bool = True) -> str:
         return json.dumps(
