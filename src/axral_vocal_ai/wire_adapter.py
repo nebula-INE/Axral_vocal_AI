@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 from typing import Any, Dict, Mapping
+from urllib.parse import unquote, urlsplit
 
 from .contracts import PitchDeltaPoint, PitchNote, PitchRequest, PitchResponse, SCHEMA_VERSION
 from .response_validation import validate_pitch_response
@@ -94,11 +95,24 @@ def _validate_wire_request(request: Mapping[str, Any]) -> dict[str, Mapping[str,
         if not isinstance(sample_ref, str) or not sample_ref.strip():
             raise ValueError(f"note {note_id} must have a non-empty opaque sample_ref")
         # sample_ref is an opaque local identifier, never a filesystem path.
+        # If URI syntax is used, accept only the builder's local voicebank URI.
         normalized_ref = sample_ref.replace("\\", "/")
         if normalized_ref.startswith("/") or (len(normalized_ref) >= 2 and normalized_ref[1] == ":"):
             raise ValueError(f"note {note_id} sample_ref must not be an absolute path")
-        if ".." in normalized_ref.split("/"):
+        decoded_ref = unquote(normalized_ref)
+        if ".." in decoded_ref.split("/"):
             raise ValueError(f"note {note_id} sample_ref must not contain path traversal")
+        if "://" in normalized_ref:
+            parsed_ref = urlsplit(normalized_ref)
+            if parsed_ref.scheme != "voicebank":
+                raise ValueError(f"note {note_id} sample_ref must use a local voicebank reference")
+            if parsed_ref.netloc != voicebank["profile_id"]:
+                raise ValueError(f"note {note_id} sample_ref profile does not match request voicebank")
+            if not parsed_ref.path.startswith("/") or parsed_ref.query or parsed_ref.fragment:
+                raise ValueError(f"note {note_id} sample_ref must be a plain voicebank-relative URI")
+            decoded_path = unquote(parsed_ref.path).lstrip("/")
+            if not decoded_path or any(part in {"", ".", ".."} for part in decoded_path.split("/")):
+                raise ValueError(f"note {note_id} sample_ref must not contain path traversal")
         if "baseline_pitch" in note:
             baseline = note["baseline_pitch"]
             if not isinstance(baseline, list):
