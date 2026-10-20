@@ -12,6 +12,7 @@ from collections import Counter
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
+from urllib.parse import quote
 
 from axral_vocal_ai.voicebank_analysis import VoicebankAnalysis
 from axral_vocal_ai.voicebank_alias import resolve_utau_alias
@@ -193,7 +194,7 @@ def build_wire_request(
             "duration_ms": duration_ms,
             "lyric": lyric,
             "resolved_alias": resolution.mapped_alias,
-            "sample_ref": f"voicebank://{profile_id}/{relative.as_posix()}",
+            "sample_ref": f"voicebank://{profile_id}/{quote(relative.as_posix(), safe='/-._~')}",
             "voiced": voiced,
         }
         if "baseline_pitch" in raw_note:
