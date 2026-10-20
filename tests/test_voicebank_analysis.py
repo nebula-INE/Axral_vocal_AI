@@ -4,6 +4,8 @@ import json
 import struct
 from pathlib import Path
 
+import pytest
+
 from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 
 
