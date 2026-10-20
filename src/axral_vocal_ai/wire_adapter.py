@@ -296,7 +296,7 @@ def deterministic_wire_stub(wire_request: Dict[str, Any]) -> Dict[str, Any]:
                 "note_id": note_id,
                 "status": "ok",
                 "pitch_delta": [],
-                "confidence": 1.0,
+                # A deterministic no-op stub has no model confidence estimate.
                 "warnings": [],
             }
             for note_id in notes
