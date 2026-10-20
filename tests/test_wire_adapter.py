@@ -195,3 +195,16 @@ def test_wire_stub_validates_request_metadata_before_returning_noop():
     request["notes"][0]["sample_ref"] = "C:\\voicebank\\a.wav"
     with pytest.raises(ValueError, match="absolute path"):
         deterministic_wire_stub(request)
+
+
+
+def test_wire_adapter_rejects_integer_too_large_for_float_conversion():
+    request = _request()
+    request["notes"][0]["start_ms"] = 10**400
+    with pytest.raises(ValueError, match="finite number"):
+        deterministic_wire_stub(request)
+
+    response = _response()
+    response["note_results"][0]["pitch_delta"][0]["delta_cents"] = 10**400
+    with pytest.raises(ValueError, match="finite number"):
+        adapt_wire_response(_request(), response)
