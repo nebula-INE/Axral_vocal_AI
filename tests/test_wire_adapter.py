@@ -55,7 +55,9 @@ def test_wire_adapter_converts_relative_ms_and_cents_to_absolute_seconds_and_sem
 
 def test_wire_adapter_no_op_stub_produces_internal_no_change():
     request = _request()
-    response = adapt_wire_response(request, deterministic_wire_stub(request))
+    wire_response = deterministic_wire_stub(request)
+    assert all("confidence" not in item for item in wire_response["note_results"])
+    response = adapt_wire_response(request, wire_response)
     assert response.status == "no_change"
     assert response.pitch_deltas == ()
 
