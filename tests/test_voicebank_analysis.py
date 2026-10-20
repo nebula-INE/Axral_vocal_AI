@@ -258,7 +258,7 @@ def test_reports_and_skips_symlinked_voicebank_directory(tmp_path: Path) -> None
     outside = tmp_path.parent / f"{tmp_path.name}-linked-bank"
     outside.mkdir()
     (outside / "oto.ini").write_text(
-        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
     link = tmp_path / "linked"
     try:
