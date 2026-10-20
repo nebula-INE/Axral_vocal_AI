@@ -38,6 +38,44 @@ def _nonnegative_finite(value: Any, field: str, *, note_id: str) -> float:
     return result
 
 
+def _validated_baseline_pitch(value: Any, duration_ms: float, *, note_id: str) -> list[dict[str, float]]:
+    """Validate and copy note-relative baseline pitch points for wire v1."""
+    if not isinstance(value, list):
+        raise WireRequestBuildError("baseline_pitch must be a list", note_id=note_id)
+    result: list[dict[str, float]] = []
+    previous_ms = -math.inf
+    for index, point in enumerate(value):
+        if not isinstance(point, Mapping):
+            raise WireRequestBuildError(
+                f"baseline_pitch[{index}] must be a mapping", note_id=note_id
+            )
+        time_ms = point.get("time_ms")
+        hz = point.get("hz")
+        if (
+            isinstance(time_ms, bool) or not isinstance(time_ms, (int, float))
+            or not math.isfinite(float(time_ms))
+        ):
+            raise WireRequestBuildError(
+                f"baseline_pitch[{index}].time_ms must be finite", note_id=note_id
+            )
+        if isinstance(hz, bool) or not isinstance(hz, (int, float)) or not math.isfinite(float(hz)):
+            raise WireRequestBuildError(
+                f"baseline_pitch[{index}].hz must be finite", note_id=note_id
+            )
+        time_value, hz_value = float(time_ms), float(hz)
+        if time_value < previous_ms:
+            raise WireRequestBuildError("baseline_pitch must be time-ordered", note_id=note_id)
+        if time_value < 0 or time_value > duration_ms:
+            raise WireRequestBuildError(
+                "baseline_pitch time_ms must fall within note duration", note_id=note_id
+            )
+        if hz_value <= 0:
+            raise WireRequestBuildError("baseline_pitch hz must be greater than zero", note_id=note_id)
+        result.append({"time_ms": time_value, "hz": hz_value})
+        previous_ms = time_value
+    return result
+
+
 def build_wire_request(
     analysis: VoicebankAnalysis,
     notes: Sequence[Mapping[str, Any]],
@@ -148,7 +186,9 @@ def build_wire_request(
             "voiced": voiced,
         }
         if "baseline_pitch" in raw_note:
-            wire_note["baseline_pitch"] = raw_note["baseline_pitch"]
+            wire_note["baseline_pitch"] = _validated_baseline_pitch(
+                raw_note["baseline_pitch"], duration_ms, note_id=note_id
+            )
         wire_notes.append(wire_note)
 
     return {
