@@ -241,3 +241,16 @@ def test_does_not_read_symlinked_oto_ini_outside_voicebank(tmp_path: Path) -> No
     assert any(issue.code == "oto_metadata_path_escape" for issue in result.issues)
     assert result.summary["oto_entries"] == 0
 
+def test_report_without_root_path_redacts_local_paths_from_nested_errors(tmp_path: Path) -> None:
+    (tmp_path / "broken.wav").write_bytes(b"RIFF")
+    (tmp_path / "oto.ini").write_text(
+        "broken.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+    report = json.loads(result.to_json(include_root_path=False))
+
+    assert report["root"] is None
+    assert str(tmp_path) not in json.dumps(report, ensure_ascii=False)
+    assert any(item["error"] for item in report["wav_files"])
+
