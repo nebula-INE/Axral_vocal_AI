@@ -20,7 +20,7 @@ def test_note_name_to_midi(name: str, expected: int | None) -> None:
 
 
 def test_parses_legacy_suffix_rows_and_three_column_rows() -> None:
-    result = parse_prefix_map("C1\t\t_C4\nF4\tC4/\t\n")
+    result = parse_prefix_map("\ufeffC4\t-\t_C4\n")
     assert result.issues == ()
     assert result.entries == (
         PrefixMapEntry(boundary=24, prefix="", suffix="_C4"),
