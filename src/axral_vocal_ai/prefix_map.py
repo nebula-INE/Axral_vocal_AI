@@ -68,6 +68,8 @@ def parse_prefix_map(text: str) -> PrefixMapParseResult:
     first_line_by_boundary: dict[int, int] = {}
     for line_number, raw in enumerate(text.splitlines(), start=1):
         line = raw.rstrip("\r\n")
+        if line_number == 1:
+            line = line.removeprefix("\ufeff")
         if not line.strip() or line.lstrip().startswith(("#", ";")):
             continue
         parts = line.split("\t") if "\t" in line else re.split(r"\s+", line.strip())
