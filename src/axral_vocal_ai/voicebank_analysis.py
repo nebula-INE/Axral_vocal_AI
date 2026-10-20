@@ -255,7 +255,25 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         ))
 
     for directory, dirnames, filenames in os.walk(root_path, onerror=record_walk_error):
-        dirnames[:] = sorted(name for name in dirnames if name not in {".git", "__pycache__"})
+        current_dir = Path(directory)
+        kept_dirnames: list[str] = []
+        for name in sorted(dirnames):
+            if name in {".git", "__pycache__"}:
+                continue
+            child_dir = current_dir / name
+            # os.walk does not follow directory symlinks by default, but silently
+            # skipping them makes an audit look more complete than it is. Report
+            # them explicitly and never traverse them, even when they point inside
+            # the bank; their contents are outside this scan's trust boundary.
+            if child_dir.is_symlink():
+                issues.append(VoicebankIssue(
+                    "warning", "directory_symlink_skipped",
+                    _relative(root_path, child_dir), None,
+                    "Directory symlink was not scanned; copy or inspect its contents explicitly.",
+                ))
+                continue
+            kept_dirnames.append(name)
+        dirnames[:] = kept_dirnames
         for filename in sorted(filenames):
             lowered = filename.casefold()
             path = Path(directory) / filename
