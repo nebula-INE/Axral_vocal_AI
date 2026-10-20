@@ -103,6 +103,39 @@ def test_builder_rejects_malformed_note_metadata(tmp_path, field, value):
         build_wire_request(_analysis(tmp_path), notes, profile_id="bank", profile_version="1")
 
 
+@pytest.mark.parametrize("baseline_pitch", [
+    "not-a-list",
+    [{"time_ms": float("nan"), "hz": 440}],
+    [{"time_ms": 0, "hz": float("inf")}],
+    [{"time_ms": -1, "hz": 440}],
+    [{"time_ms": 251, "hz": 440}],
+    [{"time_ms": 20, "hz": 440}, {"time_ms": 10, "hz": 450}],
+    [{"time_ms": 0, "hz": 0}],
+    [{"time_ms": True, "hz": 440}],
+])
+def test_builder_rejects_invalid_baseline_pitch(tmp_path, baseline_pitch):
+    notes = _notes()
+    notes[0]["baseline_pitch"] = baseline_pitch
+    with pytest.raises(WireRequestBuildError, match="baseline_pitch"):
+        build_wire_request(
+            _analysis(tmp_path), notes, profile_id="bank", profile_version="1"
+        )
+
+
+def test_builder_copies_valid_baseline_pitch_without_mutating_input(tmp_path):
+    notes = _notes()
+    baseline = [{"time_ms": 0, "hz": 261.6256}, {"time_ms": 250, "hz": 261.6256}]
+    notes[0]["baseline_pitch"] = baseline
+    request = build_wire_request(
+        _analysis(tmp_path), notes, profile_id="bank", profile_version="1"
+    )
+    assert request["notes"][0]["baseline_pitch"] == [
+        {"time_ms": 0.0, "hz": 261.6256},
+        {"time_ms": 250.0, "hz": 261.6256},
+    ]
+    assert baseline == [{"time_ms": 0, "hz": 261.6256}, {"time_ms": 250, "hz": 261.6256}]
+
+
 def test_builder_rejects_duplicate_note_ids_and_blank_request_id(tmp_path):
     notes = _notes() * 2
     with pytest.raises(WireRequestBuildError, match="duplicate note_id"):
