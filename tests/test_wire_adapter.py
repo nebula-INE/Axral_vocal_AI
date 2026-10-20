@@ -205,6 +205,27 @@ def test_wire_adapter_rejects_unsafe_request_metadata(mutate, message):
         adapt_wire_response(request, _response())
 
 
+@pytest.mark.parametrize("sample_ref", [
+    "https://example.invalid/voice.wav",
+    "file:///tmp/voice.wav",
+    "voicebank://another-profile/a.wav",
+    "voicebank://local-profile/%2e%2e/outside.wav",
+    "voicebank://local-profile/a.wav?download=1",
+    "voicebank://local-profile/a.wav#fragment",
+])
+def test_wire_adapter_rejects_nonlocal_or_mismatched_sample_uris(sample_ref):
+    request = _request()
+    request["notes"][0]["sample_ref"] = sample_ref
+    with pytest.raises(ValueError):
+        deterministic_wire_stub(request)
+
+
+def test_wire_adapter_accepts_voicebank_uri_for_matching_profile():
+    request = _request()
+    request["notes"][0]["sample_ref"] = "voicebank://local-profile/subdir/a.wav"
+    assert deterministic_wire_stub(request)["status"] == "ok"
+
+
 def test_wire_stub_validates_request_metadata_before_returning_noop():
     request = _request()
     request["notes"][0]["sample_ref"] = "C:\\voicebank\\a.wav"
