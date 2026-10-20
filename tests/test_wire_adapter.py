@@ -208,3 +208,16 @@ def test_wire_adapter_rejects_integer_too_large_for_float_conversion():
     response["note_results"][0]["pitch_delta"][0]["delta_cents"] = 10**400
     with pytest.raises(ValueError, match="finite number"):
         adapt_wire_response(_request(), response)
+
+
+
+@pytest.mark.parametrize("sample_ref", [
+    "../outside.wav",
+    "voicebank://local-profile/../outside.wav",
+    r"voicebank://local-profile\..\outside.wav",
+])
+def test_wire_adapter_rejects_sample_ref_path_traversal(sample_ref):
+    request = _request()
+    request["notes"][0]["sample_ref"] = sample_ref
+    with pytest.raises(ValueError, match="path traversal"):
+        deterministic_wire_stub(request)
