@@ -204,3 +204,38 @@ def test_reports_duplicate_alias_across_root_and_nested_oto_files(tmp_path: Path
     duplicate = next(item for item in result.duplicate_aliases if item[0] == "あ")
     assert len(duplicate[1]) == 2
     assert any(issue.code == "duplicate_alias" for issue in result.issues)
+
+def test_rejects_symlinked_wav_that_resolves_outside_voicebank(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.wav"
+    write_silent_wav(outside)
+    try:
+        (tmp_path / "linked.wav").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+    (tmp_path / "oto.ini").write_text(
+        "linked.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert any(issue.code == "wav_path_escape" for issue in result.issues)
+    assert result.summary["wav_files_checked"] == 0
+    assert not any(item.path == "linked.wav" for item in result.wav_files)
+
+
+def test_does_not_read_symlinked_oto_ini_outside_voicebank(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-oto.ini"
+    outside.write_text(
+        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    try:
+        (tmp_path / "oto.ini").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries == ()
+    assert any(issue.code == "oto_metadata_path_escape" for issue in result.issues)
+    assert result.summary["oto_entries"] == 0
+
