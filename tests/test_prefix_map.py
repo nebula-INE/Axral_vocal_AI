@@ -91,3 +91,9 @@ def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() 
     assert result.issues[0].line_number == 2
     assert "Duplicate note boundary 60" in result.issues[0].message
     assert select_prefix_map(result.entries, 60).suffix == "_LAST"
+
+def test_accepts_utf8_bom_at_start_of_file() -> None:
+    result = parse_prefix_map("\ufeffC4\\t-\\t_C4\\n")
+
+    assert result.issues == ()
+    assert result.entries == (PrefixMapEntry(boundary=60, prefix="", suffix="_C4"),)
