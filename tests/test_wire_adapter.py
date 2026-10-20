@@ -255,3 +255,14 @@ def test_wire_adapter_rejects_pitch_deltas_on_no_change_note():
     response["note_results"][0]["status"] = "no_change"
     with pytest.raises(ValueError, match="no_change status cannot contain pitch deltas"):
         adapt_wire_response(_request(), response)
+
+def test_wire_adapter_accepts_missing_optional_confidence():
+    response = _response()
+    for note_result in response["note_results"]:
+        note_result.pop("confidence")
+    adapted = adapt_wire_response(_request(), response)
+    assert adapted.status == "ok"
+    assert [(point.time_sec, point.delta_semitones) for point in adapted.pitch_deltas] == [
+        (0.1, 0.5), (0.3, -0.25), (0.7, 1.0)
+    ]
+
