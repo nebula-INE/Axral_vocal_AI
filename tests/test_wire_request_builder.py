@@ -190,3 +190,25 @@ def test_builder_rejects_integers_too_large_for_float_conversion(tmp_path):
             _analysis(tmp_path), _notes(), profile_id="bank", profile_version="1",
             strength=10**400,
         )
+
+
+
+def test_builder_percent_encodes_uri_delimiters_in_sample_path(tmp_path):
+    relative = "sub dir/a#b?.wav"
+    sample = tmp_path / relative
+    sample.parent.mkdir(parents=True)
+    sample.write_bytes(b"metadata-only-test-file")
+    entry = OtoEntry(1, relative, "あ", 0, 0, 0, 0, 0)
+    analysis = VoicebankAnalysis(
+        root=str(tmp_path), oto_files=("oto.ini",), prefix_map_files=(),
+        entries=(entry,), prefix_entries=(), duplicate_aliases=(),
+        pattern_evidence=(), wav_files=(), issues=(),
+    )
+
+    request = build_wire_request(
+        analysis, _notes(), profile_id="local-bank", profile_version="1"
+    )
+    assert request["notes"][0]["sample_ref"] == (
+        "voicebank://local-bank/sub%20dir/a%23b%3F.wav"
+    )
+    assert deterministic_wire_stub(request)["status"] == "ok"
