@@ -45,11 +45,12 @@ def _safe_wav_path(root: Path, filename: str) -> Path | None:
     windows_path = PureWindowsPath(filename)
     if windows_path.is_absolute() or windows_path.drive:
         return None
-    resolved_root = root.expanduser().resolve()
-    candidate = (resolved_root / filename).resolve()
     try:
+        resolved_root = root.expanduser().resolve()
+        candidate = (resolved_root / filename).resolve()
         candidate.relative_to(resolved_root)
-    except ValueError:
+    except (OSError, RuntimeError, ValueError):
+        # Broken links and symlink loops are invalid candidates, not fatal scan errors.
         return None
     return candidate
 
