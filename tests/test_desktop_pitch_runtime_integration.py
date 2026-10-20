@@ -1,8 +1,9 @@
-"""Execute the real VO-SE_vocal Desktop pitch sampler in Axral's CI.
+"""Execute real VO-SE_vocal Desktop and Web pitch samplers in Axral's CI.
 
 The integration checkout is supplied by .github/workflows/tests.yml. These tests
-exercise the current production Python sampler without modifying or wrapping it.
-They characterize the no-AI baseline only; they do not assert Web parity.
+exercise production implementations without modifying or wrapping them. They
+characterize Desktop linear sampling and the Web bridge's existing slew limit
+and Hz-domain smoothing; they do not require identical interior samples.
 """
 from __future__ import annotations
 
@@ -103,7 +104,13 @@ def test_actual_web_bridge_matches_desktop_sampler_for_shared_positive_pitch_cur
     )
 
     assert web_curve.shape == desktop_curve.shape == (3,)
-    assert web_curve == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
+    # Both runtimes agree at the endpoints. The Web bridge then applies its
+    # existing three-point smoothing in Hz, so the midpoint is not the raw
+    # linearly interpolated Desktop midpoint.
+    assert web_curve[[0, 2]] == pytest.approx(desktop_curve[[0, 2]], rel=1e-7, abs=1e-7)
+    expected_web_midpoint = 0.25 * desktop_curve[0] + 0.50 * desktop_curve[1] + 0.25 * desktop_curve[2]
+    assert web_curve[1] == pytest.approx(expected_web_midpoint, rel=1e-7, abs=1e-7)
+    assert web_curve[1] != pytest.approx(desktop_curve[1], rel=1e-7, abs=1e-7)
 
 
 
@@ -130,7 +137,13 @@ def test_actual_web_bridge_matches_desktop_sampler_for_shared_negative_pitch_cur
     desktop_curve = engine_class._get_sampled_curve(
         engine, events, note, 3, is_pitch=True
     )
-    assert web_curves["negative"] == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
+    web_curve = web_curves["negative"]
+    assert web_curve[[0, 2]] == pytest.approx(desktop_curve[[0, 2]], rel=1e-7, abs=1e-7)
+    # As in the positive case, Web smoothing is applied after converting
+    # semitone offsets to Hz and therefore changes the midpoint.
+    expected_web_midpoint = 0.25 * desktop_curve[0] + 0.50 * desktop_curve[1] + 0.25 * desktop_curve[2]
+    assert web_curve[1] == pytest.approx(expected_web_midpoint, rel=1e-7, abs=1e-7)
+    assert web_curve[1] != pytest.approx(desktop_curve[1], rel=1e-7, abs=1e-7)
 
 
 def test_actual_web_bridge_steep_bend_keeps_web_slew_limit_distinct_from_desktop() -> None:
@@ -157,7 +170,9 @@ def test_actual_web_bridge_steep_bend_keeps_web_slew_limit_distinct_from_desktop
     desktop_curve = engine_class._get_sampled_curve(
         engine, events, note, 3, is_pitch=True
     )
-    expected_web = 440.0 * np.power(2.0, np.array([0.0, 4.0, 8.0]) / 12.0)
+    expected_web_raw = 440.0 * np.power(2.0, np.array([0.0, 4.0, 8.0]) / 12.0)
+    expected_web = expected_web_raw.copy()
+    expected_web[1] = 0.25 * expected_web_raw[0] + 0.50 * expected_web_raw[1] + 0.25 * expected_web_raw[2]
     assert web_curves["steep"] == pytest.approx(expected_web, rel=1e-7, abs=1e-7)
     assert desktop_curve == pytest.approx(
         440.0 * np.power(2.0, np.array([0.0, 5.0, 10.0]) / 12.0),
