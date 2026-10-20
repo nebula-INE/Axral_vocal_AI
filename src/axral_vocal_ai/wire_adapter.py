@@ -177,7 +177,7 @@ def adapt_wire_response(
         note_status = result.get("status")
         if not isinstance(note_status, str) or note_status not in _NOTE_STATUSES:
             raise ValueError(f"note_results[{index}] has unsupported status")
-        if note_status != "ok":
+        if note_status not in {"ok", "no_change"}:
             raise ValueError(f"note {note_id} status '{note_status}' requires review")
         confidence = _finite_number(result.get("confidence"), f"note_results[{index}].confidence")
         if not 0.0 <= confidence <= 1.0:
@@ -191,6 +191,8 @@ def adapt_wire_response(
         raw_curve = result.get("pitch_delta")
         if not isinstance(raw_curve, list):
             raise ValueError(f"note_results[{index}].pitch_delta must be a list")
+        if note_status == "no_change" and raw_curve:
+            raise ValueError(f"note {note_id} with no_change status cannot contain pitch deltas")
         start_sec = _finite_number(note["start_ms"], f"note {note_id} start_ms") / 1000.0
         duration_sec = _finite_number(note["duration_ms"], f"note {note_id} duration_ms") / 1000.0
         previous_relative_ms = -math.inf
