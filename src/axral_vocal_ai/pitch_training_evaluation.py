@@ -25,7 +25,8 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and return a safe summary of one evaluation manifest.
 
     Required fields: evaluation_id, schema, dataset_snapshot_sha256,
-    model_artifact_sha256, code_revision, seed, evaluated_split,
+    test_dataset_snapshot_sha256, model_artifact_sha256, code_revision, seed,
+    evaluated_split,
     evaluated_records, metrics, and test_split_used_for_tuning.
     """
     if not isinstance(manifest, Mapping):
@@ -36,6 +37,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "evaluation_id",
         "schema",
         "dataset_snapshot_sha256",
+        "test_dataset_snapshot_sha256",
         "model_artifact_sha256",
         "code_revision",
         "seed",
@@ -55,7 +57,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         errors.append("invalid_evaluation_id")
     if not isinstance(manifest["schema"], str) or manifest["schema"] not in _SUPPORTED_SCHEMAS:
         errors.append("unsupported_schema")
-    for key in ("dataset_snapshot_sha256", "model_artifact_sha256", "code_revision"):
+    for key in ("dataset_snapshot_sha256", "test_dataset_snapshot_sha256", "model_artifact_sha256", "code_revision"):
         value = manifest[key]
         if not isinstance(value, str) or not _SHA256_RE.fullmatch(value):
             errors.append(f"invalid_{key}")
@@ -93,6 +95,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "metric_names": sorted(metrics),
         "reproducibility": {
             "dataset_snapshot_sha256": manifest["dataset_snapshot_sha256"],
+            "test_dataset_snapshot_sha256": manifest["test_dataset_snapshot_sha256"],
             "model_artifact_sha256": manifest["model_artifact_sha256"],
             "code_revision": manifest["code_revision"],
             "seed": seed,
