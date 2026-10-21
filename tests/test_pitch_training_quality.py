@@ -91,3 +91,24 @@ def test_legacy_split_leakage_marks_both_records_invalid():
     assert report["records_valid"] == 0
     assert report["records_invalid"] == 2
     assert report["validation_issue_counts"] == {"voicebank_split_leakage": 1}
+
+
+
+def test_example_split_leakage_marks_all_related_records_invalid():
+    first = make_example_record("train-private")
+    second = make_example_record("test-private")
+    # Different example IDs but shared split identities must never cross splits.
+    first["voicebank"]["split_group"] = "shared-private-bank"
+    second["voicebank"]["split_group"] = "shared-private-bank"
+    first["provenance"]["source_id"] = "source-a"
+    second["provenance"]["source_id"] = "source-b"
+    first["split"] = "train"
+    second["split"] = "test"
+
+    report = report_example_records([first, second])
+
+    assert report["records_valid"] == 0
+    assert report["records_invalid"] == 2
+    assert report["validation_issue_counts"] == {"voicebank_split_leakage": 1}
+    assert report["records_by_split"] == {"train": 0, "validation": 0, "test": 0}
+    assert "shared-private-bank" not in str(report)
