@@ -107,8 +107,12 @@ def report_legacy_records(
     labels: Counter[str] = Counter()
     groups: set[str] = set()
     seen_ids: Counter[str] = Counter()
+    id_indices: dict[str, list[int]] = {}
     bank_split: dict[str, str] = {}
+    bank_index: dict[str, int] = {}
     source_split: dict[str, str] = {}
+    source_index: dict[str, int] = {}
+    invalid_indices: set[int] = set()
     valid_flags: list[bool] = []
 
     for index, row in enumerate(rows, 1):
@@ -145,20 +149,28 @@ def report_legacy_records(
             groups.add(bank)
             if split in _SPLITS and bank in bank_split and bank_split[bank] != split:
                 issues["voicebank_split_leakage"] += 1
+                invalid_indices.update((index - 1, bank_index[bank]))
             elif split in _SPLITS:
                 bank_split[bank] = split
+                bank_index[bank] = index - 1
         if isinstance(source, str) and source and split in _SPLITS:
             if source in source_split and source_split[source] != split:
                 issues["source_split_leakage"] += 1
+                invalid_indices.update((index - 1, source_index[source]))
             else:
                 source_split[source] = split
+                source_index[source] = index - 1
         record_id = row.get("record_id")
         if isinstance(record_id, str) and record_id:
             seen_ids[record_id] += 1
+            id_indices.setdefault(record_id, []).append(index - 1)
 
-    for count in seen_ids.values():
+    for record_id, count in seen_ids.items():
         if count > 1:
             issues["duplicate_record_id"] += count
+            invalid_indices.update(id_indices[record_id])
+    for index in invalid_indices:
+        valid_flags[index] = False
     for row, valid in zip(rows, valid_flags):
         if not valid:
             continue
@@ -190,9 +202,10 @@ def report_example_records(
     labels: Counter[str] = Counter()
     groups: set[str] = set()
     ids: Counter[str] = Counter()
+    id_indices: dict[str, list[int]] = {}
     valid_flags: list[bool] = []
 
-    for row in rows:
+    for row_index, row in enumerate(rows):
         row_issues = validate_example_record(row)
         valid_flags.append(not row_issues)
         issues.update(code for code, _message in row_issues)
@@ -216,10 +229,13 @@ def report_example_records(
         example_id = row.get("example_id")
         if isinstance(example_id, str) and example_id:
             ids[example_id] += 1
+            id_indices.setdefault(example_id, []).append(row_index)
 
-    for count in ids.values():
+    for example_id, count in ids.items():
         if count > 1:
             issues["duplicate_example_id"] += count
+            for row_index in id_indices[example_id]:
+                valid_flags[row_index] = False
     for row, valid in zip(rows, valid_flags):
         if not valid or not isinstance(row, dict):
             continue
