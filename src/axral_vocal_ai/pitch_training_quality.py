@@ -203,6 +203,19 @@ def report_example_records(
     groups: set[str] = set()
     ids: Counter[str] = Counter()
     id_indices: dict[str, list[int]] = {}
+    # Match the grouping identities used by assign_example_splits. If records
+    # sharing an identity appear in different assigned splits, invalidate all
+    # affected rows rather than letting the aggregate report hide leakage.
+    group_splits: dict[tuple[str, str], set[str]] = {}
+    group_indices: dict[tuple[str, str], set[int]] = {}
+    group_issue_codes = {
+        "voicebank_split_group": "voicebank_split_leakage",
+        "source_id": "source_split_leakage",
+        "project_id": "project_split_leakage",
+        "session_id": "session_split_leakage",
+        "source_group_id": "source_group_split_leakage",
+    }
+    invalid_indices: set[int] = set()
     valid_flags: list[bool] = []
 
     for row_index, row in enumerate(rows):
@@ -231,11 +244,31 @@ def report_example_records(
             ids[example_id] += 1
             id_indices.setdefault(example_id, []).append(row_index)
 
+        split = row.get("split")
+        if split in _SPLITS:
+            identities: list[tuple[str, Any]] = []
+            if isinstance(voicebank, dict):
+                identities.append(("voicebank_split_group", voicebank.get("split_group")))
+            if isinstance(provenance, dict):
+                for field in ("source_id", "project_id", "session_id", "source_group_id"):
+                    identities.append((field, provenance.get(field)))
+            for kind, value in identities:
+                if isinstance(value, str) and value.strip():
+                    identity = (kind, value.strip())
+                    group_splits.setdefault(identity, set()).add(split)
+                    group_indices.setdefault(identity, set()).add(row_index)
+
+    for identity, assigned_splits in group_splits.items():
+        if len(assigned_splits) > 1:
+            issues[group_issue_codes[identity[0]]] += 1
+            invalid_indices.update(group_indices[identity])
+
     for example_id, count in ids.items():
         if count > 1:
             issues["duplicate_example_id"] += count
-            for row_index in id_indices[example_id]:
-                valid_flags[row_index] = False
+            invalid_indices.update(id_indices[example_id])
+    for row_index in invalid_indices:
+        valid_flags[row_index] = False
     for row, valid in zip(rows, valid_flags):
         if not valid or not isinstance(row, dict):
             continue
