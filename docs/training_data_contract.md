@@ -15,9 +15,9 @@ Two validators currently coexist, and they intentionally serve different record 
 - `src/axral_vocal_ai/training_data.py` validates the existing manifest format (`schema_version: 1`, `record_id`, `permission_status`, `input.notes`, absolute-second timing, and `delta_semitones`). It also checks voicebank/source split leakage.
 - `src/axral_vocal_ai/pitch_training_contract.py` validates the example-level contract documented below (`record_schema: axral.pitch-training-example`, string version `1.0`, `example_id`, explicit consent/provenance, note-relative milliseconds, baseline pitch in Hz, and target deltas in cents). It returns per-record rejection codes and aggregate counts.
 
-These formats are **not interchangeable**. Do not feed one format to the other validator, silently rename fields, or convert units without an explicit, tested migration. The example-level validator currently validates individual JSONL records; it does not generate dataset splits or establish cross-record split isolation. The existing manifest validator checks leakage for records that already have split assignments, but does not generate those assignments either.
+These formats are **not interchangeable**. Do not feed one format to the other validator, silently rename fields, or convert units without an explicit, tested migration. The example-level validator currently validates individual JSONL records; it does not generate dataset splits or establish cross-record split isolation. `src/axral_vocal_ai/pitch_training_splits.py` now generates deterministic splits for the **legacy manifest format only**. It keeps connected voicebank/source/project/session groups together, then reuses `validate_records` as a final leakage gate. The existing manifest validator still validates already-assigned splits; it does not generate assignments itself.
 
-The documented example format is the intended shape for new note-level pitch training examples. Before training, a separate preparation step must deterministically assign split groups and enforce both voicebank and original project/session isolation; only then should a manifest be emitted for the training runner. Until that migration path is implemented and tested, keep the two validators separate and treat neither passing validator as proof that a usable training dataset exists.
+The documented example format is the intended shape for new note-level pitch training examples. The new split generator accepts the legacy manifest shape (`voicebank_id`, `source_id`, `provenance`) and groups records by shared voicebank, source ID, source reference, and optional `provenance.project_id`, `provenance.session_id`, or `provenance.source_group_id`. It does not yet assign splits directly to the example-level format (`voicebank.split_group` / `provenance.source_id`); an explicit, tested migration/preparation step is still required before that format can be used for training. Keep the two validators separate and treat neither passing validator as proof that a usable training dataset exists.
 
 ## Example record
 
@@ -116,7 +116,7 @@ A passing unit test or low numeric error alone does not establish musical qualit
 ## Implementation gates
 
 1. Implement a strict record parser/validator with unit tests. **Implemented** for the documented example-level schema; the separate existing manifest validator remains in place.
-2. Add deterministic split generation with leakage checks.
+2. Implement deterministic split generation with leakage checks for the legacy manifest format. **Implemented**; direct split generation for the documented example-level format and an end-to-end migration path remain pending.
 3. Add a report generator that works on synthetic fixtures only.
 4. Add licensed, consented examples only after their provenance is verified.
 5. Train a baseline and evaluate on voicebanks excluded from training.
