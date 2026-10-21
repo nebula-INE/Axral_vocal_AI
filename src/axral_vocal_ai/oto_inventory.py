@@ -54,8 +54,9 @@ def parse_oto_ini(content: str) -> OtoParseResult:
     """Parse standard six-parameter oto.ini lines without dropping bad records.
 
     Expected format: wav=alias,offset,consonant,cutoff,preutterance,overlap.
-    Blank lines and comments are ignored. Malformed lines become issues, and
-    duplicate aliases remain separate entries so callers can inspect ambiguity.
+    Blank lines and comments are ignored. A UTF-8 BOM at the beginning of the
+    file is ignored. Malformed lines become issues, and duplicate aliases remain
+    separate entries so callers can inspect ambiguity.
     """
     if not isinstance(content, str):
         raise TypeError("oto.ini content must be a string")
@@ -64,6 +65,8 @@ def parse_oto_ini(content: str) -> OtoParseResult:
     issues: list[OtoParseIssue] = []
     for line_number, raw_line in enumerate(content.splitlines(), start=1):
         line = raw_line.strip()
+        if line_number == 1:
+            line = line.removeprefix("\ufeff")
         if not line or line.startswith(";") or line.startswith("#"):
             continue
         if "=" not in line:

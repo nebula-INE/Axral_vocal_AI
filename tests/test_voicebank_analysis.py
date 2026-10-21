@@ -4,6 +4,8 @@ import json
 import struct
 from pathlib import Path
 
+import pytest
+
 from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 
 
@@ -204,3 +206,99 @@ def test_reports_duplicate_alias_across_root_and_nested_oto_files(tmp_path: Path
     duplicate = next(item for item in result.duplicate_aliases if item[0] == "あ")
     assert len(duplicate[1]) == 2
     assert any(issue.code == "duplicate_alias" for issue in result.issues)
+
+def test_rejects_symlinked_wav_that_resolves_outside_voicebank(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.wav"
+    write_silent_wav(outside)
+    try:
+        (tmp_path / "linked.wav").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+    (tmp_path / "oto.ini").write_text(
+        "linked.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert any(issue.code == "wav_path_escape" for issue in result.issues)
+    assert result.summary["wav_files_checked"] == 0
+    assert not any(item.path == "linked.wav" for item in result.wav_files)
+
+
+def test_does_not_read_symlinked_oto_ini_outside_voicebank(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-oto.ini"
+    outside.write_text(
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+    try:
+        (tmp_path / "oto.ini").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries == ()
+    assert any(issue.code == "oto_metadata_path_escape" for issue in result.issues)
+    assert result.summary["oto_entries"] == 0
+
+def test_report_without_root_path_redacts_local_paths_from_nested_errors(tmp_path: Path) -> None:
+    (tmp_path / "broken.wav").write_bytes(b"RIFF")
+    (tmp_path / "oto.ini").write_text(
+        "broken.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+    report = json.loads(result.to_json(include_root_path=False))
+
+    assert report["root"] is None
+    assert str(tmp_path) not in json.dumps(report, ensure_ascii=False)
+    assert any(item["error"] for item in report["wav_files"])
+
+def test_reports_and_skips_symlinked_voicebank_directory(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-linked-bank"
+    outside.mkdir()
+    (outside / "oto.ini").write_text(
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+    link = tmp_path / "linked"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlink creation is unavailable on this platform")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries == ()
+    assert result.summary["oto_files"] == 0
+    issue = next(item for item in result.issues if item.code == "directory_symlink_skipped")
+    assert issue.path == "linked"
+    assert "not scanned" in issue.message
+
+
+def test_symlink_loop_in_oto_metadata_is_reported_without_crashing(tmp_path: Path) -> None:
+    link = tmp_path / "oto.ini"
+    try:
+        link.symlink_to(link)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries == ()
+    assert any(issue.code == "oto_metadata_path_escape" for issue in result.issues)
+
+
+def test_symlink_loop_in_wav_path_is_reported_without_crashing(tmp_path: Path) -> None:
+    link = tmp_path / "loop.wav"
+    try:
+        link.symlink_to(link)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+    (tmp_path / "oto.ini").write_text(
+        "loop.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert any(issue.code == "wav_path_resolution_failed" for issue in result.issues)
+    assert result.summary["wav_files_checked"] == 0

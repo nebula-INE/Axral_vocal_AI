@@ -40,12 +40,18 @@ def note_name_to_midi(value: str) -> int | None:
     match = re.fullmatch(r"([A-Ga-g])([#b]?)(-?\d+)", value.strip())
     if not match:
         return None
+    try:
+        octave = int(match.group(3))
+    except ValueError:
+        # Extremely long numeric fields can exceed Python's safe int-string
+        # conversion limit. Treat them as malformed metadata, not a scan crash.
+        return None
     semitone = _NOTE_TO_SEMITONE[match.group(1).upper()]
     if match.group(2) == "#":
         semitone += 1
     elif match.group(2) == "b":
         semitone -= 1
-    return (int(match.group(3)) + 1) * 12 + semitone
+    return (octave + 1) * 12 + semitone
 
 
 def parse_prefix_map(text: str) -> PrefixMapParseResult:
@@ -62,6 +68,8 @@ def parse_prefix_map(text: str) -> PrefixMapParseResult:
     first_line_by_boundary: dict[int, int] = {}
     for line_number, raw in enumerate(text.splitlines(), start=1):
         line = raw.rstrip("\r\n")
+        if line_number == 1:
+            line = line.removeprefix("\ufeff")
         if not line.strip() or line.lstrip().startswith(("#", ";")):
             continue
         parts = line.split("\t") if "\t" in line else re.split(r"\s+", line.strip())

@@ -104,8 +104,8 @@ class VoicebankAnalysis:
         }
 
     def to_dict(self, *, include_root_path: bool = True) -> dict[str, Any]:
-        """Return a JSON-ready report, optionally omitting the local root path."""
-        return {
+        """Return a JSON-ready report, optionally redacting local filesystem paths."""
+        report = {
             "schema_version": 1,
             "root": self.root if include_root_path else None,
             "summary": self.summary,
@@ -135,6 +135,32 @@ class VoicebankAnalysis:
             ],
             "issues": [asdict(issue) for issue in self.issues],
         }
+        if include_root_path:
+            return report
+
+        # Redact the root wherever it appears, not only in the top-level field.
+        # Exception messages from filesystem operations can otherwise leak the
+        # user's local directory through issue/wav error strings.
+        roots = {
+            self.root,
+            self.root.replace("/", "\\"),
+            self.root.replace("\\", "/"),
+        }
+
+        def redact(value: Any) -> Any:
+            if isinstance(value, str):
+                for root in roots:
+                    if root:
+                        value = value.replace(root, "<voicebank>")
+                return value
+            if isinstance(value, list):
+                return [redact(item) for item in value]
+            if isinstance(value, dict):
+                return {key: redact(item) for key, item in value.items()}
+            return value
+
+        report["root"] = None
+        return redact(report)
 
     def to_json(self, *, indent: int = 2, include_root_path: bool = True) -> str:
         return json.dumps(
@@ -221,7 +247,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         failed_path = Path(exc.filename) if exc.filename else root_path
         try:
             relative_path = _relative(root_path, failed_path.resolve())
-        except (ValueError, OSError):
+        except (ValueError, OSError, RuntimeError):
             relative_path = str(exc.filename or root_path)
         issues.append(VoicebankIssue(
             "error", "directory_scan_failed", relative_path, None,
@@ -229,7 +255,25 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         ))
 
     for directory, dirnames, filenames in os.walk(root_path, onerror=record_walk_error):
-        dirnames[:] = sorted(name for name in dirnames if name not in {".git", "__pycache__"})
+        current_dir = Path(directory)
+        kept_dirnames: list[str] = []
+        for name in sorted(dirnames):
+            if name in {".git", "__pycache__"}:
+                continue
+            child_dir = current_dir / name
+            # os.walk does not follow directory symlinks by default, but silently
+            # skipping them makes an audit look more complete than it is. Report
+            # them explicitly and never traverse them, even when they point inside
+            # the bank; their contents are outside this scan's trust boundary.
+            if child_dir.is_symlink():
+                issues.append(VoicebankIssue(
+                    "warning", "directory_symlink_skipped",
+                    _relative(root_path, child_dir), None,
+                    "Directory symlink was not scanned; copy or inspect its contents explicitly.",
+                ))
+                continue
+            kept_dirnames.append(name)
+        dirnames[:] = kept_dirnames
         for filename in sorted(filenames):
             lowered = filename.casefold()
             path = Path(directory) / filename
@@ -249,7 +293,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         relative_path = _relative(root_path, path)
         try:
             path.resolve().relative_to(root_path)
-        except (ValueError, OSError):
+        except (ValueError, OSError, RuntimeError):
             issues.append(VoicebankIssue(
                 "error", "oto_metadata_path_escape", relative_path, None,
                 "oto.ini resolves outside the voicebank root; external metadata is not read.",
@@ -266,7 +310,18 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
             # Paths in oto.ini are relative to the oto.ini containing them.
             filename = entry.wav_filename
             windows = PureWindowsPath(filename)
-            candidate = (path.parent / Path(filename)).resolve() if not windows.is_absolute() and not windows.drive and not Path(filename).is_absolute() else None
+            try:
+                candidate = (
+                    (path.parent / Path(filename)).resolve()
+                    if not windows.is_absolute() and not windows.drive and not Path(filename).is_absolute()
+                    else None
+                )
+            except (OSError, RuntimeError, ValueError):
+                candidate = None
+                issues.append(VoicebankIssue(
+                    "error", "wav_path_resolution_failed", relative_path, entry.source_line,
+                    "WAV path could not be resolved safely; the sample was not inspected.",
+                ))
             if candidate is None:
                 issues.append(VoicebankIssue("error", "absolute_wav_path", relative_path, entry.source_line,
                                              f"WAV path must be relative to oto.ini: {filename}"))
@@ -282,6 +337,13 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                     candidate = _resolve_case_insensitive(root_path, candidate)
                     try:
                         candidate.resolve().relative_to(root_path)
+                    except (OSError, RuntimeError):
+                        issues.append(VoicebankIssue(
+                            "error", "wav_path_resolution_failed", relative_path, entry.source_line,
+                            "WAV path could not be resolved safely; the sample was not inspected.",
+                        ))
+                        rebased = filename
+                        candidate = None
                     except ValueError:
                         issues.append(VoicebankIssue("error", "wav_path_escape", relative_path, entry.source_line,
                                                      f"WAV path resolves outside voicebank root: {filename}"))
@@ -304,10 +366,10 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         if relative_wav in seen_wav_paths:
             continue
         seen_wav_paths.add(relative_wav)
-        candidate = (root_path / relative_wav).resolve()
         try:
+            candidate = (root_path / relative_wav).resolve()
             candidate.relative_to(root_path)
-        except ValueError:
+        except (ValueError, OSError, RuntimeError):
             continue
         if not candidate.is_file():
             continue
@@ -338,7 +400,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         relative_path = _relative(root_path, path)
         try:
             path.resolve().relative_to(root_path)
-        except (ValueError, OSError):
+        except (ValueError, OSError, RuntimeError):
             issues.append(VoicebankIssue(
                 "error", "prefix_map_path_escape", relative_path, None,
                 "prefix.map resolves outside the voicebank root; external metadata is not read.",

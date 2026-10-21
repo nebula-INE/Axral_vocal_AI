@@ -20,7 +20,7 @@ def test_note_name_to_midi(name: str, expected: int | None) -> None:
 
 
 def test_parses_legacy_suffix_rows_and_three_column_rows() -> None:
-    result = parse_prefix_map("C1\t\t_C4\nF4\tC4/\t\n")
+    result = parse_prefix_map("C1\t_C4\nF4\tC4/\t-\n")
     assert result.issues == ()
     assert result.entries == (
         PrefixMapEntry(boundary=24, prefix="", suffix="_C4"),
@@ -76,6 +76,13 @@ def test_non_string_input_raises_type_error() -> None:
         parse_prefix_map(None)  # type: ignore[arg-type]
 
 
+def test_extremely_long_octave_field_is_reported_not_raised() -> None:
+    result = parse_prefix_map("C" + ("9" * 5000) + "\t_SUFFIX")
+    assert result.entries == ()
+    assert len(result.issues) == 1
+    assert "Invalid or out-of-range note boundary" in result.issues[0].message
+
+
 def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() -> None:
     result = parse_prefix_map("C4\t\t_FIRST\nC4\t\t_LAST\n")
 
@@ -84,3 +91,10 @@ def test_duplicate_boundaries_are_reported_and_last_row_remains_deterministic() 
     assert result.issues[0].line_number == 2
     assert "Duplicate note boundary 60" in result.issues[0].message
     assert select_prefix_map(result.entries, 60).suffix == "_LAST"
+
+
+def test_accepts_utf8_bom_at_start_of_file() -> None:
+    result = parse_prefix_map("\ufeffC4\t-\t_C4\n")
+
+    assert result.issues == ()
+    assert result.entries == (PrefixMapEntry(boundary=60, prefix="", suffix="_C4"),)
