@@ -14,6 +14,7 @@ from .training_data import DatasetValidationError, SPLITS, validate_record, vali
 
 _DEFAULT_RATIOS = {"train": 0.8, "validation": 0.1, "test": 0.1}
 _GROUP_FIELDS = ("project_id", "session_id", "source_group_id")
+_SPLIT_ORDER = ("train", "validation", "test")
 
 
 def _stable_key(values: Iterable[str]) -> str:
@@ -53,6 +54,8 @@ def assign_splits(
     any populated provenance project_id/session_id/source_group_id are joined
     into a single connected group. A group cannot cross splits. The input is
     not mutated. Existing split values are replaced; use only for fresh data.
+    If at least three independent groups exist, each split receives one group
+    before remaining groups are allocated by target-size deficit.
     """
     ratio_map = _ratio_map(ratios)
     copied: list[dict[str, Any]] = []
@@ -125,13 +128,22 @@ def assign_splits(
 
     target_counts = {split: len(copied) * ratio_map[split] for split in SPLITS}
     assigned_counts = {split: 0 for split in SPLITS}
-    split_order = ("train", "validation", "test")
-    for indices, _ in groups:
+    # Avoid accidentally leaving a split empty merely because its target is
+    # smaller than the deficits of the larger splits. Leakage groups stay
+    # indivisible; if fewer than three groups exist, some splits must be empty.
+    reserved = min(len(groups), len(_SPLIT_ORDER))
+    for index, (indices, _) in enumerate(groups[:reserved]):
+        split = _SPLIT_ORDER[index]
+        for record_index in indices:
+            copied[record_index]["split"] = split
+        assigned_counts[split] += len(indices)
+
+    for indices, _ in groups[reserved:]:
         split = max(
-            split_order,
+            _SPLIT_ORDER,
             key=lambda name: (
                 target_counts[name] - assigned_counts[name],
-                -split_order.index(name),
+                -_SPLIT_ORDER.index(name),
             ),
         )
         for index in indices:
