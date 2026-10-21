@@ -130,18 +130,21 @@ Until those gates are complete, the existing deterministic stub remains a contra
 `src/axral_vocal_ai/pitch_training_evaluation.py` provides
 `validate_evaluation_manifest(...)` for recording a reproducible evaluation
 summary. The manifest requires both the full dataset snapshot SHA-256 and a
-separate held-out `test_dataset_snapshot_sha256`, plus the model artifact
+separate held-out `test_dataset_snapshot_sha256`, a `split_manifest_sha256`
+identifying the frozen split-assignment/policy artifact, plus the model artifact
 SHA-256, code revision, random seed, schema, positive evaluated-record count,
 named finite numeric metrics, and an explicit `evaluated_split: test`.
 It rejects a manifest that says the test split was used for tuning or omits/has
-an invalid digest for the dedicated test snapshot. Record the test snapshot
-separately so the evaluated partition can be identified independently of the
-full dataset snapshot; this field alone does not prove that the snapshots are
-correct or that no leakage occurred.
+an invalid digest for the dedicated test snapshot or frozen split manifest.
+Record the test snapshot separately so the evaluated partition can be identified
+independently of the full dataset snapshot. The split-manifest digest makes the
+claimed split artifact traceable, but does not verify its contents or prove that
+the test set is independent or that no leakage occurred.
 
 A valid manifest returns `status: ready_for_human_review`; it does not run
 evaluation or training and does not prove the supplied hashes match artifacts,
-that the test set is independent, or that reported metrics are truthful.
+that the frozen split assignment was followed, that the test set is independent,
+or that reported metrics are truthful.
 Only metric names and reproducibility metadata are returned in the summary;
 raw samples and record identifiers are not copied into it. This is an
 auditability guard, not a substitute for a real held-out evaluation protocol.
