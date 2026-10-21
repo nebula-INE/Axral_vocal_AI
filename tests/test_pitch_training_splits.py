@@ -115,3 +115,21 @@ def test_assign_splits_rejects_duplicate_record_ids():
 def test_assign_splits_rejects_empty_input():
     with pytest.raises(DatasetValidationError, match="no records"):
         assign_splits([])
+
+
+
+def test_assign_splits_keeps_explicit_project_and_session_groups_together():
+    first = make_record("r1", "bank-a", "source-a", "record-a")
+    second = make_record("r2", "bank-b", "source-b", "record-b")
+    first["provenance"]["project_id"] = "project-shared"
+    second["provenance"]["project_id"] = "project-shared"
+    third = make_record("r3", "bank-c", "source-c", "record-c")
+    third["provenance"]["session_id"] = "session-shared"
+    fourth = make_record("r4", "bank-d", "source-d", "record-d")
+    fourth["provenance"]["session_id"] = "session-shared"
+
+    result = assign_splits([first, second, third, fourth])
+    by_id = split_by_id(result)
+
+    assert by_id["r1"] == by_id["r2"]
+    assert by_id["r3"] == by_id["r4"]
