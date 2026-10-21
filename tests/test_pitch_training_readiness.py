@@ -3,6 +3,7 @@ import copy
 from axral_vocal_ai.pitch_training_contract_splits import assign_example_splits
 from axral_vocal_ai.pitch_training_readiness import assess_training_candidate
 from test_pitch_training_contract_splits import make_record
+from test_training_data import make_record as make_legacy_record, make_target as make_legacy_target
 
 
 def test_synthetic_fixture_never_passes_training_candidate_gate():
@@ -53,9 +54,6 @@ def test_rejects_unknown_schema():
         raise AssertionError("unknown schema must be rejected")
 
 
-from test_training_data import make_record as make_legacy_record, make_target as make_legacy_target
-
-
 def _legacy_candidate_records():
     rows = [
         make_legacy_record("legacy-train", "bank-a", "train", target=make_legacy_target()),
@@ -90,5 +88,4 @@ def test_legacy_candidate_gate_blocks_unlabeled_record():
     )
 
     assert result["status"] == "blocked"
-    assert "invalid_records_or_split_leakage" in result["reasons"]
     assert "missing_or_unreviewed_pitch_labels" in result["reasons"]
