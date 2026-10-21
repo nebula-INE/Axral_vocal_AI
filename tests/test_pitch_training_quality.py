@@ -68,3 +68,26 @@ def test_invalid_origin_is_rejected():
         assert "dataset_origin" in str(exc)
     else:
         raise AssertionError("invalid dataset_origin should fail")
+
+
+
+def test_duplicate_example_ids_are_counted_invalid():
+    report = report_example_records([
+        make_example_record("same-private-id"),
+        make_example_record("same-private-id"),
+    ])
+
+    assert report["records_valid"] == 0
+    assert report["records_invalid"] == 2
+    assert report["validation_issue_counts"] == {"duplicate_example_id": 2}
+
+
+def test_legacy_split_leakage_marks_both_records_invalid():
+    first = make_legacy_record("train-private", "same-bank", "train")
+    second = make_legacy_record("test-private", "same-bank", "test")
+
+    report = report_legacy_records([first, second])
+
+    assert report["records_valid"] == 0
+    assert report["records_invalid"] == 2
+    assert report["validation_issue_counts"] == {"voicebank_split_leakage": 1}
