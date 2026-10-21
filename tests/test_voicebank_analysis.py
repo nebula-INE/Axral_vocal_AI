@@ -295,7 +295,7 @@ def test_symlink_loop_in_wav_path_is_reported_without_crashing(tmp_path: Path) -
     except (OSError, NotImplementedError):
         pytest.skip("symlink creation is unavailable on this platform")
     (tmp_path / "oto.ini").write_text(
-        "loop.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "loop.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     result = analyze_voicebank(tmp_path)
