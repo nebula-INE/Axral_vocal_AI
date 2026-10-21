@@ -46,6 +46,6 @@ def test_pipeline_rejects_invalid_example_records_before_preparation():
     try:
         prepare_example_dataset([invalid])
     except ValueError as exc:
-        assert "record 1 is invalid" in str(exc)
+        assert "permission_not_verified" in str(exc)
     else:
         raise AssertionError("invalid records must not enter preparation")
