@@ -273,3 +273,32 @@ def test_reports_and_skips_symlinked_voicebank_directory(tmp_path: Path) -> None
     issue = next(item for item in result.issues if item.code == "directory_symlink_skipped")
     assert issue.path == "linked"
     assert "not scanned" in issue.message
+
+
+def test_symlink_loop_in_oto_metadata_is_reported_without_crashing(tmp_path: Path) -> None:
+    link = tmp_path / "oto.ini"
+    try:
+        link.symlink_to(link)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.entries == ()
+    assert any(issue.code == "oto_metadata_path_escape" for issue in result.issues)
+
+
+def test_symlink_loop_in_wav_path_is_reported_without_crashing(tmp_path: Path) -> None:
+    link = tmp_path / "loop.wav"
+    try:
+        link.symlink_to(link)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+    (tmp_path / "oto.ini").write_text(
+        "loop.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert any(issue.code == "wav_path_resolution_failed" for issue in result.issues)
+    assert result.summary["wav_files_checked"] == 0
