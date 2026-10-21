@@ -337,6 +337,13 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
                     candidate = _resolve_case_insensitive(root_path, candidate)
                     try:
                         candidate.resolve().relative_to(root_path)
+                    except (OSError, RuntimeError):
+                        issues.append(VoicebankIssue(
+                            "error", "wav_path_resolution_failed", relative_path, entry.source_line,
+                            "WAV path could not be resolved safely; the sample was not inspected.",
+                        ))
+                        rebased = filename
+                        candidate = None
                     except ValueError:
                         issues.append(VoicebankIssue("error", "wav_path_escape", relative_path, entry.source_line,
                                                      f"WAV path resolves outside voicebank root: {filename}"))
