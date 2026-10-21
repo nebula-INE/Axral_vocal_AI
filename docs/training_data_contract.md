@@ -129,10 +129,15 @@ Until those gates are complete, the existing deterministic stub remains a contra
 
 `src/axral_vocal_ai/pitch_training_evaluation.py` provides
 `validate_evaluation_manifest(...)` for recording a reproducible evaluation
-summary. The manifest requires the dataset snapshot SHA-256, model artifact
+summary. The manifest requires both the full dataset snapshot SHA-256 and a
+separate held-out `test_dataset_snapshot_sha256`, plus the model artifact
 SHA-256, code revision, random seed, schema, positive evaluated-record count,
 named finite numeric metrics, and an explicit `evaluated_split: test`.
-It rejects a manifest that says the test split was used for tuning.
+It rejects a manifest that says the test split was used for tuning or omits/has
+an invalid digest for the dedicated test snapshot. Record the test snapshot
+separately so the evaluated partition can be identified independently of the
+full dataset snapshot; this field alone does not prove that the snapshots are
+correct or that no leakage occurred.
 
 A valid manifest returns `status: ready_for_human_review`; it does not run
 evaluation or training and does not prove the supplied hashes match artifacts,
