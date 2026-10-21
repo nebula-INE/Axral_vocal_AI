@@ -21,8 +21,7 @@ def prepare_legacy_dataset(
 ) -> dict[str, Any]:
     """Assign safe splits and report quality for legacy-manifest records.
 
-    Raises DatasetValidationError for invalid records or split leakage that
-    cannot be resolved by the deterministic assignment policy.
+    Raises the schema-specific split error for invalid input records or ratios.
     """
     assigned = assign_splits(records, ratios=ratios)
     report = report_legacy_records(assigned, dataset_origin=dataset_origin)
