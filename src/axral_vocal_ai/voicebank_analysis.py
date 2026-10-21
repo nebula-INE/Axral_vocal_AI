@@ -359,10 +359,10 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         if relative_wav in seen_wav_paths:
             continue
         seen_wav_paths.add(relative_wav)
-        candidate = (root_path / relative_wav).resolve()
         try:
+            candidate = (root_path / relative_wav).resolve()
             candidate.relative_to(root_path)
-        except ValueError:
+        except (ValueError, OSError, RuntimeError):
             continue
         if not candidate.is_file():
             continue
