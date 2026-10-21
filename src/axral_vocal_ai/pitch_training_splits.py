@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping
 from .training_data import DatasetValidationError, SPLITS, validate_record, validate_records
 
 _DEFAULT_RATIOS = {"train": 0.8, "validation": 0.1, "test": 0.1}
+_GROUP_FIELDS = ("project_id", "session_id", "source_group_id")
 
 
 def _stable_key(values: Iterable[str]) -> str:
@@ -46,13 +47,12 @@ def assign_splits(
     records: Iterable[Mapping[str, Any]],
     ratios: Mapping[str, float] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return copied records with deterministic, leakage-safe split assignments.
+    """Return copied legacy-manifest records with deterministic split assignments.
 
-    Records use the legacy training_data.py manifest schema. All records sharing
-    a voicebank_id, source_id, or provenance.source_reference are joined into a
-    single connected group; connected groups can never cross splits. The input
-    records are not mutated. Existing split values are deliberately ignored and
-    replaced, so callers should only use this for a fresh unsplit manifest.
+    Records sharing a voicebank_id, source_id, provenance.source_reference, or
+    any populated provenance project_id/session_id/source_group_id are joined
+    into a single connected group. A group cannot cross splits. The input is
+    not mutated. Existing split values are replaced; use only for fresh data.
     """
     ratio_map = _ratio_map(ratios)
     copied: list[dict[str, Any]] = []
@@ -60,7 +60,7 @@ def assign_splits(
         if not isinstance(raw, Mapping):
             raise DatasetValidationError(f"record {index} must be an object")
         record = dict(raw)
-        record["split"] = "train"  # validate legacy schema before assigning groups
+        record["split"] = "train"
         validate_record(record, index)
         copied.append(record)
     if not copied:
@@ -73,7 +73,6 @@ def assign_splits(
             raise DatasetValidationError(f"duplicate record_id {record_id!r}")
         ids.add(record_id)
 
-    # Union-find over records. Sharing any protected identity joins the groups.
     parents = list(range(len(copied)))
 
     def find(item: int) -> int:
@@ -89,14 +88,15 @@ def assign_splits(
 
     owner: dict[tuple[str, str], int] = {}
     for index, record in enumerate(copied):
+        provenance = record["provenance"]
         identities = [
             ("voicebank", record["voicebank_id"]),
             ("source", record["source_id"]),
         ]
-        provenance = record["provenance"]
-        reference = provenance.get("source_reference")
-        if isinstance(reference, str) and reference.strip():
-            identities.append(("source_reference", reference))
+        for field in ("source_reference", *_GROUP_FIELDS):
+            value = provenance.get(field)
+            if isinstance(value, str) and value.strip():
+                identities.append((field, value.strip()))
         for identity in identities:
             if identity in owner:
                 union(index, owner[identity])
@@ -107,8 +107,6 @@ def assign_splits(
     for index in range(len(copied)):
         components[find(index)].append(index)
 
-    # Largest groups first for better balance; stable hashes break ties without
-    # depending on input order, process hash randomization, or wall-clock time.
     groups = []
     for indices in components.values():
         tokens = []
@@ -118,9 +116,10 @@ def assign_splits(
                 f"voicebank:{record['voicebank_id']}",
                 f"source:{record['source_id']}",
             ))
-            source_reference = record["provenance"].get("source_reference")
-            if isinstance(source_reference, str) and source_reference.strip():
-                tokens.append(f"source_reference:{source_reference}")
+            for field in ("source_reference", *_GROUP_FIELDS):
+                value = record["provenance"].get(field)
+                if isinstance(value, str) and value.strip():
+                    tokens.append(f"{field}:{value.strip()}")
         groups.append((indices, _stable_key(tokens)))
     groups.sort(key=lambda item: (-len(item[0]), item[1]))
 
@@ -128,17 +127,16 @@ def assign_splits(
     assigned_counts = {split: 0 for split in SPLITS}
     split_order = ("train", "validation", "test")
     for indices, _ in groups:
-        # Put each indivisible group where it most reduces the current target
-        # deficit. Fixed split order resolves exact ties deterministically.
         split = max(
             split_order,
-            key=lambda name: (target_counts[name] - assigned_counts[name], -split_order.index(name)),
+            key=lambda name: (
+                target_counts[name] - assigned_counts[name],
+                -split_order.index(name),
+            ),
         )
         for index in indices:
             copied[index]["split"] = split
         assigned_counts[split] += len(indices)
 
-    # Reuse the existing full-manifest validator as the final leakage and schema
-    # gate. Do not claim training readiness unless the caller requests it there.
     validate_records(copied)
     return copied
