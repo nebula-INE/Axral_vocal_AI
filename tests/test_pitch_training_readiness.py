@@ -51,3 +51,44 @@ def test_rejects_unknown_schema():
         assert "schema must be" in str(exc)
     else:
         raise AssertionError("unknown schema must be rejected")
+
+
+from test_training_data import make_record as make_legacy_record, make_target as make_legacy_target
+
+
+def _legacy_candidate_records():
+    rows = [
+        make_legacy_record("legacy-train", "bank-a", "train", target=make_legacy_target()),
+        make_legacy_record("legacy-validation", "bank-b", "validation", target=make_legacy_target()),
+        make_legacy_record("legacy-test", "bank-c", "test", target=make_legacy_target()),
+    ]
+    for row in rows:
+        row["provenance"]["acquisition_method"] = "human-labeled-project"
+        row["provenance"]["source_reference"] = "permission-record-" + row["record_id"]
+    return rows
+
+
+def test_legacy_candidate_schema_can_reach_human_review_gate():
+    records = _legacy_candidate_records()
+
+    result = assess_training_candidate(
+        records, schema="legacy-manifest-v1", dataset_origin="candidate_real_data"
+    )
+
+    assert result["status"] == "candidate_for_human_training_review"
+    assert result["reasons"] == []
+    assert result["records_by_split"] == {"train": 1, "validation": 1, "test": 1}
+    assert result["training_started"] is False
+
+
+def test_legacy_candidate_gate_blocks_unlabeled_record():
+    records = _legacy_candidate_records()
+    records[1]["target"] = None
+
+    result = assess_training_candidate(
+        records, schema="legacy-manifest-v1", dataset_origin="candidate_real_data"
+    )
+
+    assert result["status"] == "blocked"
+    assert "invalid_records_or_split_leakage" in result["reasons"]
+    assert "missing_or_unreviewed_pitch_labels" in result["reasons"]
