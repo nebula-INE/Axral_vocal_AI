@@ -15,6 +15,7 @@ def _manifest():
         "schema": "axral.pitch-training-example-1.0",
         "dataset_snapshot_sha256": digest,
         "test_dataset_snapshot_sha256": "d" * 64,
+        "split_manifest_sha256": "e" * 64,
         "model_artifact_sha256": "b" * 64,
         "code_revision": "c" * 64,
         "seed": 17,
@@ -37,6 +38,7 @@ def test_valid_manifest_returns_reproducibility_summary_without_starting_trainin
     assert result["metric_names"] == ["mae_cents", "within_20_cents"]
     assert result["reproducibility"]["seed"] == 17
     assert result["reproducibility"]["test_dataset_snapshot_sha256"] == "d" * 64
+    assert result["reproducibility"]["split_manifest_sha256"] == "e" * 64
     assert result["training_started"] is False
     assert "does not verify" in result["warning"]
 
@@ -50,6 +52,7 @@ def test_valid_manifest_returns_reproducibility_summary_without_starting_trainin
         ("seed", True, "invalid_seed"),
         ("dataset_snapshot_sha256", "not-a-digest", "invalid_dataset_snapshot_sha256"),
         ("test_dataset_snapshot_sha256", "not-a-digest", "invalid_test_dataset_snapshot_sha256"),
+        ("split_manifest_sha256", "not-a-digest", "invalid_split_manifest_sha256"),
         ("metrics", {"mae_cents": float("nan")}, "invalid_metric_value:mae_cents"),
     ],
 )
@@ -82,4 +85,12 @@ def test_rejects_missing_held_out_test_snapshot_digest():
     del manifest["test_dataset_snapshot_sha256"]
 
     with pytest.raises(PitchEvaluationManifestError, match="missing_test_dataset_snapshot_sha256"):
+        validate_evaluation_manifest(manifest)
+
+
+def test_rejects_missing_frozen_split_manifest_digest():
+    manifest = _manifest()
+    del manifest["split_manifest_sha256"]
+
+    with pytest.raises(PitchEvaluationManifestError, match="missing_split_manifest_sha256"):
         validate_evaluation_manifest(manifest)
