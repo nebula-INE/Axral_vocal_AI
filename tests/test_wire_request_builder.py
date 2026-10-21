@@ -234,3 +234,37 @@ def test_builder_percent_encodes_unicode_and_literal_percent_in_sample_path(tmp_
         "voicebank://local-bank/%E9%9F%B3%E6%BA%90/%E3%81%82%2520.wav"
     )
     assert deterministic_wire_stub(request)["status"] == "ok"
+
+
+@pytest.mark.parametrize("baseline_pitch", [
+    [{"time_ms": 0, "hz": True}],
+    [{"time_ms": 0}],
+    [{"hz": 440}],
+    [None],
+    [{"time_ms": 0, "hz": 440}, {"time_ms": 0, "hz": 445}],
+])
+def test_builder_rejects_malformed_baseline_pitch_points(tmp_path, baseline_pitch):
+    notes = _notes()
+    notes[0]["baseline_pitch"] = baseline_pitch
+    with pytest.raises(WireRequestBuildError, match="baseline_pitch"):
+        build_wire_request(
+            _analysis(tmp_path), notes, profile_id="bank", profile_version="1"
+        )
+
+
+@pytest.mark.parametrize("strength", [True, float("nan"), float("inf"), -0.01, 1.01])
+def test_builder_rejects_invalid_strength_without_emitting_request(tmp_path, strength):
+    with pytest.raises(WireRequestBuildError, match="strength"):
+        build_wire_request(
+            _analysis(tmp_path), _notes(), profile_id="bank", profile_version="1",
+            strength=strength,
+        )
+
+
+@pytest.mark.parametrize("profile_version", ["", " ", None, 1])
+def test_builder_rejects_invalid_profile_version(tmp_path, profile_version):
+    with pytest.raises(WireRequestBuildError, match="profile_version"):
+        build_wire_request(
+            _analysis(tmp_path), _notes(), profile_id="bank",
+            profile_version=profile_version,
+        )
