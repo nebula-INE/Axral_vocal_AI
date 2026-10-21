@@ -24,10 +24,10 @@ class PitchEvaluationManifestError(ValueError):
 def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and return a safe summary of one evaluation manifest.
 
-    Required fields: evaluation_id, schema, dataset_snapshot_sha256,
-    test_dataset_snapshot_sha256, model_artifact_sha256, code_revision, seed,
-    evaluated_split,
-    evaluated_records, metrics, and test_split_used_for_tuning.
+    Required fields include hashes for the dataset, held-out test snapshot,
+    frozen split manifest, model artifact, and code revision. The split
+    manifest digest records which frozen split policy/assignment artifact
+    the evaluation claims to use; it does not verify the artifact itself.
     """
     if not isinstance(manifest, Mapping):
         raise PitchEvaluationManifestError("manifest must be a mapping")
@@ -38,6 +38,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "schema",
         "dataset_snapshot_sha256",
         "test_dataset_snapshot_sha256",
+        "split_manifest_sha256",
         "model_artifact_sha256",
         "code_revision",
         "seed",
@@ -57,7 +58,13 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         errors.append("invalid_evaluation_id")
     if not isinstance(manifest["schema"], str) or manifest["schema"] not in _SUPPORTED_SCHEMAS:
         errors.append("unsupported_schema")
-    for key in ("dataset_snapshot_sha256", "test_dataset_snapshot_sha256", "model_artifact_sha256", "code_revision"):
+    for key in (
+        "dataset_snapshot_sha256",
+        "test_dataset_snapshot_sha256",
+        "split_manifest_sha256",
+        "model_artifact_sha256",
+        "code_revision",
+    ):
         value = manifest[key]
         if not isinstance(value, str) or not _SHA256_RE.fullmatch(value):
             errors.append(f"invalid_{key}")
@@ -96,6 +103,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "reproducibility": {
             "dataset_snapshot_sha256": manifest["dataset_snapshot_sha256"],
             "test_dataset_snapshot_sha256": manifest["test_dataset_snapshot_sha256"],
+            "split_manifest_sha256": manifest["split_manifest_sha256"],
             "model_artifact_sha256": manifest["model_artifact_sha256"],
             "code_revision": manifest["code_revision"],
             "seed": seed,
@@ -104,7 +112,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "training_started": False,
         "warning": (
             "Metadata validation does not verify that hashes match artifacts, "
-            "metrics are truthful, the test set is independent, or evaluation "
-            "results are scientifically valid."
+            "the frozen split assignment was followed, metrics are truthful, "
+            "the test set is independent, or evaluation results are scientifically valid."
         ),
     }
