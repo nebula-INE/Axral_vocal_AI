@@ -61,7 +61,7 @@ def test_voicebank_pipeline_preserves_baseline_pitch_and_adapts_note_relative_pr
     tmp_path: Path,
 ) -> None:
     (tmp_path / "oto.ini").write_text(
-        "a.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
     _write_wav(tmp_path / "a.wav")
     notes = [{
