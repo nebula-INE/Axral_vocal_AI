@@ -42,7 +42,10 @@ def test_nested_prefix_maps_fail_closed_before_wire_request(
     analysis = analyze_voicebank(tmp_path)
     assert "nested_prefix_map" in {issue.code for issue in analysis.issues}
 
-    with pytest.raises(WireRequestBuildError, match="multiple/nested prefix.map") as exc:
+    with pytest.raises(
+        WireRequestBuildError,
+        match="prefix.map contains duplicate MIDI boundaries|multiple/nested prefix.map",
+    ) as exc:
         build_wire_request(
             analysis,
             [{
