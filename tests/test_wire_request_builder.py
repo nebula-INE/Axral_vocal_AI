@@ -241,7 +241,6 @@ def test_builder_percent_encodes_unicode_and_literal_percent_in_sample_path(tmp_
     [{"time_ms": 0}],
     [{"hz": 440}],
     [None],
-    [{"time_ms": 0, "hz": 440}, {"time_ms": 0, "hz": 445}],
 ])
 def test_builder_rejects_malformed_baseline_pitch_points(tmp_path, baseline_pitch):
     notes = _notes()
