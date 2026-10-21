@@ -46,3 +46,35 @@ def test_symlinked_directory_to_outside_voicebank_is_rejected(tmp_path: Path) ->
     assert result.candidates == ()
     assert any("absolute or escapes" in issue for issue in result.issues)
 
+def test_broken_symlink_inside_voicebank_is_rejected(tmp_path: Path) -> None:
+    voicebank = tmp_path / "voicebank"
+    voicebank.mkdir()
+    link = voicebank / "missing.wav"
+    try:
+        link.symlink_to(voicebank / "does-not-exist.wav")
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    entry = OtoEntry(1, "missing.wav", "あ", 0.0, 100.0, -100.0, 20.0, 10.0)
+    result = resolve_utau_alias("あ", 60, [entry], voicebank_root=voicebank)
+
+    assert result.status == "invalid_sample_path"
+    assert result.candidates == ()
+    assert any("WAV file does not exist" in issue for issue in result.issues)
+
+
+def test_symlink_loop_inside_voicebank_is_rejected(tmp_path: Path) -> None:
+    voicebank = tmp_path / "voicebank"
+    voicebank.mkdir()
+    link = voicebank / "loop.wav"
+    try:
+        link.symlink_to(link)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable on this platform")
+
+    entry = OtoEntry(1, "loop.wav", "あ", 0.0, 100.0, -100.0, 20.0, 10.0)
+    result = resolve_utau_alias("あ", 60, [entry], voicebank_root=voicebank)
+
+    assert result.status == "invalid_sample_path"
+    assert result.candidates == ()
+    assert any("absolute or escapes" in issue for issue in result.issues)
