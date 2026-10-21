@@ -8,6 +8,17 @@ The first model target is an editable pitch-expression proposal. Training exampl
 
 This contract applies to data preparation and evaluation in `Axral_vocal_AI`. It does not authorize changes to VO-SE_vocal's renderer, synthesis, export, WAV writing, timing, pitch shifting, or audio processing.
 
+## Implementation status and schema boundaries
+
+Two validators currently coexist, and they intentionally serve different record shapes:
+
+- `src/axral_vocal_ai/training_data.py` validates the existing manifest format (`schema_version: 1`, `record_id`, `permission_status`, `input.notes`, absolute-second timing, and `delta_semitones`). It also checks voicebank/source split leakage.
+- `src/axral_vocal_ai/pitch_training_contract.py` validates the example-level contract documented below (`record_schema: axral.pitch-training-example`, string version `1.0`, `example_id`, explicit consent/provenance, note-relative milliseconds, baseline pitch in Hz, and target deltas in cents). It returns per-record rejection codes and aggregate counts.
+
+These formats are **not interchangeable**. Do not feed one format to the other validator, silently rename fields, or convert units without an explicit, tested migration. The example-level validator currently validates individual JSONL records; it does not generate dataset splits or establish cross-record split isolation. The existing manifest validator checks leakage for records that already have split assignments, but does not generate those assignments either.
+
+The documented example format is the intended shape for new note-level pitch training examples. Before training, a separate preparation step must deterministically assign split groups and enforce both voicebank and original project/session isolation; only then should a manifest be emitted for the training runner. Until that migration path is implemented and tested, keep the two validators separate and treat neither passing validator as proof that a usable training dataset exists.
+
 ## Example record
 
 The following is a JSON Lines record shape for a *metadata/label record*. Values are illustrative and are not training data.
@@ -104,7 +115,7 @@ A passing unit test or low numeric error alone does not establish musical qualit
 
 ## Implementation gates
 
-1. Implement a strict record parser/validator with unit tests.
+1. Implement a strict record parser/validator with unit tests. **Implemented** for the documented example-level schema; the separate existing manifest validator remains in place.
 2. Add deterministic split generation with leakage checks.
 3. Add a report generator that works on synthetic fixtures only.
 4. Add licensed, consented examples only after their provenance is verified.
