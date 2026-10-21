@@ -124,3 +124,19 @@ A passing unit test or low numeric error alone does not establish musical qualit
 6. Connect a trained model to the wire contract only after quality, runtime, data-rights, and fallback gates pass.
 
 Until those gates are complete, the existing deterministic stub remains a contract test fixture, not an AI model.
+
+## Evaluation manifest validator
+
+`src/axral_vocal_ai/pitch_training_evaluation.py` provides
+`validate_evaluation_manifest(...)` for recording a reproducible evaluation
+summary. The manifest requires the dataset snapshot SHA-256, model artifact
+SHA-256, code revision, random seed, schema, positive evaluated-record count,
+named finite numeric metrics, and an explicit `evaluated_split: test`.
+It rejects a manifest that says the test split was used for tuning.
+
+A valid manifest returns `status: ready_for_human_review`; it does not run
+evaluation or training and does not prove the supplied hashes match artifacts,
+that the test set is independent, or that reported metrics are truthful.
+Only metric names and reproducibility metadata are returned in the summary;
+raw samples and record identifiers are not copied into it. This is an
+auditability guard, not a substitute for a real held-out evaluation protocol.
