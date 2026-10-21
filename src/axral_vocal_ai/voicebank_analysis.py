@@ -247,7 +247,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         failed_path = Path(exc.filename) if exc.filename else root_path
         try:
             relative_path = _relative(root_path, failed_path.resolve())
-        except (ValueError, OSError):
+        except (ValueError, OSError, RuntimeError):
             relative_path = str(exc.filename or root_path)
         issues.append(VoicebankIssue(
             "error", "directory_scan_failed", relative_path, None,
@@ -293,7 +293,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         relative_path = _relative(root_path, path)
         try:
             path.resolve().relative_to(root_path)
-        except (ValueError, OSError):
+        except (ValueError, OSError, RuntimeError):
             issues.append(VoicebankIssue(
                 "error", "oto_metadata_path_escape", relative_path, None,
                 "oto.ini resolves outside the voicebank root; external metadata is not read.",
@@ -310,7 +310,18 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
             # Paths in oto.ini are relative to the oto.ini containing them.
             filename = entry.wav_filename
             windows = PureWindowsPath(filename)
-            candidate = (path.parent / Path(filename)).resolve() if not windows.is_absolute() and not windows.drive and not Path(filename).is_absolute() else None
+            try:
+                candidate = (
+                    (path.parent / Path(filename)).resolve()
+                    if not windows.is_absolute() and not windows.drive and not Path(filename).is_absolute()
+                    else None
+                )
+            except (OSError, RuntimeError, ValueError):
+                candidate = None
+                issues.append(VoicebankIssue(
+                    "error", "wav_path_resolution_failed", relative_path, entry.source_line,
+                    "WAV path could not be resolved safely; the sample was not inspected.",
+                ))
             if candidate is None:
                 issues.append(VoicebankIssue("error", "absolute_wav_path", relative_path, entry.source_line,
                                              f"WAV path must be relative to oto.ini: {filename}"))
@@ -382,7 +393,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         relative_path = _relative(root_path, path)
         try:
             path.resolve().relative_to(root_path)
-        except (ValueError, OSError):
+        except (ValueError, OSError, RuntimeError):
             issues.append(VoicebankIssue(
                 "error", "prefix_map_path_escape", relative_path, None,
                 "prefix.map resolves outside the voicebank root; external metadata is not read.",
