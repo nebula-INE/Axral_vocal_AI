@@ -53,7 +53,7 @@ def validate_evaluation_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
 
     if not isinstance(manifest["evaluation_id"], str) or not manifest["evaluation_id"].strip():
         errors.append("invalid_evaluation_id")
-    if manifest["schema"] not in _SUPPORTED_SCHEMAS:
+    if not isinstance(manifest["schema"], str) or manifest["schema"] not in _SUPPORTED_SCHEMAS:
         errors.append("unsupported_schema")
     for key in ("dataset_snapshot_sha256", "model_artifact_sha256", "code_revision"):
         value = manifest[key]
