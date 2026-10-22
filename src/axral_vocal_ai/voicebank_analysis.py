@@ -76,6 +76,12 @@ class VoicebankAnalysis:
                             "chunk_size_exceeds_riff_boundary",
                             "chunk_truncated",
                             "missing_chunk_padding",
+                            "invalid_channel_count",
+                            "invalid_sample_rate",
+                            "invalid_byte_rate",
+                            "invalid_block_align",
+                            "invalid_bits_per_sample",
+                            "data_size_not_aligned_to_sample_frames",
                         )
                     )
                 )
