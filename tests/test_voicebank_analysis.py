@@ -302,3 +302,21 @@ def test_symlink_loop_in_wav_path_is_reported_without_crashing(tmp_path: Path) -
 
     assert any(issue.code == "wav_path_resolution_failed" for issue in result.issues)
     assert result.summary["wav_files_checked"] == 0
+
+
+def test_summary_counts_invalid_wav_format_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "invalid-rate.wav"
+    write_silent_wav(path)
+    raw = bytearray(path.read_bytes())
+    # RIFF header (12 bytes), fmt chunk header (8 bytes), then sample_rate.
+    struct.pack_into("<I", raw, 24, 0)
+    path.write_bytes(raw)
+    (tmp_path / "oto.ini").write_text(
+        "invalid-rate.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+
+    result = analyze_voicebank(tmp_path)
+
+    assert result.summary["wav_files_checked"] == 1
+    assert result.summary["wav_files_invalid"] == 1
+    assert any(issue.code == "wav_invalid_sample_rate" for issue in result.issues)
