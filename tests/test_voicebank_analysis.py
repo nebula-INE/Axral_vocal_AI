@@ -312,7 +312,7 @@ def test_summary_counts_invalid_wav_format_metadata(tmp_path: Path) -> None:
     struct.pack_into("<I", raw, 24, 0)
     path.write_bytes(raw)
     (tmp_path / "oto.ini").write_text(
-        "invalid-rate.wav=あ,0,100,-100,20,10\\n", encoding="utf-8"
+        "invalid-rate.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
     )
 
     result = analyze_voicebank(tmp_path)
