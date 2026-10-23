@@ -85,3 +85,50 @@ A bank should not be marked compatible merely because the CLI exits 0. Compatibi
 - This is a filesystem, metadata, and signal audit. It does not prove pronunciation correctness, phoneme segmentation, oto timing quality, or rendering equivalence.
 - The CLI does not modify voicebanks and does not render audio.
 - Keep VO-SE_vocal/WORLD rendering behavior as the source of truth. Any renderer change requires a separate reviewed task.
+
+## 6. Starter collection register
+
+The following names are **research candidates only**. Listing a voicebank here does not mean its current terms have been checked or that AI training is permitted. Before downloading or using assets, identify the exact voicebank release and record the current primary-source terms.
+
+| Candidate | First intended use | Current status | Required gate before use |
+| --- | --- | --- | --- |
+| つくよみちゃん (UTAU voicebank; exact release to identify) | First audit candidate | Not yet verified in this repository | Confirm exact release, current terms, local testing permission, AI-training permission, and any model-publication restrictions |
+| 桃音モモ (exact voicebank/release to identify) | Alternate layout/alias coverage | Not yet verified in this repository | Confirm release-specific source and terms; do not infer AI-training permission from general fan-use permission |
+| 重音テト (UTAU voicebank; exact release to identify) | Compatibility test only unless terms clearly permit more | Not yet verified in this repository | Read current official voice-use rules and FAQ; separately decide testing, training, and distribution |
+| デフォ子／唄音ウタ (exact distribution to identify) | Additional baseline candidate | Not yet verified in this repository | Confirm original distribution source, exact version, and applicable terms |
+
+Do not mark a candidate “approved” based on a secondary summary, a search snippet, or the fact that files are publicly downloadable. If terms are ambiguous, leave the status blocked and ask the rights holder or distributor for clarification.
+
+## 7. Local collection sheet template
+
+Keep this register outside the public repository if it contains private correspondence, local paths, or identifying audit details. A sanitized copy may be shared only after review.
+
+| Field | Value to record |
+| --- | --- |
+| Candidate and exact release | Name, version/release date, source page |
+| Primary-source terms | Terms URL, date checked, archived reference if permitted |
+| Local compatibility testing | Allowed / denied / unclear; evidence |
+| Feature extraction and derived metadata | Allowed / denied / unclear; evidence |
+| AI training | Allowed / denied / unclear; evidence |
+| Model or output distribution | Allowed / denied / unclear; evidence |
+| Audio redistribution | Allowed / denied / unclear; evidence |
+| Attribution requirements | Exact required wording and placement |
+| Files present | oto.ini, prefix.map, WAV, readme, other config |
+| Layout/encoding notes | CV/VCV/CVVC, encoding, nested paths, aliases |
+| Audit status | Not started / audited / needs review / blocked |
+| Reviewer and date | Person or role, date, notes |
+
+Use separate decisions for local compatibility testing, derived-feature creation, model training, and distribution. Permission for one activity does not imply permission for the others.
+
+## 8. First-run acceptance checklist
+
+For the first permitted candidate:
+
+- [ ] Exact release and primary-source terms recorded before use.
+- [ ] Testing/training/distribution decisions recorded separately.
+- [ ] Assets remain local; no voicebank WAVs or restricted oto.ini contents are committed.
+- [ ] Audit is run with `--redact-root`, and the output is reviewed for identifying aliases/filenames before sharing.
+- [ ] Errors, warnings, and unsupported cases are triaged; CLI exit code alone is not accepted as compatibility proof.
+- [ ] Alias and prefix resolution are compared with VO-SE_vocal.
+- [ ] A small set of expected notes is manually checked using the existing VO-SE_vocal renderer without changing its synthesis/export implementation.
+- [ ] The candidate is marked compatible only after a reviewer records the evidence and known differences.
