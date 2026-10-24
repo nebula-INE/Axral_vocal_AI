@@ -132,3 +132,49 @@ For the first permitted candidate:
 - [ ] Alias and prefix resolution are compared with VO-SE_vocal.
 - [ ] A small set of expected notes is manually checked using the existing VO-SE_vocal renderer without changing its synthesis/export implementation.
 - [ ] The candidate is marked compatible only after a reviewer records the evidence and known differences.
+
+## 9. Kaggle dataset lifecycle (private by default)
+
+Kaggle is a training workspace, not the canonical archive for original voicebanks. Keep the original download and its license evidence in a local, access-controlled source store. Do not upload an asset merely because the Kaggle dataset is private.
+
+### Storage layers
+
+1. **Source vault (local, read-only):** original archive, exact release/version, source URL, terms snapshot/reference, checksum, and permission decision. Never commit this folder to Git.
+2. **Audit workspace (local):** parsed `oto.ini`/`prefix.map` inventory, WAV diagnostics, resolver comparison, and a manually reviewed spot-check record. Keep identifying details local unless sharing is allowed.
+3. **Approved training package (Kaggle private dataset):** only assets and derived data whose permissions explicitly cover cloud storage and the intended ML use. Use a versioned manifest and opaque IDs. Keep each source's permission evidence in the manifest; exclude `review_required` and `prohibited` sources.
+4. **Training outputs:** model checkpoints, logs, metrics, and dataset version identifiers. Check these for embedded samples, aliases, local paths, or other source-identifying data before sharing or publishing.
+
+### Recommended dataset layout
+
+```text
+axral-vocal-ai-dataset-v001/
+  dataset_manifest.json
+  permission_register.csv
+  records/
+    train.jsonl
+    validation.jsonl
+    test.jsonl
+  features/                 # only when permitted and needed
+  checksums.sha256
+  README.md
+```
+
+Keep raw WAV files in a separate, explicitly approved directory or dataset version only when the training method genuinely requires them and the license permits cloud storage. Do not duplicate all voicebank WAVs by default. For the initial pitch-delta model, prioritize curated note/feature/target records and evaluate whether raw audio is needed at all; never manufacture pitch ground truth from unverified curves.
+
+### Versioning and access
+
+- Create a private Kaggle Dataset for each immutable dataset release (for example, `v001`); create a new version when records or labels change, and record its dataset/version identifier in every training run.
+- Keep the dataset private, do not add collaborators unless needed, and do not publish a Notebook or output that exposes restricted inputs.
+- Track file checksums, schema version, preprocessing code/version, source IDs, and train/validation/test assignment so each run can be reproduced.
+- Verify Kaggle's current quota and storage rules in its official documentation before upload; quotas and interface behavior can change.
+- Private visibility limits ordinary access but does not replace the rights holder's permission, the platform's terms, or a review of what the training output may reveal.
+- If permission is unclear, keep the source local and use synthetic fixtures or explicitly authorized data instead.
+
+### Before the first upload
+
+- [ ] Exact release and terms recorded; permission explicitly covers cloud upload/storage and intended ML use.
+- [ ] Model/output distribution and derived-feature use assessed separately.
+- [ ] Only the minimum required files are included; no unrelated voicebanks or personal/local-path data.
+- [ ] Manifest, checksums, schema validation, and group-based split manifest are generated.
+- [ ] A small dry run completes on synthetic fixtures before the approved dataset is attached to a GPU notebook.
+- [ ] Notebook visibility and dataset visibility are checked independently.
