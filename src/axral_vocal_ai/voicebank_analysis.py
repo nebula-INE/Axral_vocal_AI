@@ -10,6 +10,7 @@ from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 import json
 import os
+import unicodedata
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
@@ -192,10 +193,12 @@ def _relative(root: Path, path: Path) -> str:
 
 
 def _resolve_case_insensitive(root: Path, candidate: Path) -> Path:
-    """Resolve an existing path with VO-SE's case-insensitive component fallback.
+    """Resolve a path by exact spelling, then case/Unicode-normalized components.
 
-    Exact filesystem matches always win. The fallback is only used when a
-    component's spelling differs; ambiguous case-folded matches are not guessed.
+    Exact filesystem matches always win. A fallback component is accepted only
+    when exactly one directory entry matches after case-folding and NFC
+    normalization; ambiguous matches are never guessed. The returned path is
+    always built from actual filesystem entry names.
     """
     if candidate.is_file():
         return candidate
@@ -204,20 +207,42 @@ def _resolve_case_insensitive(root: Path, candidate: Path) -> Path:
     except ValueError:
         return candidate
 
+    def key(value: str) -> str:
+        # NFC makes canonically equivalent composed/decomposed Japanese names
+        # comparable; casefold retains the existing case-insensitive behavior.
+        return unicodedata.normalize("NFC", value).casefold()
+
     current = root
     for component in relative.parts:
         if component in ("", "."):
             continue
         try:
-            matches = sorted(
-                child for child in current.iterdir()
-                if child.name.casefold() == component.casefold()
-            )
+            children = list(current.iterdir())
         except OSError:
             return candidate
-        if len(matches) != 1:
+
+        # Prefer exact spelling first, then the historical case-insensitive
+        # fallback, then Unicode-normalized matching.
+        exact = [child for child in children if child.name == component]
+        if len(exact) == 1:
+            current = exact[0]
+            continue
+
+        case_matches = [
+            child for child in children
+            if child.name.casefold() == component.casefold()
+        ]
+        if len(case_matches) == 1:
+            current = case_matches[0]
+            continue
+        if len(case_matches) > 1:
             return candidate
-        current = matches[0]
+
+        normalized_matches = [child for child in children if key(child.name) == key(component)]
+        if len(normalized_matches) != 1:
+            # Missing or ambiguous: do not select an arbitrary sample.
+            return candidate
+        current = normalized_matches[0]
 
     return current if current.is_file() else candidate
 
