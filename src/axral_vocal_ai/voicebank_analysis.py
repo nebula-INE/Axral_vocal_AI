@@ -150,8 +150,8 @@ class VoicebankAnalysis:
         # user's local directory through issue/wav error strings.
         roots = {
             self.root,
-            self.root.replace("/", "\\"),
-            self.root.replace("\\", "/"),
+            self.root.replace("/", "\"),
+            self.root.replace("\", "/"),
         }
 
         def redact(value: Any) -> Any:
@@ -185,7 +185,7 @@ def _read_text(path: Path) -> str:
     only when its BOM explicitly identifies byte order.
     """
     raw = path.read_bytes()
-    if raw.startswith((b"\\xff\\xfe", b"\\xfe\\xff")):
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
         return raw.decode("utf-16")
     for encoding in ("utf-8-sig", "utf-8", "cp932"):
         try:
