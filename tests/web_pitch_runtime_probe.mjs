@@ -10,13 +10,13 @@ const moduleRoot = process.env.AXRAL_NODE_MODULES_ROOT || root;
 const requireFromVoiceRepo = createRequire(resolve(moduleRoot, 'package.json'));
 const ts = requireFromVoiceRepo('typescript');
 
-const utilitySource = readFileSync(resolve(root, 'src/utils/pitchCurve.ts'), 'utf8');
+const utilitySource = readFileSync(resolve(root, 'assets/src/utils/pitchCurve.ts'), 'utf8');
 const compiledUtility = ts.transpileModule(utilitySource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const utilityUrl = 'data:text/javascript;base64,' + Buffer.from(compiledUtility, 'utf8').toString('base64');
 
-const clientSource = readFileSync(resolve(root, 'src/voseCoreClient.ts'), 'utf8');
+const clientSource = readFileSync(resolve(root, 'assets/src/voseCoreClient.ts'), 'utf8');
 const helperMatch = clientSource.match(
   /function buildPitchCurveHz\([\s\S]*?\): number\[\] \{[\s\S]*?\r?\n\}\r?\n\r?\nfunction silentFrames/
 );

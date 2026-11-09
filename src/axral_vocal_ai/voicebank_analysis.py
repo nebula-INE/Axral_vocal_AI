@@ -178,14 +178,21 @@ class VoicebankAnalysis:
 
 
 def _read_text(path: Path) -> str:
-    """Read common Japanese Windows voicebank encodings without data loss."""
+    """Decode UTAU metadata using BOM-aware Unicode and Japanese legacy encodings.
+
+    UTF-8 is preferred for BOM-less files because CP932 can decode many UTF-8
+    byte sequences into plausible but incorrect mojibake. UTF-16 is accepted
+    only when its BOM explicitly identifies byte order.
+    """
     raw = path.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16")
     for encoding in ("utf-8-sig", "utf-8", "cp932"):
         try:
             return raw.decode(encoding)
         except UnicodeDecodeError:
             continue
-    raise UnicodeError("File is not valid UTF-8 or CP932 text")
+    raise UnicodeError("Metadata is not valid UTF-8, UTF-16 (with BOM), or CP932 text")
 
 
 def _relative(root: Path, path: Path) -> str:
