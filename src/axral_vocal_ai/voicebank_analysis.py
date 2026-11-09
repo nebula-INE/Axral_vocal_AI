@@ -150,8 +150,8 @@ class VoicebankAnalysis:
         # user's local directory through issue/wav error strings.
         roots = {
             self.root,
-            self.root.replace("/", "\"),
-            self.root.replace("\", "/"),
+            self.root.replace("/", "\\"),
+            self.root.replace("\\", "/"),
         }
 
         def redact(value: Any) -> Any:
