@@ -1,0 +1,21 @@
+"""Structural checks for the single-cell Kaggle notebook."""
+import ast
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+NOTEBOOK = ROOT / "kaggle" / "Axral_Vocal_AI_OneCell.ipynb"
+
+
+def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    assert notebook["nbformat"] == 4
+    code_cells = [cell for cell in notebook["cells"] if cell.get("cell_type") == "code"]
+    assert len(code_cells) == 1
+    source = "".join(code_cells[0]["source"])
+    ast.parse(source)
+    assert 'HF_DATA_URL = "https://huggingface.co/datasets/' in source
+    assert "training/validate_dataset.py" in source
+    assert "training/train_pitch_model.py" in source
+    assert "resume_download" not in source
