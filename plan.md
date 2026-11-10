@@ -70,3 +70,32 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 4. Add the separate GitHub Actions manual/weekly workflow.
 5. Run the complete existing test suite and inspect CI results.
 6. Update this plan with implementation status and open limitations before opening the pull request.
+
+
+## Implementation status (2026-11-11)
+
+### Completed on this branch
+
+- [x] Commit this plan before implementation.
+- [x] Add `scripts/audit_hf_voicebanks.py` for Hugging Face revision pinning, file selection, bounded downloads, safe extraction, dynamic voicebank discovery, audit aggregation, and sanitized reporting.
+- [x] Add tests for Hub file selection, unknown-size and download-limit rejection, archive path traversal/link/special-file rejection, extraction-size limits, nested voicebank discovery, symlink directory skipping, and report redaction.
+- [x] Add `.github/workflows/hf-utau-voicebank-audit.yml` with manual dispatch and weekly schedule.
+- [x] Keep the existing per-PR unit/integration workflow separate and unchanged.
+- [x] Document workflow operation and data-use boundaries in `docs/real_voicebank_validation.md`.
+- [x] CI green on Python 3.10 and Python 3.12: 563 tests passed in each matrix job.
+
+### Remaining verification
+
+- [ ] Run the workflow against the live `SEKOIA2900/VO-US` Hub repository and confirm its actual repository layout, file types, total selected size, and number of discoverable voicebank roots.
+- [ ] Review the live sanitized report and adjust limits or file-selection rules only if the dataset contents require it.
+
+The live Hub download has not yet been executed from this development session. The implementation resolves the requested revision and discovers file paths dynamically at workflow runtime; the actual dataset structure is therefore still a runtime verification item, not a claimed pass.
+
+### Current archive support and bounds
+
+- Supported archives: ZIP (including UAR when ZIP-compatible) and tar/tar.gz/tar.bz2/tar.xz/tgz/tbz2/txz.
+- RAR and 7z are not currently supported.
+- Default limits are 4096 MiB selected download and 8192 MiB extracted archive contents; maintainers can adjust these through manual workflow inputs.
+- The optional voicebank filter is applied after the selected files are downloaded; it narrows which discovered roots are audited, not the Hub download size.
+- Only aggregate counts and issue codes are uploaded. Raw audio, detailed parser reports, aliases, and sample filenames are not workflow artifacts.
+- The workflow performs technical auditing only. It does not infer or grant permission for machine-learning training or redistribution.
