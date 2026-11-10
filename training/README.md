@@ -54,3 +54,11 @@ The command validates the manifest and uses only records assigned to `train` for
 ## Reproducibility record
 
 For each run, preserve dataset identifiers and permission status (without private content), voicebank-level splits, label definition, feature version, alpha, package versions, metrics, artifact checksum, and known limitations. Do not upload copyrighted or restricted data to Kaggle unless the license and consent explicitly permit hosted processing.
+
+## Kaggle one-cell manifest discovery
+
+The repository notebook at `kaggle/Axral_Vocal_AI_OneCell.ipynb` downloads the dataset URL supplied in `HF_DATA_URL`, audits all discovered UTAU voicebanks, runs pytest, then searches the downloaded dataset for JSONL manifests. The recommended filename is `pitch_training_manifest.jsonl` (it may be nested under a dataset subdirectory).
+
+A manifest is eligible only when every row passes `training/validate_dataset.py --require-labeled`: schema version 1, explicit `permission_status: "approved"`, an approved provenance review, non-empty pitch-delta labels, finite values within ±2 semitones, and train/validation/test splits isolated by voicebank. Exactly one eligible manifest is required; zero or multiple candidates block training rather than choosing data implicitly. JSONL is expected to be UTF-8 and a UTF-8 BOM is accepted.
+
+The current command trains only the **metadata-only pitch-delta ridge MVP** using note context and pre-existing pitch-delta labels. It does not open UTAU WAV files, learn from waveform samples, synthesize singing, or use the Kaggle GPU. A voicebank archive containing only `oto.ini` and WAV samples does not provide aligned score-to-pitch-delta ground truth; such a dataset will be audited and tested, but model training will be reported as blocked. Do not manufacture labels to bypass this gate.
