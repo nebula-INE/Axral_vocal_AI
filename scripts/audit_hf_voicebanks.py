@@ -63,7 +63,8 @@ def is_relevant_voicebank_file(path: str) -> bool:
     )
 
 
-def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
+def select_relevant_files(entries: Iterable[Any], path_filter: str = "") -> list[HubFile]:
+    """Select relevant files, optionally restricting Hub paths before download."""
     selected: dict[str, HubFile] = {}
     for entry in entries:
         raw_path = _field(entry, "path")
@@ -71,6 +72,8 @@ def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
             continue
         path = _safe_repo_path(raw_path)
         if not is_relevant_voicebank_file(path):
+            continue
+        if path_filter and path_filter.casefold() not in path.casefold():
             continue
         size = _field(entry, "size")
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
@@ -88,7 +91,7 @@ def enforce_download_limit(files: Iterable[HubFile], maximum_bytes: int) -> int:
     return total
 
 
-def _safe_member_path(name: str) -> PurePosixPath:
+def _safe_member_path(name: str, *, allow_current_directory: bool = False) -> PurePosixPath:
     if not isinstance(name, str) or not name or "\x00" in name:
         raise AuditFailure("unsafe_archive_member")
     normalized = name.replace("\\", "/")
@@ -101,6 +104,8 @@ def _safe_member_path(name: str) -> PurePosixPath:
         raise AuditFailure("unsafe_archive_member")
     parts = tuple(part for part in path.parts if part not in {"", "."})
     if not parts:
+        if allow_current_directory and not path.is_absolute():
+            return PurePosixPath(".")
         raise AuditFailure("unsafe_archive_member")
     return PurePosixPath(*parts)
 
@@ -119,6 +124,7 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
     with zipfile.ZipFile(archive) as bundle:
         for info in bundle.infolist():
             if info.is_dir():
+                _safe_member_path(info.filename.rstrip("/") or ".", allow_current_directory=True)
                 continue
             relative = _safe_member_path(info.filename)
             mode = (info.external_attr >> 16) & 0o170000
@@ -148,9 +154,10 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
     total = 0
     with tarfile.open(archive, "r:*") as bundle:
         for member in bundle.getmembers():
-            relative = _safe_member_path(member.name.rstrip("/"))
             if member.isdir():
+                _safe_member_path(member.name.rstrip("/") or ".", allow_current_directory=True)
                 continue
+            relative = _safe_member_path(member.name)
             if not member.isfile():
                 raise AuditFailure("archive_link_or_special_file_rejected")
             key = relative.as_posix().casefold()
@@ -276,6 +283,7 @@ def _args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-id", default=DEFAULT_REPO_ID)
     parser.add_argument("--revision", default="main")
+    parser.add_argument("--file-path-filter", default="")
     parser.add_argument("--voicebank-filter", default="")
     parser.add_argument("--max-download-mb", type=int, default=4096)
     parser.add_argument("--max-extracted-mb", type=int, default=8192)
@@ -307,9 +315,10 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             args.repo_id, repo_type="dataset", revision=revision_sha,
             recursive=True, expand=False,
         )
-        selected = select_relevant_files(repo_files)
+        selected = select_relevant_files(repo_files, path_filter=args.file_path_filter)
         if not selected:
-            raise AuditFailure("no_relevant_voicebank_files")
+            code = "no_relevant_files_after_path_filter" if args.file_path_filter else "no_relevant_voicebank_files"
+            raise AuditFailure(code)
         total_download = enforce_download_limit(
             selected, args.max_download_mb * 1024 * 1024
         )
