@@ -83,7 +83,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Add `.github/workflows/hf-utau-voicebank-audit.yml` with manual dispatch and weekly schedule.
 - [x] Keep the existing per-PR unit/integration workflow separate and unchanged.
 - [x] Document workflow operation and data-use boundaries in `docs/real_voicebank_validation.md`.
-- [x] CI green on Python 3.10 and Python 3.12: 563 tests passed in each matrix job.
+- [x] CI green on Python 3.10 and Python 3.12: latest run passed 565 tests in each matrix job.
 
 ### Remaining verification
 
@@ -91,7 +91,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Add a pre-download Hub path filter so a maintainer can reduce the amount fetched before snapshot download.
 - [ ] Review the live sanitized report and adjust limits or file-selection rules only if the dataset contents require it.
 
-The live Hub download has not yet been executed from this development session. The implementation resolves the requested revision and discovers file paths dynamically at workflow runtime; the actual dataset structure is therefore still a runtime verification item, not a claimed pass.
+The live Hub download has not yet been executed from this development session. The current session cannot dispatch a workflow run, and the public Hub tree could not be fetched from this runtime. The workflow and script are covered by CI, but actual `VO-US` file layout, selected size, and voicebank count remain unverified until a maintainer runs the workflow after merging this PR. The implementation resolves the requested revision and discovers file paths dynamically at workflow runtime; this is not a claimed live-data pass.
 
 ### Current archive support and bounds
 
