@@ -19,3 +19,8 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "training/validate_dataset.py" in source
     assert "training/train_pitch_model.py" in source
     assert "resume_download" not in source
+    assert "scripts/kaggle_hf_download.py" in source
+    assert "download_summary.json" in source
+    assert "discover_voicebank_roots" in source
+    assert "snapshot_download" not in source  # download logic lives in the tested helper
+    assert 'if DATA_ROOT.exists(): shutil.rmtree(DATA_ROOT)' in source
