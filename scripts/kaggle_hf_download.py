@@ -258,6 +258,10 @@ def download_dataset(
     api = HfApi(token=token or None)
     info = api.dataset_info(repo_id, revision=requested_revision)
     revision = getattr(info, "sha", None)
+    card_data = _field(info, "cardData") or _field(info, "card_data")
+    dataset_card_license = _field(card_data, "license")
+    if not isinstance(dataset_card_license, str) or not dataset_card_license.strip():
+        dataset_card_license = None
     if not isinstance(revision, str) or not revision:
         raise DownloadAuditError("dataset_revision_unresolved")
     entries = api.list_repo_tree(
@@ -307,6 +311,7 @@ def download_dataset(
         "dataset": repo_id,
         "requested_revision": requested_revision,
         "resolved_revision": revision,
+        "dataset_card_license": dataset_card_license,
         "selected_files": len(selected),
         "download_bytes": download_bytes,
         "archives_found": len(archives),
