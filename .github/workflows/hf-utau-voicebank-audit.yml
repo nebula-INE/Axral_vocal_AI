@@ -8,8 +8,13 @@ on:
         required: false
         default: main
         type: string
+      file_path_filter:
+        description: Optional case-insensitive substring filter applied to Hub paths before download
+        required: false
+        default: ""
+        type: string
       voicebank_filter:
-        description: Optional substring filter for discovered voicebank directories
+        description: Optional substring filter for discovered voicebank directories after download
         required: false
         default: ""
         type: string
@@ -50,6 +55,7 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       AUDIT_REVISION: ${{ github.event.inputs.revision || 'main' }}
+      AUDIT_FILE_FILTER: ${{ github.event.inputs.file_path_filter || '' }}
       AUDIT_FILTER: ${{ github.event.inputs.voicebank_filter || '' }}
       MAX_DOWNLOAD_MB: ${{ github.event.inputs.max_download_mb || '4096' }}
       MAX_EXTRACTED_MB: ${{ github.event.inputs.max_extracted_mb || '8192' }}
@@ -74,7 +80,7 @@ jobs:
         id: audit
         continue-on-error: true
         run: |
-          python scripts/audit_hf_voicebanks.py --repo-id "SEKOIA2900/VO-US" --revision "$AUDIT_REVISION" --voicebank-filter "$AUDIT_FILTER" --max-download-mb "$MAX_DOWNLOAD_MB" --max-extracted-mb "$MAX_EXTRACTED_MB" --fail-on "$FAIL_ON" --output-dir "artifacts/hf-voicebank-audit"
+          python scripts/audit_hf_voicebanks.py --repo-id "SEKOIA2900/VO-US" --revision "$AUDIT_REVISION" --file-path-filter "$AUDIT_FILE_FILTER" --voicebank-filter "$AUDIT_FILTER" --max-download-mb "$MAX_DOWNLOAD_MB" --max-extracted-mb "$MAX_EXTRACTED_MB" --fail-on "$FAIL_ON" --output-dir "artifacts/hf-voicebank-audit"
 
       - name: Upload sanitized audit summary
         if: always() && hashFiles('artifacts/hf-voicebank-audit/summary.json') != ''
