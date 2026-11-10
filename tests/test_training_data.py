@@ -125,7 +125,7 @@ def test_jsonl_cli_core_reads_metadata_without_audio(tmp_path):
 def test_jsonl_reader_accepts_utf8_bom(tmp_path):
     manifest = tmp_path / "manifest.jsonl"
     row = make_record("bom-row", "bank-bom", "train", target=make_target())
-    manifest.write_text("\\ufeff" + json.dumps(row) + "\\n", encoding="utf-8")
+    manifest.write_text("\ufeff" + json.dumps(row) + "\n", encoding="utf-8")
 
     summary = validate_jsonl(manifest)
 
