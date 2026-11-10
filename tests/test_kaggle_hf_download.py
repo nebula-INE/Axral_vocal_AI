@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+import sys
 import tarfile
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -11,6 +13,7 @@ from scripts.kaggle_hf_download import (
     DownloadAuditError,
     HubFile,
     discover_voicebank_roots,
+    download_dataset,
     enforce_download_limit,
     parse_dataset_url,
     safe_extract_archive,
@@ -106,3 +109,57 @@ def test_extract_zip_enforces_actual_extracted_byte_limit(tmp_path):
         bundle.writestr("voice/large.wav", b"x" * 2048)
     with pytest.raises(DownloadAuditError, match="extracted_size_limit_exceeded"):
         safe_extract_archive(archive, tmp_path / "out", 1024)
+
+
+def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_path, monkeypatch):
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w") as bundle:
+        bundle.writestr("Voice/oto.ini", "a.wav=a,0,0,0,0,0\n")
+        bundle.writestr("Voice/a.wav", b"RIFF")
+    archive_bytes = archive_buffer.getvalue()
+    calls = {}
+
+    class FakeApi:
+        def __init__(self, token=None):
+            calls["token"] = token
+
+        def dataset_info(self, repo_id, revision):
+            calls["dataset_info"] = (repo_id, revision)
+            return SimpleNamespace(sha="abc123")
+
+        def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
+            calls["list_repo_tree"] = (repo_id, repo_type, revision, recursive, expand)
+            return [
+                {"path": "voicebank.zip", "size": len(archive_bytes)},
+                {"path": "README.md", "size": 50},
+            ]
+
+    def fake_snapshot_download(**kwargs):
+        calls["snapshot_download"] = kwargs
+        target = Path(kwargs["local_dir"]) / "voicebank.zip"
+        target.write_bytes(archive_bytes)
+        return str(kwargs["local_dir"])
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeApi, snapshot_download=fake_snapshot_download),
+    )
+
+    result = download_dataset(
+        "https://huggingface.co/datasets/SEKOIA2900/VO-US/tree/main",
+        tmp_path / "dataset",
+        token="private-token",
+        max_download_mb=1,
+        max_extracted_mb=1,
+    )
+
+    assert calls["token"] == "private-token"
+    assert calls["dataset_info"] == ("SEKOIA2900/VO-US", "main")
+    assert calls["list_repo_tree"] == ("SEKOIA2900/VO-US", "dataset", "abc123", True, False)
+    assert calls["snapshot_download"]["revision"] == "abc123"
+    assert calls["snapshot_download"]["allow_patterns"] == ["voicebank.zip"]
+    assert result["resolved_revision"] == "abc123"
+    assert result["voicebank_roots"] == 1
+    assert result["status"] == "completed"
+    assert (tmp_path / "dataset" / "download_summary.json").is_file()
