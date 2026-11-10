@@ -85,3 +85,23 @@ A bank should not be marked compatible merely because the CLI exits 0. Compatibi
 - This is a filesystem, metadata, and signal audit. It does not prove pronunciation correctness, phoneme segmentation, oto timing quality, or rendering equivalence.
 - The CLI does not modify voicebanks and does not render audio.
 - Keep VO-SE_vocal/WORLD rendering behavior as the source of truth. Any renderer change requires a separate reviewed task.
+
+
+## 6. GitHub Actions audit from Hugging Face
+
+The repository workflow `.github/workflows/hf-utau-voicebank-audit.yml` audits the Hugging Face dataset `SEKOIA2900/VO-US` without placing source voicebank data in Git.
+
+Run it manually from **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**, or allow its weekly schedule after the workflow has been merged to the default branch. The workflow resolves the requested Hub revision to a commit SHA and records that SHA in its report.
+
+Manual inputs:
+- `revision`: Hub branch, tag, or commit SHA; default `main`.
+- `voicebank_filter`: optional case-insensitive substring matched against discovered bank directories. This filters which discovered roots are audited; it does not reduce the Hub download selection.
+- `max_download_mb`: pre-download limit for selected archive/metadata/WAV files; default 4096 MiB.
+- `max_extracted_mb`: aggregate uncompressed archive limit; default 8192 MiB.
+- `fail_on`: `error` (default), `warning`, or `never`.
+
+The downloader selects supported ZIP/UAR and tar archives plus standalone `oto.ini`, `prefix.map`, and WAV files. ZIP/tar members that are absolute, escape the extraction root, or represent links/special files are rejected. Archive extraction runs in a temporary directory and its contents are deleted when the job ends.
+
+The CLI audit is read-only. The Actions artifact and step summary contain only aggregate counts and issue codes; detailed JSON containing aliases, filenames, and paths is deliberately not uploaded. WAVs, extracted voicebanks, and detailed parser output remain on the ephemeral runner.
+
+This workflow is a parser/filesystem/signal audit only. It does not infer ML training permission, generate training labels, train a model, or establish rendering compatibility. Confirm each voicebank's own terms before any separate training or redistribution use. The default public Hub request does not require a token; a repository secret named `HF_TOKEN` can be provided for gated access.
