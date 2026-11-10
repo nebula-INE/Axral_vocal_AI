@@ -125,7 +125,7 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
 
         def dataset_info(self, repo_id, revision):
             calls["dataset_info"] = (repo_id, revision)
-            return SimpleNamespace(sha="abc123")
+            return SimpleNamespace(sha="abc123", cardData={"license": "cc-by-4.0"})
 
         def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
             calls["list_repo_tree"] = (repo_id, repo_type, revision, recursive, expand)
@@ -160,6 +160,7 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
     assert calls["snapshot_download"]["revision"] == "abc123"
     assert calls["snapshot_download"]["allow_patterns"] == ["voicebank.zip"]
     assert result["resolved_revision"] == "abc123"
+    assert result["dataset_card_license"] == "cc-by-4.0"
     assert result["voicebank_roots"] == 1
     assert result["status"] == "completed"
     assert (tmp_path / "dataset" / "download_summary.json").is_file()
