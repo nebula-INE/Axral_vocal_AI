@@ -95,7 +95,8 @@ Run it manually from **Actions → Hugging Face UTAU Voicebank Audit → Run wor
 
 Manual inputs:
 - `revision`: Hub branch, tag, or commit SHA; default `main`.
-- `voicebank_filter`: optional case-insensitive substring matched against discovered bank directories. This filters which discovered roots are audited; it does not reduce the Hub download selection.
+- `file_path_filter`: optional case-insensitive substring matched against Hugging Face file paths before download, reducing the selected bytes. Use a path fragment present in the Hub repository (for example a bank folder or archive name).
+- `voicebank_filter`: optional case-insensitive substring matched against discovered bank directories after extraction. This narrows audited roots but does not reduce the download selection.
 - `max_download_mb`: pre-download limit for selected archive/metadata/WAV files; default 4096 MiB.
 - `max_extracted_mb`: aggregate uncompressed archive limit; default 8192 MiB.
 - `fail_on`: `error` (default), `warning`, or `never`.
