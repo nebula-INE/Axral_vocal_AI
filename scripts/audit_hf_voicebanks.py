@@ -117,6 +117,24 @@ def _safe_destination(root: Path, relative: PurePosixPath) -> Path:
     return destination
 
 
+
+def _copy_bounded(source: Any, output: Any, maximum_bytes: int, expected_bytes: int) -> int:
+    """Copy a member while enforcing actual decompressed bytes, not only headers."""
+    copied = 0
+    while True:
+        remaining = maximum_bytes - copied
+        chunk = source.read(min(1024 * 1024, remaining + 1))
+        if not chunk:
+            break
+        copied += len(chunk)
+        if copied > maximum_bytes or copied > expected_bytes:
+            raise AuditFailure("extracted_size_limit_exceeded")
+        output.write(chunk)
+    if copied != expected_bytes:
+        raise AuditFailure("archive_member_size_mismatch")
+    return copied
+
+
 def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
     entries: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
     seen: set[str] = set()
@@ -143,8 +161,7 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
             target = _safe_destination(root, relative)
             target.parent.mkdir(parents=True, exist_ok=True)
             with bundle.open(info) as source, target.open("xb") as output:
-                shutil.copyfileobj(source, output, length=1024 * 1024)
-                written += info.file_size
+                written += _copy_bounded(source, output, max_bytes - written, info.file_size)
     return written
 
 
@@ -176,8 +193,7 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
             if source is None:
                 raise AuditFailure("archive_member_read_failed")
             with source, target.open("xb") as output:
-                shutil.copyfileobj(source, output, length=1024 * 1024)
-                written += member.size
+                written += _copy_bounded(source, output, max_bytes - written, member.size)
     return written
 
 
