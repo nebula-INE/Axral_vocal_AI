@@ -33,6 +33,12 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        # Prevent a successful run from replacing its own input manifest with
+        # the model report. resolve() also catches equivalent relative paths
+        # and existing symlink targets before any output is written.
+        if args.manifest.resolve() == args.output.resolve():
+            raise ValueError("output path must differ from manifest path")
+
         summary = validate_jsonl(args.manifest, require_labeled=True)
         with args.manifest.open("r", encoding="utf-8") as stream:
             records = [json.loads(line) for line in stream if line.strip() and not line.lstrip().startswith("#")]
