@@ -79,6 +79,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Commit this plan before implementation.
 - [x] Add `scripts/audit_hf_voicebanks.py` for Hugging Face revision pinning, file selection, bounded downloads, safe extraction, dynamic voicebank discovery, audit aggregation, and sanitized reporting.
 - [x] Add tests for Hub file selection, pre-download path filtering, unknown-size and download-limit rejection, archive path traversal/link/special-file rejection, extraction-size limits, common tar `./` root directory entries, nested voicebank discovery, symlink directory skipping, and report redaction.
+- [x] Enforce the actual decompressed byte count while streaming archive members, rather than trusting archive size headers alone.
 - [x] Add `.github/workflows/hf-utau-voicebank-audit.yml` with manual dispatch and weekly schedule.
 - [x] Keep the existing per-PR unit/integration workflow separate and unchanged.
 - [x] Document workflow operation and data-use boundaries in `docs/real_voicebank_validation.md`.
