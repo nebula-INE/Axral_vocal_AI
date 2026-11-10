@@ -200,7 +200,7 @@ def validate_jsonl(path: str | Path, require_labeled: bool = False) -> dict[str,
     manifest_path = Path(path)
     records: list[Any] = []
     try:
-        with manifest_path.open("r", encoding="utf-8") as stream:
+        with manifest_path.open("r", encoding="utf-8-sig") as stream:
             for line_number, line in enumerate(stream, start=1):
                 if not line.strip() or line.lstrip().startswith("#"):
                     continue
