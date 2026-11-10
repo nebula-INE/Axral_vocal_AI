@@ -37,6 +37,18 @@ def test_file_selection_keeps_archives_utau_metadata_and_wav_only():
     assert sum(item.size for item in selected) == 3192
 
 
+def test_file_path_filter_is_applied_before_download_selection():
+    rows = [
+        {"path": "banks/tsukuyomi/voice.zip", "size": 100},
+        {"path": "banks/other/voice.zip", "size": 200},
+        {"path": "banks/tsukuyomi/oto.ini", "size": 10},
+    ]
+    selected = select_relevant_files(rows, path_filter="tsukuyomi")
+    assert [item.path for item in selected] == [
+        "banks/tsukuyomi/oto.ini", "banks/tsukuyomi/voice.zip"
+    ]
+
+
 @pytest.mark.parametrize("path", ["../escape.wav", "/absolute.wav", "C:\\escape.wav", ""])
 def test_selection_rejects_unsafe_hub_paths(path):
     with pytest.raises(AuditFailure):
@@ -92,6 +104,22 @@ def test_zip_extraction_rejects_symlinks(tmp_path):
         bundle.writestr(info, "../../outside.wav")
     with pytest.raises(AuditFailure, match="archive_link_rejected"):
         safe_extract_archive(archive, tmp_path / "out", 1024)
+
+
+def test_tar_extraction_accepts_common_dot_root_directory_entry(tmp_path):
+    archive = tmp_path / "voice.tar"
+    with tarfile.open(archive, "w") as bundle:
+        root_entry = tarfile.TarInfo("./")
+        root_entry.type = tarfile.DIRTYPE
+        bundle.addfile(root_entry)
+        contents = b"sample.wav=\xe3\x81\x82,0,100,-100,20,10"
+        member = tarfile.TarInfo("./voice/oto.ini")
+        member.size = len(contents)
+        bundle.addfile(member, io.BytesIO(contents))
+    destination = tmp_path / "out"
+    written = safe_extract_archive(archive, destination, 1024)
+    assert written == len(contents)
+    assert (destination / "voice" / "oto.ini").read_bytes() == contents
 
 
 def test_tar_extraction_rejects_links(tmp_path):
