@@ -1,0 +1,94 @@
+name: Hugging Face UTAU Voicebank Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Hugging Face dataset branch, tag, or commit SHA
+        required: false
+        default: main
+        type: string
+      voicebank_filter:
+        description: Optional substring filter for discovered voicebank directories
+        required: false
+        default: ""
+        type: string
+      max_download_mb:
+        description: Maximum selected download size in MiB
+        required: true
+        default: "4096"
+        type: string
+      max_extracted_mb:
+        description: Maximum total extracted archive size in MiB
+        required: true
+        default: "8192"
+        type: string
+      fail_on:
+        description: Fail after all banks are audited when findings meet this threshold
+        required: true
+        default: error
+        type: choice
+        options:
+          - error
+          - warning
+          - never
+  schedule:
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-utau-voicebank-audit-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit VO-US UTAU voicebanks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      AUDIT_REVISION: ${{ github.event.inputs.revision || 'main' }}
+      AUDIT_FILTER: ${{ github.event.inputs.voicebank_filter || '' }}
+      MAX_DOWNLOAD_MB: ${{ github.event.inputs.max_download_mb || '4096' }}
+      MAX_EXTRACTED_MB: ${{ github.event.inputs.max_extracted_mb || '8192' }}
+      FAIL_ON: ${{ github.event.inputs.fail_on || 'error' }}
+    steps:
+      - name: Check out Axral Vocal AI
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project and Hugging Face client
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install "huggingface_hub>=0.30,<2"
+
+      - name: Download and audit VO-US
+        id: audit
+        continue-on-error: true
+        run: |
+          python scripts/audit_hf_voicebanks.py --repo-id "SEKOIA2900/VO-US" --revision "$AUDIT_REVISION" --voicebank-filter "$AUDIT_FILTER" --max-download-mb "$MAX_DOWNLOAD_MB" --max-extracted-mb "$MAX_EXTRACTED_MB" --fail-on "$FAIL_ON" --output-dir "artifacts/hf-voicebank-audit"
+
+      - name: Upload sanitized audit summary
+        if: always() && hashFiles('artifacts/hf-voicebank-audit/summary.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: hf-utau-voicebank-audit
+          path: |
+            artifacts/hf-voicebank-audit/summary.json
+            artifacts/hf-voicebank-audit/summary.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Apply audit result
+        if: always() && steps.audit.outcome == 'failure'
+        run: |
+          echo "Voicebank audit failed. See the sanitized summary artifact and job summary."
+          exit 1
