@@ -47,3 +47,16 @@ The CLI inventories `oto.ini` and `prefix.map`, checks referenced WAV paths and 
 - `models/`: model manifests and documentation; large model artifacts should use an explicit artifact-storage policy
 
 The exact structure may evolve after the initial code audit. Avoid duplicating existing VO-SE_vocal functionality until its interfaces have been reviewed.
+
+
+## Hugging Face real voicebank audit
+
+Axral Vocal AI can audit selected UTAU voicebanks directly from the Hugging Face dataset `SEKOIA2900/VO-US` through a separate GitHub Actions workflow:
+
+- Workflow: `.github/workflows/hf-utau-voicebank-audit.yml`
+- Run: **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**
+- The workflow also supports a weekly scheduled audit after it is merged to the default branch.
+- It resolves the dataset revision to a commit SHA, applies an optional Hub path filter before downloading, checks archive size limits, safely extracts supported ZIP/UAR and tar archives, discovers `oto.ini` roots, and runs the existing read-only audit.
+- Only sanitized aggregate reports are uploaded. Raw WAVs and detailed aliases/paths stay on the ephemeral runner.
+
+See [Real UTAU Voicebank Validation Gate](docs/real_voicebank_validation.md) and [plan.md](plan.md) for inputs, limits, supported formats, and the remaining live-data verification step. This workflow performs technical auditing only; machine-learning training and redistribution permissions must be reviewed separately.
