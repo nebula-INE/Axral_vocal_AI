@@ -330,12 +330,22 @@ def main() -> int:
     parser.add_argument("--max-download-mb", type=int, default=DEFAULT_MAX_DOWNLOAD_MB)
     parser.add_argument("--max-extracted-mb", type=int, default=DEFAULT_MAX_EXTRACTED_MB)
     args = parser.parse_args()
-    summary = download_dataset(
-        args.dataset_url, args.output_dir,
-        token=os.environ.get("HF_TOKEN"),
-        max_download_mb=args.max_download_mb,
-        max_extracted_mb=args.max_extracted_mb,
-    )
+    try:
+        summary = download_dataset(
+            args.dataset_url, args.output_dir,
+            token=os.environ.get("HF_TOKEN"),
+            max_download_mb=args.max_download_mb,
+            max_extracted_mb=args.max_extracted_mb,
+        )
+    except DownloadAuditError as exc:
+        print(json.dumps({"status": "failed", "error_code": str(exc)}, ensure_ascii=False))
+        return 2
+    except Exception as exc:
+        print(json.dumps({
+            "status": "failed",
+            "error_code": f"unexpected_{type(exc).__name__.lower()}",
+        }, ensure_ascii=False))
+        return 2
     print(json.dumps(summary, ensure_ascii=False))
     return 0
 
