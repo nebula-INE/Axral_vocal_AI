@@ -32,7 +32,7 @@ def test_file_selection_keeps_archives_utau_metadata_and_wav_only():
     ]
     selected = select_relevant_files(rows)
     assert [item.path for item in selected] == [
-        "banks/raw/PREFIX.MAP", "banks/raw/a.WAV", "banks/raw/oto.ini", "banks/voice.zip"
+        "banks/raw/a.WAV", "banks/raw/oto.ini", "banks/raw/PREFIX.MAP", "banks/voice.zip"
     ]
     assert sum(item.size for item in selected) == 3192
 
