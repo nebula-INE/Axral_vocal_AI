@@ -305,7 +305,7 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         summary["resolved_revision"] = revision_sha
         repo_files = api.list_repo_tree(
             args.repo_id, repo_type="dataset", revision=revision_sha,
-            recursive=True, expand=True,
+            recursive=True, expand=False,
         )
         selected = select_relevant_files(repo_files)
         if not selected:
@@ -346,10 +346,11 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 destination = extract_root / f"{index:04d}_{safe_name}"
                 try:
                     extracted_size += safe_extract_archive(archive, destination, remaining)
-                except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile, AuditFailure):
+                except Exception:
                     archive_errors += 1
 
             voicebank_roots = discover_voicebank_roots(download_root, extract_root)
+            summary["archive_errors"] = archive_errors
             if args.voicebank_filter:
                 needle = args.voicebank_filter.casefold()
                 voicebank_roots = [
