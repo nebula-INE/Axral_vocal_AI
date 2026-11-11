@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+import stat
 import sys
 import tarfile
 from types import SimpleNamespace
@@ -55,9 +56,9 @@ def test_select_relevant_files_includes_utau_files_and_jsonl_but_skips_directori
     selected = select_relevant_files(entries)
     assert {item.path for item in selected} == {
         "banks/voice.zip", "banks/raw/oto.ini", "banks/raw/prefix.map",
-        "banks/raw/a.wav", "labels/pitch_training_manifest.jsonl",
+        "banks/raw/a.wav", "labels/pitch_training_manifest.jsonl", "docs/README.md",
     }
-    assert sum(item.size for item in selected) == 3704
+    assert sum(item.size for item in selected) == 3724
 
 
 def test_select_relevant_files_rejects_traversal():
@@ -138,6 +139,8 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
         calls["snapshot_download"] = kwargs
         target = Path(kwargs["local_dir"]) / "voicebank.zip"
         target.write_bytes(archive_bytes)
+        readme = Path(kwargs["local_dir"]) / "README.md"
+        readme.write_text("---\\nlicense: cc-by-4.0\\n---\\nDataset card", encoding="utf-8")
         return str(kwargs["local_dir"])
 
     monkeypatch.setitem(
@@ -162,5 +165,47 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
     assert result["resolved_revision"] == "abc123"
     assert result["dataset_card_license"] == "cc-by-4.0"
     assert result["voicebank_roots"] == 1
+    assert result["license_documents"] == [{
+        "source_root": "downloads",
+        "path": "README.md",
+        "size_bytes": 48,
+        "sha256": __import__("hashlib").sha256(
+            b"---\\nlicense: cc-by-4.0\\n---\\nDataset card"
+        ).hexdigest(),
+    }]
     assert result["status"] == "completed"
     assert (tmp_path / "dataset" / "download_summary.json").is_file()
+
+
+def test_extract_zip_rejects_symlink(tmp_path):
+    archive = tmp_path / "link.zip"
+    link = zipfile.ZipInfo("Voice/link")
+    link.create_system = 3
+    link.external_attr = (stat.S_IFLNK | 0o777) << 16
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr(link, "../../outside")
+    with pytest.raises(DownloadAuditError, match="archive_link_or_special_file_rejected"):
+        safe_extract_archive(archive, tmp_path / "out", 1024)
+    assert not (tmp_path / "out").exists()
+
+
+def test_extract_zip_rejects_case_insensitive_duplicate_members(tmp_path):
+    archive = tmp_path / "duplicate.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("Voice/oto.ini", "first")
+        bundle.writestr("voice/OTO.INI", "second")
+    with pytest.raises(DownloadAuditError, match="archive_duplicate_path"):
+        safe_extract_archive(archive, tmp_path / "out", 1024)
+    assert not (tmp_path / "out").exists()
+
+
+def test_extract_tar_rejects_hardlink(tmp_path):
+    archive = tmp_path / "hardlink.tar"
+    with tarfile.open(archive, "w") as bundle:
+        info = tarfile.TarInfo("Voice/hardlink")
+        info.type = tarfile.LNKTYPE
+        info.linkname = "Voice/oto.ini"
+        bundle.addfile(info)
+    with pytest.raises(DownloadAuditError, match="archive_link_or_special_file_rejected"):
+        safe_extract_archive(archive, tmp_path / "out", 1024)
+    assert not (tmp_path / "out").exists()
