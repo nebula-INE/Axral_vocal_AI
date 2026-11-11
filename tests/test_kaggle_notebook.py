@@ -28,6 +28,9 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "shutil.rmtree(DATA_ROOT, ignore_errors=True)" in source
     assert "TEMP_DATA_CLEANED" in source
     assert "sanitize_dataset_paths" in source
+    assert "redact_output=False" in source
+    assert "detailed dataset output suppressed" in source
+    assert "output_tail=0, redact_output=True" in source
     assert "re.escape(str(DATA_ROOT))" in source and '"<dataset-path>"' in source
     assert 'r"[^\\r\\n]*"' in source  # redact full paths even when they contain spaces
     assert 'audit_dir = DATA_ROOT / "audit_reports"' in source
