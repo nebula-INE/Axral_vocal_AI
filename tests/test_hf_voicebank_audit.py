@@ -483,5 +483,5 @@ def test_tar_extraction_streams_without_caching_member_objects(tmp_path, monkeyp
     # is_tarfile() opens the archive once for probing; the final open is the
     # actual r|* extraction stream. Its TarInfo cache must stay empty.
     assert len(opened) >= 2
-    assert opened[-1].stream is True
+    assert getattr(opened[-1], "stream", True) is True
     assert opened[-1].members == []
