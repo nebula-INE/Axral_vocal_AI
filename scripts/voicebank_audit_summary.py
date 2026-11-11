@@ -107,14 +107,13 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
             return {}
         result: dict[str, object] = {}
         for key, item in value.items():
-            if isinstance(key, str) and (
-                item is None
-                or (
-                    isinstance(item, (int, float))
-                    and not isinstance(item, bool)
-                    and math.isfinite(float(item))
-                )
-            ):
+            finite_number = False
+            if isinstance(item, (int, float)) and not isinstance(item, bool):
+                try:
+                    finite_number = math.isfinite(item)
+                except (OverflowError, TypeError, ValueError):
+                    finite_number = False
+            if isinstance(key, str) and (item is None or finite_number):
                 result[key] = item
         return result
 
