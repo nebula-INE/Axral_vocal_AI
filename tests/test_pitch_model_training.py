@@ -1,4 +1,8 @@
+import json
 import math
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -263,6 +267,40 @@ def test_non_overlapping_note_context_still_resolves_at_shared_boundary():
     assert features is not None
     assert features[1] == pytest.approx(72 / 127)
     assert features[2] == pytest.approx(0.0)
+
+
+def test_pitch_training_cli_streams_a_validated_jsonl_manifest(tmp_path):
+    rows = synthetic_records()
+    manifest = tmp_path / "pitch_training_manifest.jsonl"
+    report_path = tmp_path / "pitch_report.json"
+    manifest.write_text(
+        chr(10).join(json.dumps(row, ensure_ascii=False) for row in rows) + chr(10),
+        encoding="utf-8",
+    )
+
+    repository_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repository_root / "training" / "train_pitch_model.py"),
+            str(manifest),
+            "--output",
+            str(report_path),
+            "--evaluate-test",
+        ],
+        cwd=repository_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["manifest_validation"]["records"] == 4
+    assert report["test_evaluation_included"] is True
+    assert set(report["evaluation_by_split"]) == {"train", "validation", "test"}
+    assert report["usable_examples_by_split"]["train"] == 6
 
 
 def test_training_examples_accept_one_pass_record_iterators():
