@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass
+from hashlib import sha256
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -65,6 +66,15 @@ def _safe_hub_path(value: Any) -> str:
     return path.as_posix()
 
 
+def _is_license_document_name(name: str) -> bool:
+    lowered = name.casefold()
+    return (
+        lowered == "readme.md"
+        or lowered in {"license", "copying", "notice"}
+        or lowered.startswith(("license.", "license-", "copying.", "copying-", "notice.", "notice-"))
+    )
+
+
 def _is_relevant(path: str) -> bool:
     lowered = path.casefold()
     name = PurePosixPath(lowered).name
@@ -72,7 +82,32 @@ def _is_relevant(path: str) -> bool:
         any(lowered.endswith(suffix) for suffix in ARCHIVE_SUFFIXES)
         or name in {"oto.ini", "prefix.map"}
         or PurePosixPath(lowered).suffix in {".wav", ".jsonl"}
+        or _is_license_document_name(name)
     )
+
+
+def collect_license_document_metadata(*scan_roots: Path) -> list[dict[str, Any]]:
+    """Index README/license documents without treating their presence as permission."""
+    records: list[dict[str, Any]] = []
+    for scan_root in scan_roots:
+        if not scan_root.exists():
+            continue
+        for path in sorted(scan_root.rglob("*"), key=lambda item: item.as_posix().casefold()):
+            if path.is_symlink() or not path.is_file() or not _is_license_document_name(path.name):
+                continue
+            digest = sha256()
+            size = 0
+            with path.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    size += len(chunk)
+                    digest.update(chunk)
+            records.append({
+                "source_root": scan_root.name,
+                "path": path.relative_to(scan_root).as_posix(),
+                "size_bytes": size,
+                "sha256": digest.hexdigest(),
+            })
+    return records
 
 
 def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
@@ -307,11 +342,13 @@ def download_dataset(
             archive_errors.append(code)
 
     roots = discover_voicebank_roots(download_dir, extracted_dir)
+    license_documents = collect_license_document_metadata(download_dir, extracted_dir)
     summary = {
         "dataset": repo_id,
         "requested_revision": requested_revision,
         "resolved_revision": revision,
         "dataset_card_license": dataset_card_license,
+        "license_documents": license_documents,
         "selected_files": len(selected),
         "download_bytes": download_bytes,
         "archives_found": len(archives),
