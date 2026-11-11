@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 from pathlib import Path
 import stat
 import sys
@@ -161,15 +162,15 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
     assert calls["dataset_info"] == ("SEKOIA2900/VO-US", "main")
     assert calls["list_repo_tree"] == ("SEKOIA2900/VO-US", "dataset", "abc123", True, False)
     assert calls["snapshot_download"]["revision"] == "abc123"
-    assert calls["snapshot_download"]["allow_patterns"] == ["voicebank.zip"]
+    assert calls["snapshot_download"]["allow_patterns"] == ["README.md", "voicebank.zip"]
     assert result["resolved_revision"] == "abc123"
     assert result["dataset_card_license"] == "cc-by-4.0"
     assert result["voicebank_roots"] == 1
     assert result["license_documents"] == [{
         "source_root": "downloads",
         "path": "README.md",
-        "size_bytes": 48,
-        "sha256": __import__("hashlib").sha256(
+        "size_bytes": 39,
+        "sha256": hashlib.sha256(
             b"---\\nlicense: cc-by-4.0\\n---\\nDataset card"
         ).hexdigest(),
     }]
