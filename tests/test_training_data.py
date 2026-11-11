@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import axral_vocal_ai.training_data as training_data
 from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl, validate_records
 
 
@@ -311,3 +312,61 @@ def test_manifest_rejects_numeric_values_that_overflow_float_conversion():
 
     with pytest.raises(DatasetValidationError, match="must be finite"):
         validate_records([record])
+
+
+def test_validate_jsonl_passes_a_streaming_iterator_to_record_validation(tmp_path, monkeypatch):
+    manifest = tmp_path / "streamed.jsonl"
+    rows = [
+        make_record("train", "bank-a", "train", target=make_target()),
+        make_record("validation", "bank-b", "validation", target=make_target()),
+        make_record("test", "bank-c", "test", target=make_target()),
+    ]
+    manifest.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\\n" for row in rows),
+        encoding="utf-8",
+    )
+    original = training_data.validate_records
+    observed = {}
+
+    def inspect_iterator(records, require_labeled=False):
+        observed["is_list"] = isinstance(records, list)
+        observed["is_iterator"] = iter(records) is records
+        return original(records, require_labeled=require_labeled)
+
+    monkeypatch.setattr(training_data, "validate_records", inspect_iterator)
+
+    summary = validate_jsonl(manifest, require_labeled=True)
+
+    assert observed == {"is_list": False, "is_iterator": True}
+    assert summary["records"] == 3
+
+
+def test_jsonl_reader_rejects_oversized_manifest_before_parsing(tmp_path, monkeypatch):
+    manifest = tmp_path / "oversized.jsonl"
+    manifest.write_text(" " * 32, encoding="utf-8")
+    monkeypatch.setattr(training_data, "MAX_MANIFEST_BYTES", 16)
+
+    with pytest.raises(DatasetValidationError, match="manifest byte limit exceeded"):
+        validate_jsonl(manifest)
+
+
+def test_jsonl_reader_rejects_oversized_single_line(tmp_path, monkeypatch):
+    manifest = tmp_path / "long-line.jsonl"
+    manifest.write_text(json.dumps(make_record()) + "\\n", encoding="utf-8")
+    monkeypatch.setattr(training_data, "MAX_MANIFEST_BYTES", 1024 * 1024)
+    monkeypatch.setattr(training_data, "MAX_JSONL_LINE_BYTES", 64)
+
+    with pytest.raises(DatasetValidationError, match="JSONL line byte limit exceeded"):
+        validate_jsonl(manifest)
+
+
+def test_manifest_record_count_is_bounded_for_stream_and_iterable(monkeypatch):
+    monkeypatch.setattr(training_data, "MAX_MANIFEST_RECORDS", 2)
+    rows = [
+        make_record("one", "bank-a", "train"),
+        make_record("two", "bank-b", "validation"),
+        make_record("three", "bank-c", "test"),
+    ]
+
+    with pytest.raises(DatasetValidationError, match="manifest record limit exceeded"):
+        validate_records(iter(rows))
