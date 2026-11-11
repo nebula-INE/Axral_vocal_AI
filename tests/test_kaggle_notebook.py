@@ -46,7 +46,7 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert '"manifest_index": manifest_index' in source
     assert "artifact_files = [" in source
     assert 'OUT / "voicebank_audit_summary.json"' in source
-    assert 'OUT / "models" / "pitch_delta_report.json"' in source
+    assert 'OUT / "models" / "pitch_delta_metrics.json"' in source
     assert 'for artifact in OUT.rglob("*")' not in source
     assert 'OUT / "audits"' not in source
     assert source.index("TEMP_DATA_CLEANED") < source.index("with zipfile.ZipFile(archive")
