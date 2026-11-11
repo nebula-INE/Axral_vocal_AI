@@ -30,9 +30,9 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert '"audit_failures": audit_failures' in source
     assert '(OUT / "download_summary.json").write_text' in source
     assert "license/readme documents indexed" in source
-    assert "git status --porcelain" in source
-    assert "git fetch" in source
-    assert "git reset --hard FETCH_HEAD" in source
+    assert '["git", "status", "--porcelain"]' in source
+    assert '["git", "fetch", "--depth", "1", "origin", "main"]' in source
+    assert '["git", "reset", "--hard", "FETCH_HEAD"]' in source
     assert "local changes" in source
     assert "source_commit" in source
     assert 'p.suffix.casefold() == ".jsonl"' in source
