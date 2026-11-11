@@ -373,9 +373,9 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         api = HfApi(token=os.environ.get("HF_TOKEN") or None)
         info = api.dataset_info(args.repo_id, revision=args.revision)
         revision_sha = getattr(info, "sha", None)
-        if not isinstance(revision_sha, str) or not revision_sha:
+        if not isinstance(revision_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", revision_sha):
             raise AuditFailure("dataset_revision_unresolved")
-        summary["resolved_revision"] = revision_sha
+        summary["resolved_revision"] = revision_sha.lower()
         repo_files = api.list_repo_tree(
             args.repo_id, repo_type="dataset", revision=revision_sha,
             recursive=True, expand=False,
