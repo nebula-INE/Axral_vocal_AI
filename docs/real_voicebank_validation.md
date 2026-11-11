@@ -94,7 +94,7 @@ The repository workflow `.github/workflows/hf-utau-voicebank-audit.yml` audits t
 Run it manually from **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**, or allow its weekly schedule after the workflow has been merged to the default branch. The workflow resolves the requested Hub revision to a commit SHA and records that SHA in its report.
 
 Manual inputs:
-- `revision`: Hub branch, tag, or commit SHA; default `main`.
+- `revision`: Hub branch, tag, or commit SHA; default `main`. Invalid dataset IDs/revisions (including control characters, path traversal components, and Markdown-injection text) are rejected before Hub API access. The resolved Hub revision must be a full 40-character commit SHA before file listing and download.
 - `file_path_filter`: optional case-insensitive substring matched against Hugging Face file paths before download, reducing the selected bytes. Use a path fragment present in the Hub repository (for example a bank folder or archive name).
 - `voicebank_filter`: optional case-insensitive substring matched against discovered bank directories after extraction. This narrows audited roots but does not reduce the download selection.
 - `max_download_mb`: pre-download limit for selected archive/metadata/WAV files; default 4096 MiB.
