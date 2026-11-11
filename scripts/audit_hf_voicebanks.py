@@ -21,6 +21,7 @@ from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 
 DEFAULT_REPO_ID = "SEKOIA2900/VO-US"
 MAX_ARCHIVE_MEMBERS = 100_000
+MAX_SELECTED_FILES = 250_000
 ARCHIVE_SUFFIXES = (".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".zip", ".uar", ".tar")
 
 
@@ -105,6 +106,8 @@ def select_relevant_files(entries: Iterable[Any], path_filter: str = "") -> list
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise AuditFailure("hub_file_size_unavailable")
         selected[path] = HubFile(path, size)
+        if len(selected) > MAX_SELECTED_FILES:
+            raise AuditFailure("selected_file_count_limit_exceeded")
     return sorted(selected.values(), key=lambda item: item.path.casefold())
 
 
