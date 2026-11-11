@@ -70,6 +70,11 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert '(OUT / "download_summary.json").write_text' in source
     assert "license/readme documents indexed" in source
     assert '["git", "status", "--porcelain"]' in source
+    assert '["git", "remote", "get-url", "--all", "origin"]' in source
+    assert "trusted_origins" in source
+    assert "origin_urls[0] not in trusted_origins" in source
+    assert "Existing checkout origin is not the trusted Axral_vocal_AI GitHub repository" in source
+    assert source.index("origin_result = subprocess.run") < source.index('["git", "fetch", "--depth", "1", "origin", "main"]')
     assert '["git", "fetch", "--depth", "1", "origin", "main"]' in source
     assert "required_pipeline_files" in source
     assert '["git", "fetch", "--depth", "1", "origin", "feat/kaggle-one-url-pipeline"]' in source
