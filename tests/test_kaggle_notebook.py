@@ -31,6 +31,13 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "redact_output=False" in source
     assert "detailed dataset output suppressed" in source
     assert "output_tail=0, redact_output=True" in source
+    assert 'private_model_report = DATA_ROOT / "model_reports" / "pitch_delta_report.json"' in source
+    assert 'public_model_report = OUT / "models" / "pitch_delta_metrics.json"' in source
+    assert "build_public_model_report(private_report)" in source
+    assert 'OUT / "models" / "pitch_delta_metrics.json"' in source
+    assert 'OUT / "models" / "pitch_delta_report.json"' not in source
+    assert 'str(model_report)' not in source
+    assert "manifest_index" in source
     assert "re.escape(str(DATA_ROOT))" in source and '"<dataset-path>"' in source
     assert 'r"[^\\r\\n]*"' in source  # redact full paths even when they contain spaces
     assert 'audit_dir = DATA_ROOT / "audit_reports"' in source
