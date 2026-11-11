@@ -67,3 +67,8 @@ The current command trains only the **metadata-only pitch-delta ridge MVP** usin
 ## Archive diagnostics
 
 Each archive receives its own summary entry with its repository-relative path, compressed byte size, extraction status, extracted byte count, and stable error code. Archive-level failures produce `completed_with_archive_errors` when other usable voicebanks were found, and they block training; the per-archive records remain in `download_summary.json`.
+
+
+## Compact voicebank audit index
+
+In addition to the full per-bank JSON reports, the Kaggle notebook writes `voicebank_audit_summary.json`. It aggregates numeric inventory/WAV/error/warning counters by bank index, records the failed audit exit codes, and deliberately omits bank paths, aliases, and raw filenames from this compact index. The full per-bank JSON files remain available under `audits/` for detailed local inspection.
