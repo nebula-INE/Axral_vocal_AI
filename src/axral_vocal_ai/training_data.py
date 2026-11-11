@@ -25,6 +25,54 @@ class DatasetValidationError(ValueError):
     """Raised when a dataset manifest violates the training gate."""
 
 
+def validation_error_code(error: BaseException) -> str:
+    """Map a private validation exception to a stable, path-free diagnostic code.
+
+    Never return the exception message: it can contain record IDs, bank names,
+    field values, or local paths from a user's manifest.
+    """
+    message = str(error).casefold()
+    if "manifest byte limit exceeded" in message:
+        return "manifest_size_limit"
+    if "jsonl line byte limit exceeded" in message:
+        return "manifest_line_size_limit"
+    if "manifest record limit exceeded" in message:
+        return "manifest_record_limit"
+    if "must be valid utf-8" in message:
+        return "manifest_invalid_encoding"
+    if "invalid json" in message:
+        return "manifest_invalid_json"
+    if "cannot read manifest" in message:
+        return "manifest_unreadable"
+    if "contains no records" in message:
+        return "manifest_empty"
+    if "duplicate record_id" in message:
+        return "duplicate_record_id"
+    if "appears in multiple splits" in message:
+        return "split_leakage"
+    if "training readiness requires" in message:
+        return "split_requirements_not_met"
+    if "not approved for ml use" in message or "permission_status" in message or "license_id" in message:
+        return "source_permission_not_approved"
+    if "provenance" in message or "review_status" in message:
+        return "provenance_not_approved"
+    if (
+        "not allowed in a metadata manifest" in message
+        or "local filesystem path" in message
+        or "windows filesystem path" in message
+    ):
+        return "private_payload_rejected"
+    if "input.notes" in message or ".midi_note" in message or "note timeline" in message:
+        return "invalid_note_data"
+    if "target" in message or "pitch_delta_semitones" in message:
+        return "invalid_or_missing_pitch_labels"
+    if "missing required fields" in message or "schema_version" in message:
+        return "manifest_schema_invalid"
+    if "split" in message or "voicebank" in message or "source_id" in message:
+        return "manifest_split_invalid"
+    return "manifest_validation_failed"
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise DatasetValidationError(message)
