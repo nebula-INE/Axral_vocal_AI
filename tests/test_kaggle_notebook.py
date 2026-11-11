@@ -8,6 +8,30 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "kaggle" / "Axral_Vocal_AI_OneCell.ipynb"
 
 
+def test_trusted_axral_origin_accepts_only_single_canonical_remote():
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    source = "".join(
+        cell["source"] for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+    )
+    tree = ast.parse(source)
+    function = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "is_trusted_axral_origin"
+    )
+    isolated = ast.Module(body=[function], type_ignores=[])
+    namespace = {}
+    exec(compile(isolated, str(NOTEBOOK), "exec"), namespace)
+    is_trusted = namespace["is_trusted_axral_origin"]
+
+    assert is_trusted(["https://github.com/nebula-INE/Axral_vocal_AI.git"])
+    assert is_trusted(["git@github.com:nebula-INE/Axral_vocal_AI.git"])
+    assert is_trusted(["ssh://git@github.com/nebula-INE/Axral_vocal_AI"])
+    assert not is_trusted(["https://github.com/another-owner/untrusted.git"])
+    assert not is_trusted(["https://github.com/nebula-INE/Axral_vocal_AI.git", "https://evil.example/repo.git"])
+    assert not is_trusted(["https://github.com/nebula-INE/Axral_vocal_AI.git/"])
+
+
 def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     assert notebook["nbformat"] == 4
@@ -71,8 +95,7 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "license/readme documents indexed" in source
     assert '["git", "status", "--porcelain"]' in source
     assert '["git", "remote", "get-url", "--all", "origin"]' in source
-    assert "trusted_origins" in source
-    assert "origin_urls[0] not in trusted_origins" in source
+    assert "is_trusted_axral_origin(origin_urls)" in source
     assert "Existing checkout origin is not the trusted Axral_vocal_AI GitHub repository" in source
     assert source.index("origin_result = subprocess.run") < source.index('["git", "fetch", "--depth", "1", "origin", "main"]')
     assert '["git", "fetch", "--depth", "1", "origin", "main"]' in source
