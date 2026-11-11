@@ -313,3 +313,44 @@ def test_run_audit_reports_archive_error_codes_without_archive_paths(tmp_path, m
     assert "archive_duplicate_path" in markdown
     assert "broken.zip" not in markdown
     assert "banks/voice" not in markdown
+
+
+def test_run_audit_rejects_non_commit_revision_before_listing_or_download(tmp_path, monkeypatch):
+    calls = []
+
+    class FakeHfApi:
+        def __init__(self, token=None):
+            pass
+
+        def dataset_info(self, repo_id, revision):
+            return SimpleNamespace(sha="not-a-commit-sha")
+
+        def list_repo_tree(self, *args, **kwargs):
+            calls.append("list_repo_tree")
+            return []
+
+    def fake_snapshot_download(**kwargs):
+        calls.append("snapshot_download")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeHfApi, snapshot_download=fake_snapshot_download),
+    )
+    args = SimpleNamespace(
+        repo_id="SEKOIA2900/VO-US",
+        revision="main",
+        file_path_filter="",
+        voicebank_filter="",
+        max_download_mb=10,
+        max_extracted_mb=10,
+        fail_on="error",
+        output_dir=tmp_path / "summary",
+    )
+
+    summary, exit_code = run_audit(args)
+
+    assert exit_code == 2
+    assert summary["status"] == "failed"
+    assert summary["fatal_error_code"] == "dataset_revision_unresolved"
+    assert calls == []
