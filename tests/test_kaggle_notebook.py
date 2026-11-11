@@ -49,6 +49,9 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert 'r"[^\\r\\n]*"' in source  # redact full paths even when they contain spaces
     assert 'audit_dir = DATA_ROOT / "audit_reports"' in source
     assert "build_public_download_summary(download_summary)" in source
+    assert 'public_download_summary.get("dataset_card_license")' in source
+    assert 'dataset_id = public_download_summary.get("dataset")' in source
+    assert 'download_summary.get("dataset_card_license")' not in source
     assert '"download": public_download_summary' in source
     assert '"manifest_index": manifest_index' in source
     assert "artifact_files = [" in source
