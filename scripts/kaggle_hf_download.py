@@ -34,23 +34,48 @@ class HubFile:
 
 
 def parse_dataset_url(value: str) -> tuple[str, str]:
-    """Return (dataset repo ID, revision) from a Hugging Face dataset URL."""
-    parsed = urlsplit(value)
+    """Return (dataset repo ID, revision) from a Hugging Face dataset URL.
+
+    Accept the dataset landing page or an exact /tree/<revision> page.
+    Encode slashes inside branch names as %2F to avoid confusing them with
+    a folder path beneath the revision.
+    """
+    if not isinstance(value, str) or not value or len(value) > 2048:
+        raise DownloadAuditError("dataset_url_invalid")
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        raise DownloadAuditError("dataset_url_invalid_authority") from None
     if parsed.scheme != "https" or parsed.hostname != "huggingface.co":
         raise DownloadAuditError("dataset_url_must_use_https_huggingface_co")
-    if parsed.username or parsed.password or parsed.port not in (None, 443):
+    if parsed.username or parsed.password or port not in (None, 443):
         raise DownloadAuditError("dataset_url_has_unsupported_authority")
-    parts = [unquote(part) for part in parsed.path.split("/") if part]
+    if parsed.query or parsed.fragment:
+        raise DownloadAuditError("dataset_url_query_or_fragment_not_supported")
+
+    raw_parts = [part for part in parsed.path.split("/") if part]
+    parts = [unquote(part) for part in raw_parts]
     if len(parts) < 3 or parts[0] != "datasets":
         raise DownloadAuditError("dataset_url_must_include_owner_and_repository")
     owner, name = parts[1], parts[2]
-    if not owner or not name or "/" in owner or "/" in name or "\\" in owner or "\\" in name:
+    repo_component = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}"
+    if not re.fullmatch(repo_component, owner) or not re.fullmatch(repo_component, name):
         raise DownloadAuditError("dataset_url_has_invalid_repository_id")
+
     revision = "main"
-    if len(parts) >= 5 and parts[3] == "tree":
-        revision = parts[4]
-        if not revision or revision in {".", ".."}:
-            raise DownloadAuditError("dataset_url_has_invalid_revision")
+    if len(parts) == 3:
+        return f"{owner}/{name}", revision
+    if len(parts) != 5 or parts[3] != "tree":
+        raise DownloadAuditError("dataset_url_has_unsupported_path")
+    revision = parts[4]
+    revision_parts = revision.split("/")
+    if (
+        len(revision) > 128
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", revision)
+        or any(part in {"", ".", ".."} for part in revision_parts)
+    ):
+        raise DownloadAuditError("dataset_url_has_invalid_revision")
     return f"{owner}/{name}", revision
 
 
