@@ -224,13 +224,20 @@ def test_download_summary_reports_archive_failures_with_paths(tmp_path, monkeypa
             return SimpleNamespace(sha="abc123", cardData=None)
 
         def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
-            return [{"path": "banks/broken.zip", "size": 4}]
+            return [
+                {"path": "banks/broken.zip", "size": 4},
+                {"path": "loose/oto.ini", "size": 20},
+            ]
 
     def fake_snapshot_download(**kwargs):
-        target = Path(kwargs["local_dir"]) / "banks" / "broken.zip"
-        target.parent.mkdir(parents=True)
-        target.write_bytes(b"nope")
-        return str(kwargs["local_dir"])
+        root = Path(kwargs["local_dir"])
+        archive = root / "banks" / "broken.zip"
+        archive.parent.mkdir(parents=True)
+        archive.write_bytes(b"nope")
+        loose_oto = root / "loose" / "oto.ini"
+        loose_oto.parent.mkdir(parents=True)
+        loose_oto.write_text("a.wav=a,0,0,0,0,0\n", encoding="utf-8")
+        return str(root)
 
     monkeypatch.setitem(
         sys.modules,
@@ -238,18 +245,15 @@ def test_download_summary_reports_archive_failures_with_paths(tmp_path, monkeypa
         SimpleNamespace(HfApi=FakeApi, snapshot_download=fake_snapshot_download),
     )
 
-    with pytest.raises(DownloadAuditError, match="no_voicebank_roots_found"):
-        download_dataset(
-            "https://huggingface.co/datasets/owner/repo",
-            tmp_path / "dataset",
-            max_download_mb=1,
-            max_extracted_mb=1,
-        )
-
-    summary = __import__("json").loads(
-        (tmp_path / "dataset" / "download_summary.json").read_text(encoding="utf-8")
+    summary = download_dataset(
+        "https://huggingface.co/datasets/owner/repo",
+        tmp_path / "dataset",
+        max_download_mb=1,
+        max_extracted_mb=1,
     )
-    assert summary["status"] == "no_voicebank_roots_found"
+
+    assert summary["status"] == "completed_with_archive_errors"
+    assert summary["voicebank_roots"] == 1
     assert summary["archives_found"] == 1
     assert summary["archive_results"] == [{
         "path": "banks/broken.zip",
@@ -259,3 +263,8 @@ def test_download_summary_reports_archive_failures_with_paths(tmp_path, monkeypa
         "extracted_bytes": 0,
     }]
     assert summary["archive_errors"] == ["unsupported_or_invalid_archive"]
+    saved = __import__("json").loads(
+        (tmp_path / "dataset" / "download_summary.json").read_text(encoding="utf-8")
+    )
+    assert saved["status"] == "completed_with_archive_errors"
+
