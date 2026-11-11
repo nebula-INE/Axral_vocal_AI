@@ -90,7 +90,7 @@ def test_build_audit_index_ignores_bool_and_negative_counters(tmp_path):
         },
     }), encoding="utf-8")
     result = build_audit_index([(1, report, 0)])
-    assert result["aggregate"] == {"errors": 0, "valid": 3}
+    assert result["aggregate"] == {"errors": 0, "warnings": 0, "valid": 3}
 
 
 
