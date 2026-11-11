@@ -69,9 +69,15 @@ def _safe_hub_path(value: Any) -> str:
 def _is_license_document_name(name: str) -> bool:
     lowered = name.casefold()
     return (
-        lowered == "readme.md"
-        or lowered in {"license", "copying", "notice"}
-        or lowered.startswith(("license.", "license-", "copying.", "copying-", "notice.", "notice-"))
+        lowered in {
+            "readme.md", "readme.txt", "readme.rst",
+            "license", "licence", "copying", "notice", "copyright", "terms", "eula",
+        }
+        or lowered.startswith((
+            "license.", "license-", "licence.", "licence-",
+            "copying.", "copying-", "notice.", "notice-",
+            "copyright.", "copyright-", "terms.", "terms-",
+        ))
     )
 
 
