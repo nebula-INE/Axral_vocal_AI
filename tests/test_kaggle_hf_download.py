@@ -141,7 +141,7 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
         target = Path(kwargs["local_dir"]) / "voicebank.zip"
         target.write_bytes(archive_bytes)
         readme = Path(kwargs["local_dir"]) / "README.md"
-        readme.write_text("---\\nlicense: cc-by-4.0\\n---\\nDataset card", encoding="utf-8")
+        readme.write_text("---\nlicense: cc-by-4.0\n---\nDataset card", encoding="utf-8")
         return str(kwargs["local_dir"])
 
     monkeypatch.setitem(
@@ -171,7 +171,7 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
         "path": "README.md",
         "size_bytes": 39,
         "sha256": hashlib.sha256(
-            b"---\\nlicense: cc-by-4.0\\n---\\nDataset card"
+            b"---\nlicense: cc-by-4.0\n---\nDataset card"
         ).hexdigest(),
     }]
     assert result["status"] == "completed"
