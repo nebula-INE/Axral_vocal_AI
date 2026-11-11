@@ -303,6 +303,18 @@ def build_markdown(summary: dict[str, Any]) -> str:
     for key in ("oto_files", "oto_entries", "unique_aliases", "prefix_map_files",
                 "prefix_map_entries", "wav_files_checked", "wav_files_invalid", "errors", "warnings"):
         lines.append(f"| {key} | {totals.get(key, 0)} |")
+    archive_error_codes = summary.get("archive_error_codes", {})
+    if isinstance(archive_error_codes, dict) and archive_error_codes:
+        lines.extend(["", "| Archive error code | Count |", "| --- | ---: |"])
+        for code, count in sorted(archive_error_codes.items()):
+            if (
+                isinstance(code, str)
+                and re.fullmatch(r"[a-z0-9_]{1,80}", code)
+                and isinstance(count, int)
+                and not isinstance(count, bool)
+                and count > 0
+            ):
+                lines.append(f"| {code} | {count} |")
     lines.extend(["", "| Bank | OTO entries | WAV checked | Errors | Warnings |",
                   "| ---: | ---: | ---: | ---: | ---: |"])
     for bank in summary.get("banks", []):
@@ -349,7 +361,8 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         "schema_version": 1, "dataset": args.repo_id, "requested_revision": args.revision,
         "resolved_revision": None, "status": "running", "selected_files": 0,
         "download_bytes": 0, "voicebank_roots": 0, "archive_errors": 0,
-        "banks": [], "totals": {}, "fail_on": args.fail_on, "fatal_error_code": None,
+        "archive_error_codes": {}, "banks": [], "totals": {},
+        "fail_on": args.fail_on, "fatal_error_code": None,
     }
     try:
         try:
@@ -398,20 +411,27 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             )
             extracted_size = 0
             archive_errors = 0
+            archive_error_codes: Counter[str] = Counter()
             for index, archive in enumerate(archives, start=1):
                 remaining = max_extracted - extracted_size
                 if remaining <= 0:
                     archive_errors += 1
+                    archive_error_codes["extracted_size_limit_exceeded"] += 1
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", archive.name)[:80] or f"archive_{index}"
                 destination = extract_root / f"{index:04d}_{safe_name}"
                 try:
                     extracted_size += safe_extract_archive(archive, destination, remaining)
+                except AuditFailure as exc:
+                    archive_errors += 1
+                    archive_error_codes[exc.code] += 1
                 except Exception:
                     archive_errors += 1
+                    archive_error_codes["archive_extraction_failed"] += 1
 
             voicebank_roots = discover_voicebank_roots(download_root, extract_root)
             summary["archive_errors"] = archive_errors
+            summary["archive_error_codes"] = dict(sorted(archive_error_codes.items()))
             if args.voicebank_filter:
                 needle = args.voicebank_filter.casefold()
                 voicebank_roots = [
