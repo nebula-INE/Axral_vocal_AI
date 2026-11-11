@@ -30,6 +30,9 @@ def test_parse_dataset_url_accepts_repo_and_tree_revision():
     assert parse_dataset_url(
         "https://huggingface.co/datasets/owner/repo/tree/feature-branch"
     ) == ("owner/repo", "feature-branch")
+    assert parse_dataset_url(
+        "https://huggingface.co/datasets/owner/repo/tree/feature%2Fbranch"
+    ) == ("owner/repo", "feature/branch")
 
 
 @pytest.mark.parametrize("url", [
@@ -369,3 +372,29 @@ def test_select_relevant_files_rejects_excessive_file_count(monkeypatch):
     ]
     with pytest.raises(DownloadAuditError, match="selected_file_count_limit_exceeded"):
         select_relevant_files(entries)
+
+
+@pytest.mark.parametrize("url", [
+    "https://huggingface.co:invalid/datasets/owner/repo",
+    "https://huggingface.co/datasets/owner/repo/tree/%2E%2E",
+    "https://huggingface.co/datasets/owner/repo/tree/feature%2F..%2Fmain",
+    "https://huggingface.co/datasets/owner/repo/tree/feature%2F%2Fbranch",
+    "https://huggingface.co/datasets/owner/repo/tree/feature%0Abranch",
+    "https://huggingface.co/datasets/owner/repo/tree/main/subfolder",
+    "https://huggingface.co/datasets/owner/repo?download=1",
+])
+def test_parse_dataset_url_rejects_malformed_revision_or_extra_path(url):
+    with pytest.raises(DownloadAuditError):
+        parse_dataset_url(url)
+
+
+def test_parse_dataset_url_rejects_encoded_slashes_in_repository_id():
+    with pytest.raises(DownloadAuditError, match="dataset_url_has_invalid_repository_id"):
+        parse_dataset_url("https://huggingface.co/datasets/owner%2Frepo/name")
+
+
+def test_parse_dataset_url_rejects_non_string_and_oversized_input():
+    with pytest.raises(DownloadAuditError, match="dataset_url_invalid"):
+        parse_dataset_url(None)
+    with pytest.raises(DownloadAuditError, match="dataset_url_invalid"):
+        parse_dataset_url("x" * 2049)
