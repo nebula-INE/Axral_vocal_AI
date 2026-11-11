@@ -18,6 +18,7 @@ import zipfile
 
 DEFAULT_MAX_DOWNLOAD_MB = 4096
 DEFAULT_MAX_EXTRACTED_MB = 8192
+MAX_ARCHIVE_MEMBERS = 100_000
 ARCHIVE_SUFFIXES = (".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".zip", ".uar", ".tar")
 
 
@@ -219,7 +220,10 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
     seen: set[str] = set()
     declared = 0
     with zipfile.ZipFile(archive) as bundle:
-        for info in bundle.infolist():
+        infos = bundle.infolist()
+        if len(infos) > MAX_ARCHIVE_MEMBERS:
+            raise DownloadAuditError("archive_member_limit_exceeded")
+        for info in infos:
             if info.is_dir():
                 _zip_member_path(info, allow_dot=True)
                 continue
@@ -249,7 +253,10 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
     seen: set[str] = set()
     declared = 0
     with tarfile.open(archive, "r:*") as bundle:
-        for member in bundle.getmembers():
+        tar_members = bundle.getmembers()
+        if len(tar_members) > MAX_ARCHIVE_MEMBERS:
+            raise DownloadAuditError("archive_member_limit_exceeded")
+        for member in tar_members:
             if member.isdir():
                 _safe_member_path(member.name.rstrip("/") or ".", allow_dot=True)
                 continue
