@@ -32,6 +32,10 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "license/readme documents indexed" in source
     assert '["git", "status", "--porcelain"]' in source
     assert '["git", "fetch", "--depth", "1", "origin", "main"]' in source
+    assert "required_pipeline_files" in source
+    assert '["git", "fetch", "--depth", "1", "origin", "feat/kaggle-one-url-pipeline"]' in source
+    assert "Default branch does not contain the Kaggle pipeline helpers yet" in source
+    assert "Axral checkout is missing required Kaggle pipeline files" in source
     assert '["git", "reset", "--hard", "FETCH_HEAD"]' in source
     assert "local changes" in source
     assert "source_commit" in source
@@ -39,3 +43,4 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "from scripts.voicebank_audit_summary import build_audit_index" in source
     assert "voicebank_audit_summary.json" in source
     assert "audit_index[\"aggregate\"]" in source
+    assert 'json.dumps(download_summary, ensure_ascii=False, indent=2) + "\\n",' not in source
