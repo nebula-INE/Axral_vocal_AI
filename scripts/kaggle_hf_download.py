@@ -171,7 +171,7 @@ def _contains_japanese_text(value: str) -> bool:
     )
 
 
-def _zip_member_path(info: zipfile.ZipInfo) -> PurePosixPath:
+def _zip_member_path(info: zipfile.ZipInfo, *, allow_dot: bool = False) -> PurePosixPath:
     """Decode legacy CP932 ZIP names when the UTF-8 flag is absent.
 
     Python's ZIP reader follows the ZIP default and decodes unflagged names as
@@ -189,7 +189,7 @@ def _zip_member_path(info: zipfile.ZipInfo) -> PurePosixPath:
         else:
             if legacy_candidate != filename and _contains_japanese_text(legacy_candidate):
                 filename = legacy_candidate
-    return _safe_member_path(filename)
+    return _safe_member_path(filename, allow_dot=allow_dot)
 
 
 def _safe_target(root: Path, relative: PurePosixPath) -> Path:
@@ -221,7 +221,7 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
     with zipfile.ZipFile(archive) as bundle:
         for info in bundle.infolist():
             if info.is_dir():
-                _safe_member_path(info.filename.rstrip("/") or ".", allow_dot=True)
+                _zip_member_path(info, allow_dot=True)
                 continue
             relative = _zip_member_path(info)
             mode = (info.external_attr >> 16) & 0o170000
