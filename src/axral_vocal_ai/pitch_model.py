@@ -15,6 +15,10 @@ FEATURE_VERSION = 1
 MAX_PREDICTION_DELTA_SEMITONES = 2.0
 FEATURE_NAMES = ("bias", "midi_normalized", "note_phase", "phase_squared", "duration_seconds")
 
+# Bound the experimental MVP before constructing dense NumPy matrices.
+MAX_TRAINING_EXAMPLES = 250_000
+MAX_TRAINING_LABEL_POINTS = 1_000_000
+
 
 @dataclass(frozen=True)
 class TrainingExample:
@@ -67,8 +71,14 @@ def _features_for_time(notes: list[dict[str, Any]], time_sec: float) -> tuple[fl
     return (1.0, midi / 127.0, 1.0, 1.0, duration)
 
 
-def examples_from_records(records: Iterable[dict[str, Any]]) -> tuple[list[TrainingExample], dict[str, int]]:
-    """Convert validated manifest rows to per-label examples; no audio is accessed."""
+def examples_from_records(
+    records: Iterable[dict[str, Any]],
+    *,
+    max_examples: int = MAX_TRAINING_EXAMPLES,
+) -> tuple[list[TrainingExample], dict[str, int]]:
+    """Convert a one-pass record stream to bounded per-label examples; no audio is accessed."""
+    if isinstance(max_examples, bool) or not isinstance(max_examples, int) or max_examples < 1:
+        raise ValueError("max_examples must be a positive integer")
     examples: list[TrainingExample] = []
     counts = {"labels_seen": 0, "labels_used": 0, "labels_without_voiced_note": 0}
     for record in records:
@@ -78,10 +88,16 @@ def examples_from_records(records: Iterable[dict[str, Any]]) -> tuple[list[Train
         notes = record["input"]["notes"]
         for point in target["points"]:
             counts["labels_seen"] += 1
+            if counts["labels_seen"] > MAX_TRAINING_LABEL_POINTS:
+                raise ValueError(
+                    f"training label point limit exceeded ({MAX_TRAINING_LABEL_POINTS})"
+                )
             features = _features_for_time(notes, float(point["time_sec"]))
             if features is None:
                 counts["labels_without_voiced_note"] += 1
                 continue
+            if len(examples) >= max_examples:
+                raise ValueError(f"training example limit exceeded ({max_examples})")
             examples.append(TrainingExample(
                 features=features,
                 target=float(point["delta_semitones"]),
