@@ -62,3 +62,8 @@ The repository notebook at `kaggle/Axral_Vocal_AI_OneCell.ipynb` uses only the `
 A manifest is eligible only when every row passes `training/validate_dataset.py --require-labeled`: schema version 1, explicit `permission_status: "approved"`, an approved provenance review, non-empty pitch-delta labels, finite values within ±2 semitones, and train/validation/test splits isolated by voicebank. Exactly one eligible manifest is required; zero or multiple candidates block training rather than choosing data implicitly. JSONL is expected to be UTF-8 and a UTF-8 BOM is accepted.
 
 The current command trains only the **metadata-only pitch-delta ridge MVP** using note context and pre-existing pitch-delta labels. It does not open UTAU WAV files, learn from waveform samples, synthesize singing, or use the Kaggle GPU. A voicebank archive containing only `oto.ini` and WAV samples does not provide aligned score-to-pitch-delta ground truth; such a dataset will be audited and tested, but model training will be reported as blocked. Do not manufacture labels to bypass this gate.
+
+
+## Archive diagnostics
+
+Each archive receives its own summary entry with its repository-relative path, compressed byte size, extraction status, extracted byte count, and stable error code. Archive-level failures produce `completed_with_archive_errors` when other usable voicebanks were found, and they block training; the per-archive records remain in `download_summary.json`.
