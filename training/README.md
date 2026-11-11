@@ -72,3 +72,7 @@ Each archive receives its own summary entry with its repository-relative path, c
 ## Compact voicebank audit index
 
 In addition to the full per-bank JSON reports, the Kaggle notebook writes `voicebank_audit_summary.json`. It aggregates numeric inventory/WAV/error/warning counters by bank index, records the failed audit exit codes, and deliberately omits bank paths, aliases, and raw filenames from this compact index. The full per-bank JSON files remain available under `audits/` for detailed local inspection.
+
+## Japanese text and legacy ZIP filenames
+
+The voicebank audit reader prefers UTF-8 for BOM-less metadata, accepts UTF-8 BOM and BOM-marked UTF-16, and falls back to CP932 when UTF-8 decoding fails. This preserves Japanese aliases in common UTAU `oto.ini` and `prefix.map` files without rewriting the source files. The Kaggle archive extractor also repairs a ZIP member name only when the ZIP UTF-8 flag is absent and the CP932 interpretation produces Japanese-script characters; UTF-8 names and non-Japanese CP437 names are left unchanged. Path-safety and duplicate-path checks run after this decoding step, so the repaired path—not the mojibake display string—is what gets validated and extracted. Ambiguous or already-corrupted source text cannot be reliably reconstructed automatically and remains subject to the audit report and manual review.
