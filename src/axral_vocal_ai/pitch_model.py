@@ -98,6 +98,7 @@ def _features_for_sorted_points(
         time_sec = float(point["time_sec"])
         starts_at_time = False
 
+        ended_at_time: list[dict[str, Any]] = []
         while next_note < len(notes):
             note = notes[next_note]
             start = float(note["start_sec"])
@@ -106,12 +107,16 @@ def _features_for_sorted_points(
             if start == time_sec:
                 starts_at_time = True
             end = float(note["end_sec"])
-            if note.get("voiced") is not False and end > start and end > time_sec:
-                active[next_note] = note
-                heapq.heappush(endings, (end, next_note))
+            if note.get("voiced") is not False and end > start:
+                if end > time_sec:
+                    active[next_note] = note
+                    heapq.heappush(endings, (end, next_note))
+                elif end == time_sec:
+                    # This note may have started after the previous label, so
+                    # it was never inserted into the active heap.
+                    ended_at_time.append(note)
             next_note += 1
 
-        ended_at_time: list[dict[str, Any]] = []
         while endings and endings[0][0] <= time_sec:
             end, index = heapq.heappop(endings)
             note = active.pop(index, None)
@@ -151,9 +156,13 @@ def examples_from_records(
             float(points[index - 1]["time_sec"]) < float(points[index]["time_sec"])
             for index in range(1, len(points))
         )
+        notes_are_ordered = all(
+            float(notes[index - 1]["start_sec"]) <= float(notes[index]["start_sec"])
+            for index in range(1, len(notes))
+        )
         feature_rows = (
             _features_for_sorted_points(notes, points)
-            if points_are_ordered
+            if points_are_ordered and notes_are_ordered
             else (_features_for_time(notes, float(point["time_sec"])) for point in points)
         )
         for point, features in zip(points, feature_rows):
