@@ -113,7 +113,11 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
                     finite_number = math.isfinite(item)
                 except (OverflowError, TypeError, ValueError):
                     finite_number = False
-            if isinstance(key, str) and (item is None or finite_number):
+            if (
+                isinstance(key, str)
+                and re.fullmatch(r"[a-z0-9_]{1,80}", key)
+                and (item is None or finite_number)
+            ):
                 result[key] = item
         return result
 
@@ -138,15 +142,38 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
             "feature_names", "target_kind", "weights", "safety",
         ):
             value = model.get(key)
-            if key in {"feature_names", "weights"} and isinstance(value, list):
-                public_model[key] = value
+            if key == "feature_names" and isinstance(value, list):
+                public_model[key] = [
+                    item for item in value
+                    if isinstance(item, str) and re.fullmatch(r"[a-z0-9_]{1,80}", item)
+                ][:32]
+            elif key == "weights" and isinstance(value, list):
+                weights: list[float] = []
+                for item in value[:32]:
+                    if isinstance(item, (int, float)) and not isinstance(item, bool):
+                        try:
+                            if math.isfinite(item):
+                                weights.append(float(item))
+                        except (OverflowError, TypeError, ValueError):
+                            continue
+                public_model[key] = weights
             elif key == "safety" and isinstance(value, dict):
                 public_model[key] = {
                     name: flag for name, flag in value.items()
-                    if isinstance(name, str) and isinstance(flag, bool)
+                    if name in {
+                        "proposal_only", "waveform_generation",
+                        "production_renderer_integration",
+                    } and isinstance(flag, bool)
                 }
-            elif key not in {"feature_names", "weights", "safety"} and isinstance(value, (str, int)) and not isinstance(value, bool):
-                public_model[key] = value
+            elif key == "model_type":
+                if value == "linear_ridge_pitch_delta":
+                    public_model[key] = value
+            elif key == "target_kind":
+                if value == "pitch_delta_semitones":
+                    public_model[key] = value
+            elif key in {"schema_version", "feature_version"}:
+                if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 100:
+                    public_model[key] = value
 
     return {
         "schema_version": 1,
