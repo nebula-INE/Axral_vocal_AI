@@ -56,6 +56,31 @@ def test_manifest_validation_summarizes_voicebank_level_splits():
     assert summary["voicebanks_by_split"]["test"] == ["bank-c"]
 
 
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("manifest byte limit exceeded (10)", "manifest_size_limit"),
+        ("line 3: JSONL line byte limit exceeded (10)", "manifest_line_size_limit"),
+        ("manifest record limit exceeded (10)", "manifest_record_limit"),
+        ("line 2: manifest must be valid UTF-8", "manifest_invalid_encoding"),
+        ("line 2: invalid JSON: bad", "manifest_invalid_json"),
+        ("line 1: duplicate record_id 'PRIVATE_ID'", "duplicate_record_id"),
+        ("line 2: source 'PRIVATE_SOURCE' appears in multiple splits", "split_leakage"),
+        ("training readiness requires non-empty test split", "split_requirements_not_met"),
+        ("line 1: source is not approved for ML use", "source_permission_not_approved"),
+        ("line 1: provenance review_status must be approved", "provenance_not_approved"),
+        ("line 1: record.audio_path is not allowed in a metadata manifest", "private_payload_rejected"),
+        ("line 1: input.notes[0].midi_note must be numeric", "invalid_note_data"),
+        ("line 1: target.points must be a non-empty list", "invalid_or_missing_pitch_labels"),
+        ("unexpected schema failure", "manifest_validation_failed"),
+    ],
+)
+def test_validation_error_codes_are_stable_and_do_not_echo_private_details(message, expected):
+    code = training_data.validation_error_code(DatasetValidationError(message))
+    assert code == expected
+    assert "PRIVATE" not in code
+
+
 def test_manifest_rejects_unapproved_sources():
     with pytest.raises(DatasetValidationError, match="not approved"):
         validate_records([make_record(permission="review_required")])
