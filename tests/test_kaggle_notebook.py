@@ -25,7 +25,7 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "snapshot_download" not in source  # download logic lives in the tested helper
     assert 'if DATA_ROOT.exists(): shutil.rmtree(DATA_ROOT)' in source
     assert "sys.path.insert(0, str(PROJECT))" in source
-    assert "audit_failures = []" in source
+    assert "audit_results = []" in source
     assert "blocked_voicebank_audit_findings" in source
     assert '"audit_failures": audit_failures' in source
     assert '(OUT / "download_summary.json").write_text' in source
