@@ -86,6 +86,25 @@ def test_extract_zip_and_discover_nested_oto_files_as_one_bank(tmp_path):
     assert discover_voicebank_roots(extracted) == [(extracted / "Voice").resolve()]
 
 
+def test_extract_zip_repairs_legacy_cp932_member_names(tmp_path, monkeypatch):
+    archive = tmp_path / "legacy-japanese.zip"
+
+    # Older voicebank ZIPs often store CP932 path bytes without the UTF-8 flag.
+    def encode_cp932(info):
+        return info.filename.encode("cp932"), info.flag_bits & ~0x800
+
+    monkeypatch.setattr(zipfile.ZipInfo, "_encodeFilenameFlags", encode_cp932)
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("音源/oto.ini", "あ.wav=あ,0,100,-100,20,10\\n")
+
+    destination = tmp_path / "legacy-extracted"
+    safe_extract_archive(archive, destination, 1024)
+
+    oto_path = destination / "音源" / "oto.ini"
+    assert oto_path.is_file()
+    assert oto_path.read_text(encoding="utf-8") == "あ.wav=あ,0,100,-100,20,10\\n"
+
+
 def test_extract_zip_rejects_traversal_and_removes_partial_destination(tmp_path):
     archive = tmp_path / "bad.zip"
     with zipfile.ZipFile(archive, "w") as bundle:
