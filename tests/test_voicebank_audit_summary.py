@@ -50,6 +50,7 @@ def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
         "bank_index": 1,
         "exit_code": 1,
         "error_count": 1,
+        "error_code": "audit_cli_nonzero_exit",
     }]
     assert result["banks"][0]["status"] == "completed_with_findings"
     rendered = json.dumps(result)
@@ -73,6 +74,7 @@ def test_build_audit_index_records_invalid_or_missing_report(tmp_path):
         "bank_index": 7,
         "exit_code": 2,
         "error_count": 0,
+        "error_code": "invalid_or_missing_audit_report",
     }]
 
 
@@ -81,6 +83,7 @@ def test_build_audit_index_ignores_bool_and_negative_counters(tmp_path):
     report.write_text(json.dumps({
         "summary": {
             "errors": 0,
+            "warnings": 0,
             "unexpected": True,
             "negative": -1,
             "valid": 3,
@@ -88,3 +91,51 @@ def test_build_audit_index_ignores_bool_and_negative_counters(tmp_path):
     }), encoding="utf-8")
     result = build_audit_index([(1, report, 0)])
     assert result["aggregate"] == {"errors": 0, "valid": 3}
+
+
+
+def test_missing_report_blocks_training_even_when_cli_returns_zero(tmp_path):
+    missing = tmp_path / "missing.json"
+
+    result = build_audit_index([(3, missing, 0)])
+
+    assert result["audits_completed"] == 0
+    assert result["failures"] == [{
+        "bank_index": 3,
+        "exit_code": 0,
+        "error_count": 0,
+        "error_code": "invalid_or_missing_audit_report",
+    }]
+    assert result["banks"][0]["status"] == "invalid_or_missing_report"
+
+
+def test_report_errors_block_training_even_when_cli_returns_zero(tmp_path):
+    report = tmp_path / "report.json"
+    report.write_text(json.dumps({
+        "summary": {"errors": 2, "warnings": 0, "oto_entries": 8}
+    }), encoding="utf-8")
+
+    result = build_audit_index([(4, report, 0)])
+
+    assert result["audits_completed"] == 1
+    assert result["aggregate"]["errors"] == 2
+    assert result["failures"] == [{
+        "bank_index": 4,
+        "exit_code": 0,
+        "error_count": 2,
+        "error_code": "audit_report_contains_errors",
+    }]
+    assert result["banks"][0]["status"] == "completed_with_findings"
+
+
+def test_required_audit_counters_must_be_present_and_valid(tmp_path):
+    report = tmp_path / "malformed.json"
+    report.write_text(json.dumps({"summary": {"errors": False, "warnings": 0}}),
+                      encoding="utf-8")
+
+    result = build_audit_index([(5, report, 0)])
+
+    assert result["audits_completed"] == 0
+    assert result["aggregate"] == {}
+    assert result["failures"][0]["error_code"] == "invalid_or_missing_audit_report"
+    assert result["banks"][0]["status"] == "invalid_or_missing_report"
