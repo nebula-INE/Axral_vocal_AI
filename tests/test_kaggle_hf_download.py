@@ -359,3 +359,13 @@ def test_extract_rejects_archive_member_count_limit(tmp_path, monkeypatch, archi
     with pytest.raises(DownloadAuditError, match="archive_member_limit_exceeded"):
         safe_extract_archive(archive, destination, 1024)
     assert not destination.exists()
+
+
+def test_select_relevant_files_rejects_excessive_file_count(monkeypatch):
+    monkeypatch.setattr("scripts.kaggle_hf_download.MAX_SELECTED_FILES", 1)
+    entries = [
+        {"path": "bank-a/oto.ini", "size": 1},
+        {"path": "bank-b/oto.ini", "size": 1},
+    ]
+    with pytest.raises(DownloadAuditError, match="selected_file_count_limit_exceeded"):
+        select_relevant_files(entries)
