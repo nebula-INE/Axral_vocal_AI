@@ -10,6 +10,51 @@ from typing import Iterable
 REQUIRED_AUDIT_COUNTERS = {"errors", "warnings"}
 
 
+def build_public_download_summary(summary: dict[str, object]) -> dict[str, object]:
+    """Create an artifact-safe download summary without dataset file paths."""
+    archive_rows = summary.get("archive_results", [])
+    status_counts: Counter[str] = Counter()
+    error_counts: Counter[str] = Counter()
+    if isinstance(archive_rows, list):
+        for row in archive_rows:
+            if not isinstance(row, dict):
+                continue
+            status = row.get("status")
+            if isinstance(status, str):
+                status_counts[status] += 1
+            error_code = row.get("error_code")
+            if isinstance(error_code, str) and error_code:
+                error_counts[error_code] += 1
+
+    license_documents = summary.get("license_documents", [])
+    license_count = len(license_documents) if isinstance(license_documents, list) else 0
+
+    def safe_nonnegative_int(key: str) -> int:
+        value = summary.get(key, 0)
+        return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+
+    def safe_optional_text(key: str) -> str | None:
+        value = summary.get(key)
+        return value if isinstance(value, str) and value else None
+
+    return {
+        "schema_version": 1,
+        "dataset": safe_optional_text("dataset"),
+        "requested_revision": safe_optional_text("requested_revision"),
+        "resolved_revision": safe_optional_text("resolved_revision"),
+        "dataset_card_license": safe_optional_text("dataset_card_license"),
+        "license_documents_indexed": license_count,
+        "selected_files": safe_nonnegative_int("selected_files"),
+        "download_bytes": safe_nonnegative_int("download_bytes"),
+        "archives_found": safe_nonnegative_int("archives_found"),
+        "archive_status_counts": dict(sorted(status_counts.items())),
+        "archive_error_code_counts": dict(sorted(error_counts.items())),
+        "extracted_bytes": safe_nonnegative_int("extracted_bytes"),
+        "voicebank_roots": safe_nonnegative_int("voicebank_roots"),
+        "status": safe_optional_text("status"),
+    }
+
+
 def build_audit_index(
     results: Iterable[tuple[int, Path, int]],
 ) -> dict[str, object]:
