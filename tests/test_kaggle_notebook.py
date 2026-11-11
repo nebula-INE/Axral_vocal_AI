@@ -28,3 +28,5 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "audit_failures = []" in source
     assert "blocked_voicebank_audit_findings" in source
     assert '"audit_failures": audit_failures' in source
+    assert '(OUT / "download_summary.json").write_text' in source
+    assert "license/readme documents indexed" in source
