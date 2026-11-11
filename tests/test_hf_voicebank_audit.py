@@ -3,13 +3,17 @@ from __future__ import annotations
 import io
 from pathlib import Path
 import stat
+import sys
 import tarfile
 import zipfile
 from types import SimpleNamespace
 
 import pytest
 
+import scripts.audit_hf_voicebanks as audit_script
 from scripts.audit_hf_voicebanks import (
+    build_markdown,
+    run_audit,
     AuditFailure,
     HubFile,
     _safe_member_path,
@@ -237,3 +241,75 @@ def test_public_summary_contains_counts_only_not_sensitive_names():
     assert "SECRET_ALIAS" not in serialized
     assert "private.wav" not in serialized
     assert "oto.ini" not in serialized
+
+
+
+def test_run_audit_reports_archive_error_codes_without_archive_paths(tmp_path, monkeypatch):
+    class FakeHfApi:
+        def __init__(self, token=None):
+            self.token = token
+
+        def dataset_info(self, repo_id, revision):
+            return SimpleNamespace(sha="a" * 40)
+
+        def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
+            return [
+                {"path": "banks/broken.zip", "size": 8},
+                {"path": "banks/voice/oto.ini", "size": 20},
+            ]
+
+    def fake_snapshot_download(repo_id, repo_type, revision, local_dir,
+                               allow_patterns, token):
+        root = Path(local_dir)
+        (root / "banks" / "voice").mkdir(parents=True)
+        (root / "banks" / "broken.zip").write_bytes(b"not-a-zip")
+        (root / "banks" / "voice" / "oto.ini").write_text(
+            "a.wav=あ,0,100,-100,20,10\n", encoding="utf-8"
+        )
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeHfApi, snapshot_download=fake_snapshot_download),
+    )
+    monkeypatch.setattr(
+        audit_script,
+        "safe_extract_archive",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AuditFailure("archive_duplicate_path")
+        ),
+    )
+    monkeypatch.setattr(
+        audit_script,
+        "analyze_voicebank",
+        lambda root: SimpleNamespace(
+            summary={
+                "oto_files": 1, "oto_entries": 1, "unique_aliases": 1,
+                "prefix_map_files": 0, "prefix_map_entries": 0,
+                "wav_files_checked": 0, "wav_files_invalid": 0,
+                "errors": 0, "warnings": 0,
+            },
+            issues=[],
+        ),
+    )
+
+    args = SimpleNamespace(
+        repo_id="SEKOIA2900/VO-US",
+        revision="main",
+        file_path_filter="",
+        voicebank_filter="",
+        max_download_mb=10,
+        max_extracted_mb=10,
+        fail_on="error",
+        output_dir=tmp_path / "summary",
+    )
+    summary, exit_code = run_audit(args)
+
+    assert exit_code == 1
+    assert summary["archive_errors"] == 1
+    assert summary["archive_error_codes"] == {"archive_duplicate_path": 1}
+    assert summary["totals"]["errors"] == 1
+    markdown = build_markdown(summary)
+    assert "archive_duplicate_path" in markdown
+    assert "broken.zip" not in markdown
+    assert "banks/voice" not in markdown
