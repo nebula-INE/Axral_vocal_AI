@@ -269,3 +269,13 @@ def test_public_model_report_omits_voicebank_and_record_identifiers():
     assert "SECRET_RECORD_123" not in rendered
     assert "voicebanks_by_split" not in rendered
     assert "private_record_id" not in rendered
+
+    unsafe_metrics = build_public_model_report({
+        "mae_semitones": {
+            "nan": float("nan"),
+            "infinity": float("inf"),
+            "huge_integer": 10 ** 10000,
+            "valid": 0.25,
+        }
+    })
+    assert unsafe_metrics["mae_semitones"] == {"valid": 0.25}
