@@ -24,6 +24,9 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "discover_voicebank_roots" in source
     assert "snapshot_download" not in source  # download logic lives in the tested helper
     assert 'if DATA_ROOT.exists(): shutil.rmtree(DATA_ROOT)' in source
+    assert 'DATA_ROOT = Path("/kaggle/temp/hf_voicebanks")' in source
+    assert "shutil.rmtree(DATA_ROOT, ignore_errors=True)" in source
+    assert "TEMP_DATA_CLEANED" in source
     assert "sys.path.insert(0, str(PROJECT))" in source
     assert "audit_results = []" in source
     assert "blocked_voicebank_audit_findings" in source
