@@ -20,6 +20,14 @@ DEFAULT_MAX_DOWNLOAD_MB = 4096
 DEFAULT_MAX_EXTRACTED_MB = 8192
 MAX_ARCHIVE_MEMBERS = 100_000
 MAX_SELECTED_FILES = 250_000
+
+
+class _DiscardTarMembers(list):
+    """Prevent TarFile from retaining every TarInfo while reading a stream."""
+
+    def append(self, member):
+        # TarFile.next() appends here on Python versions before stream=True.
+        return None
 ARCHIVE_SUFFIXES = (".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".zip", ".uar", ".tar")
 
 
@@ -283,6 +291,12 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
     # Stream mode is supported by Python 3.10+ and avoids TarFile.getmembers()
     # caching every TarInfo object. Any later failure removes the partial tree.
     with tarfile.open(archive, "r|*") as bundle:
+        # Python 3.10/3.12 do not expose TarFile(stream=True). Replacing the
+        # member cache with a no-op list provides the same bounded-memory
+        # behavior while keeping TarFile's forward-only stream reader.
+        bundle.members = _DiscardTarMembers()
+        if hasattr(bundle, "stream"):
+            bundle.stream = True
         for member in bundle:
             member_count += 1
             if member_count > MAX_ARCHIVE_MEMBERS:
