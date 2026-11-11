@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.voicebank_audit_summary import build_audit_index, build_public_download_summary
+from scripts.voicebank_audit_summary import (
+    build_audit_index,
+    build_public_download_summary,
+    build_public_model_report,
+)
 
 
 def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
@@ -188,3 +192,57 @@ def test_public_download_summary_omits_archive_and_license_document_paths():
     assert "private/" not in rendered
     assert "secret_voicebank" not in rendered
     assert "音源.zip" not in rendered
+
+
+
+def test_public_model_report_omits_voicebank_and_record_identifiers():
+    private_report = {
+        "status": "experimental_training_complete",
+        "test_evaluation_included": True,
+        "manifest_validation": {
+            "status": "valid",
+            "records": 30,
+            "labeled_records": 30,
+            "records_by_split": {"train": 10, "validation": 10, "test": 10},
+            "voicebanks_by_split": {
+                "train": ["PRIVATE_BANK_A"],
+                "validation": ["PRIVATE_BANK_B"],
+                "test": ["PRIVATE_BANK_C"],
+            },
+            "require_labeled": True,
+        },
+        "label_usage": {"labels_seen": 100, "labels_used": 95,
+                        "labels_without_voiced_note": 5},
+        "usable_examples_by_split": {"train": 30, "validation": 30, "test": 35},
+        "mae_semitones": {"train": 0.1, "validation": 0.2, "test": 0.3},
+        "zero_delta_baseline_mae_semitones": {"train": 0.4, "validation": 0.5,
+                                              "test": 0.6},
+        "evaluation_by_split": {
+            "test": {"mae_semitones": 0.3,
+                     "zero_delta_baseline_mae_semitones": 0.6}
+        },
+        "model": {
+            "model_type": "linear_ridge_pitch_delta",
+            "schema_version": 1,
+            "feature_version": 1,
+            "feature_names": ["bias", "midi_normalized"],
+            "target_kind": "pitch_delta_semitones",
+            "weights": [0.01, 0.02],
+            "safety": {"proposal_only": True},
+        },
+        "private_record_id": "SECRET_RECORD_123",
+    }
+
+    public = build_public_model_report(private_report)
+
+    assert public["manifest_validation"]["records"] == 30
+    assert public["manifest_validation"]["records_by_split"] == {
+        "train": 10, "validation": 10, "test": 10
+    }
+    assert public["mae_semitones"]["test"] == 0.3
+    assert public["model"]["weights"] == [0.01, 0.02]
+    rendered = json.dumps(public)
+    assert "PRIVATE_BANK" not in rendered
+    assert "SECRET_RECORD_123" not in rendered
+    assert "voicebanks_by_split" not in rendered
+    assert "private_record_id" not in rendered
