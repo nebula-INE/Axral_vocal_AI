@@ -424,3 +424,24 @@ def test_run_audit_rejects_non_commit_revision_before_listing_or_download(tmp_pa
     assert summary["status"] == "failed"
     assert summary["fatal_error_code"] == "dataset_revision_unresolved"
     assert calls == []
+
+
+@pytest.mark.parametrize("archive_kind", ("zip", "tar"))
+def test_archive_extraction_rejects_member_count_limit(tmp_path, monkeypatch, archive_kind):
+    monkeypatch.setattr(audit_script, "MAX_ARCHIVE_MEMBERS", 1)
+    archive = tmp_path / f"many-members.{archive_kind}"
+    if archive_kind == "zip":
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr("voice/oto.ini", "first")
+            bundle.writestr("voice/sample.wav", b"RIFF")
+    else:
+        with tarfile.open(archive, "w") as bundle:
+            for name, payload in (("voice/oto.ini", b"first"), ("voice/sample.wav", b"RIFF")):
+                member = tarfile.TarInfo(name)
+                member.size = len(payload)
+                bundle.addfile(member, io.BytesIO(payload))
+
+    destination = tmp_path / "limited-out"
+    with pytest.raises(AuditFailure, match="archive_member_limit_exceeded"):
+        safe_extract_archive(archive, destination, 1024)
+    assert not destination.exists()
