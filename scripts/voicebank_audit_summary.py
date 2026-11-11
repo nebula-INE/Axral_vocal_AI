@@ -55,6 +55,94 @@ def build_public_download_summary(summary: dict[str, object]) -> dict[str, objec
     }
 
 
+def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
+    """Project a private trainer report to metrics/weights without bank IDs."""
+    validation = report.get("manifest_validation")
+    validation = validation if isinstance(validation, dict) else {}
+    raw_split_counts = validation.get("records_by_split")
+    split_counts = raw_split_counts if isinstance(raw_split_counts, dict) else {}
+
+    def safe_count(value: object) -> int:
+        return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+
+    def safe_metrics(value: object) -> dict[str, object]:
+        if not isinstance(value, dict):
+            return {}
+        result: dict[str, object] = {}
+        for key, item in value.items():
+            if isinstance(key, str) and (
+                item is None
+                or (isinstance(item, (int, float)) and not isinstance(item, bool))
+            ):
+                result[key] = item
+        return result
+
+    raw_usage = report.get("label_usage")
+    label_usage = {
+        key: safe_count(value)
+        for key, value in raw_usage.items()
+        if isinstance(key, str)
+    } if isinstance(raw_usage, dict) else {}
+    raw_examples = report.get("usable_examples_by_split")
+    examples = {
+        key: safe_count(value)
+        for key, value in raw_examples.items()
+        if isinstance(key, str)
+    } if isinstance(raw_examples, dict) else {}
+
+    model = report.get("model")
+    public_model: dict[str, object] = {}
+    if isinstance(model, dict):
+        for key in (
+            "model_type", "schema_version", "feature_version",
+            "feature_names", "target_kind", "weights", "safety",
+        ):
+            value = model.get(key)
+            if key in {"feature_names", "weights"} and isinstance(value, list):
+                public_model[key] = value
+            elif key == "safety" and isinstance(value, dict):
+                public_model[key] = {
+                    name: flag for name, flag in value.items()
+                    if isinstance(name, str) and isinstance(flag, bool)
+                }
+            elif key not in {"feature_names", "weights", "safety"} and isinstance(value, (str, int)) and not isinstance(value, bool):
+                public_model[key] = value
+
+    return {
+        "schema_version": 1,
+        "status": report.get("status") if isinstance(report.get("status"), str) else "unknown",
+        "test_evaluation_included": report.get("test_evaluation_included") is True,
+        "manifest_validation": {
+            "status": validation.get("status") if isinstance(validation.get("status"), str) else "unknown",
+            "records": safe_count(validation.get("records")),
+            "labeled_records": safe_count(validation.get("labeled_records")),
+            "records_by_split": {
+                split: safe_count(split_counts.get(split))
+                for split in ("train", "validation", "test")
+            },
+            "require_labeled": validation.get("require_labeled") is True,
+        },
+        "label_usage": label_usage,
+        "usable_examples_by_split": examples,
+        "mae_semitones": safe_metrics(report.get("mae_semitones")),
+        "zero_delta_baseline_mae_semitones": safe_metrics(
+            report.get("zero_delta_baseline_mae_semitones")
+        ),
+        "evaluation_by_split": {
+            split: safe_metrics(metrics)
+            for split, metrics in report.get("evaluation_by_split", {}).items()
+            if isinstance(split, str)
+        } if isinstance(report.get("evaluation_by_split"), dict) else {},
+        "model": public_model,
+        "limitations": [
+            "Metadata-only regression MVP; no waveform synthesis.",
+            "Metrics do not establish singing naturalness or generalization.",
+            "Review data rights and labels independently.",
+            "Do not integrate into the production renderer without a separate reviewed gate.",
+        ],
+    }
+
+
 def build_audit_index(
     results: Iterable[tuple[int, Path, int]],
 ) -> dict[str, object]:
