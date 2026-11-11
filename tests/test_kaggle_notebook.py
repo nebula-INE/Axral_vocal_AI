@@ -31,6 +31,13 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "redact_output=False" in source
     assert "detailed dataset output suppressed" in source
     assert "output_tail=0, redact_output=True" in source
+
+    audit_start = source.index("audit_rc = run")
+    audit_end = source.index("audit_results.append", audit_start)
+    assert "redact_output=True" in source[audit_start:audit_end]
+    validator_start = source.index('"training/validate_dataset.py"')
+    validator_end = source.index('if rc == 0:', validator_start)
+    assert "redact_output=True" in source[validator_start:validator_end]
     assert 'private_model_report = DATA_ROOT / "model_reports" / "pitch_delta_report.json"' in source
     assert 'public_model_report = OUT / "models" / "pitch_delta_metrics.json"' in source
     assert "build_public_model_report(private_report)" in source
