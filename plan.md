@@ -83,7 +83,10 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Add `.github/workflows/hf-utau-voicebank-audit.yml` with manual dispatch and weekly schedule.
 - [x] Keep the existing per-PR unit/integration workflow separate and unchanged.
 - [x] Document workflow operation and data-use boundaries in `docs/real_voicebank_validation.md`.
-- [x] CI green on Python 3.10 and Python 3.12: latest run passed 565 tests in each matrix job.
+- [x] Validate dataset IDs and requested Hub revisions before any Hub request or Markdown summary rendering; reject control characters, malformed path components, and oversized refs.
+- [x] Require the Hub API's resolved revision to be a full 40-character hexadecimal commit SHA before file listing/download; record it in lowercase.
+- [x] Aggregate archive failures by stable error code without exposing archive paths.
+- [x] CI green on Python 3.10 and Python 3.12: latest run passed 589 tests in each matrix job.
 
 ### Remaining verification
 
