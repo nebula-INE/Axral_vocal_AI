@@ -84,6 +84,37 @@ def test_zip_extracts_files_under_destination(tmp_path):
     assert (destination / "voice" / "a.wav").read_bytes() == b"RIFF-test"
 
 
+def test_zip_extraction_repairs_legacy_cp932_member_names(tmp_path, monkeypatch):
+    archive = tmp_path / "legacy-japanese.zip"
+
+    # Older Japanese voicebank ZIPs may omit the UTF-8 flag on CP932 names.
+    def encode_cp932(info):
+        return info.filename.encode("cp932"), info.flag_bits & ~0x800
+
+    monkeypatch.setattr(zipfile.ZipInfo, "_encodeFilenameFlags", encode_cp932)
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("音源/oto.ini", "あ.wav=あ,0,100,-100,20,10\n")
+        bundle.writestr("音源/あ.wav", b"RIFF-japanese-name")
+
+    destination = tmp_path / "legacy-out"
+    safe_extract_archive(archive, destination, 1024)
+
+    assert (destination / "音源" / "oto.ini").is_file()
+    assert (destination / "音源" / "あ.wav").read_bytes() == b"RIFF-japanese-name"
+
+
+def test_zip_extraction_rejects_special_files(tmp_path):
+    archive = tmp_path / "device.zip"
+    info = zipfile.ZipInfo("voice/device.wav")
+    info.create_system = 3
+    info.external_attr = (stat.S_IFCHR | 0o600) << 16
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr(info, b"device")
+
+    with pytest.raises(AuditFailure, match="archive_link_or_special_file_rejected"):
+        safe_extract_archive(archive, tmp_path / "device-out", 1024)
+
+
 def test_zip_extraction_rejects_path_traversal_and_cleans_partial_output(tmp_path):
     archive = tmp_path / "unsafe.zip"
     with zipfile.ZipFile(archive, "w") as bundle:
