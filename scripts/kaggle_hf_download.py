@@ -162,6 +162,36 @@ def _safe_member_path(name: str, allow_dot: bool = False) -> PurePosixPath:
     return PurePosixPath(*parts)
 
 
+def _contains_japanese_text(value: str) -> bool:
+    return any(
+        "\u3040" <= char <= "\u30ff"
+        or "\u3400" <= char <= "\u9fff"
+        or "\uff00" <= char <= "\uffef"
+        for char in value
+    )
+
+
+def _zip_member_path(info: zipfile.ZipInfo) -> PurePosixPath:
+    """Decode legacy CP932 ZIP names when the UTF-8 flag is absent.
+
+    Python's ZIP reader follows the ZIP default and decodes unflagged names as
+    CP437. Older Japanese voicebank archives often store CP932 bytes without
+    setting the UTF-8 flag, which turns otherwise valid filenames into mojibake.
+    Prefer an unambiguous Japanese-script CP932 candidate; preserve UTF-8 names,
+    Unicode-path-extra names, and non-Japanese CP437 names unchanged.
+    """
+    filename = info.filename
+    if not info.flag_bits & 0x800:
+        try:
+            legacy_candidate = filename.encode("cp437").decode("cp932")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+        else:
+            if legacy_candidate != filename and _contains_japanese_text(legacy_candidate):
+                filename = legacy_candidate
+    return _safe_member_path(filename)
+
+
 def _safe_target(root: Path, relative: PurePosixPath) -> Path:
     target = root.joinpath(*relative.parts)
     if not target.resolve(strict=False).is_relative_to(root.resolve()):
@@ -193,7 +223,7 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
             if info.is_dir():
                 _safe_member_path(info.filename.rstrip("/") or ".", allow_dot=True)
                 continue
-            relative = _safe_member_path(info.filename)
+            relative = _zip_member_path(info)
             mode = (info.external_attr >> 16) & 0o170000
             if mode not in (0, stat.S_IFREG):
                 raise DownloadAuditError("archive_link_or_special_file_rejected")
