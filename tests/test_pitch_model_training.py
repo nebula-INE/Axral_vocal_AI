@@ -2,6 +2,7 @@ import math
 
 import pytest
 
+import axral_vocal_ai.pitch_model as pitch_model
 from axral_vocal_ai.pitch_model import (
     _features_for_time,
     LinearPitchDeltaModel,
@@ -262,3 +263,22 @@ def test_non_overlapping_note_context_still_resolves_at_shared_boundary():
     assert features is not None
     assert features[1] == pytest.approx(72 / 127)
     assert features[2] == pytest.approx(0.0)
+
+
+def test_training_examples_accept_one_pass_record_iterators():
+    records = (row for row in synthetic_records())
+
+    examples, counts = examples_from_records(records)
+
+    assert len(examples) == 12
+    assert counts["labels_seen"] == 12
+    assert counts["labels_used"] == 12
+
+
+def test_training_examples_enforce_memory_bound(monkeypatch):
+    with pytest.raises(ValueError, match="training example limit exceeded"):
+        examples_from_records(synthetic_records(), max_examples=2)
+
+    monkeypatch.setattr(pitch_model, "MAX_TRAINING_LABEL_POINTS", 2)
+    with pytest.raises(ValueError, match="training label point limit exceeded"):
+        examples_from_records(synthetic_records())
