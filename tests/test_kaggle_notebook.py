@@ -40,7 +40,8 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     source = "".join(code_cells[0]["source"])
     ast.parse(source)
     assert 'HF_DATA_URL = "https://huggingface.co/datasets/' in source
-    assert "training/validate_dataset.py" in source
+    assert "validate_jsonl(manifest, require_labeled=True)" in source
+    assert "validation_error_code(exc)" in source
     assert "training/train_pitch_model.py" in source
     assert "resume_download" not in source
     assert "scripts/kaggle_hf_download.py" in source
@@ -59,9 +60,7 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     audit_start = source.index("audit_rc = run")
     audit_end = source.index("audit_results.append", audit_start)
     assert "redact_output=True" in source[audit_start:audit_end]
-    validator_start = source.index('"training/validate_dataset.py"')
-    validator_end = source.index('if rc == 0:', validator_start)
-    assert "redact_output=True" in source[validator_start:validator_end]
+    assert '"training/validate_dataset.py"' not in source
     assert 'private_model_report = DATA_ROOT / "model_reports" / "pitch_delta_report.json"' in source
     assert 'public_model_report = OUT / "models" / "pitch_delta_metrics.json"' in source
     assert "build_public_model_report(private_report)" in source
@@ -78,6 +77,11 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert 'str(download_summary.get("dataset_card_license")' not in source
     assert '"download": public_download_summary' in source
     assert '"manifest_index": manifest_index' in source
+    assert '"manifest_validation_failure_codes": validation_failure_codes' in source
+    assert '"training_diagnostic_code": training_diagnostic_code' in source
+    assert "manifest_not_found" in source
+    assert "no_eligible_labelled_manifest" in source
+    assert "manifest validation failure codes" in source.lower()
     assert "artifact_files = [" in source
     assert 'OUT / "voicebank_audit_summary.json"' in source
     assert 'OUT / "models" / "pitch_delta_metrics.json"' in source
