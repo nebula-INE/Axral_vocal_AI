@@ -199,18 +199,17 @@ def _copy_bounded(source: Any, output: Any, maximum_bytes: int, expected_bytes: 
 
 
 def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
-    entries: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
+    """Validate and extract ZIP members in one pass without a second index."""
     seen: set[str] = set()
     total = 0
+    written = 0
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
         if len(infos) > MAX_ARCHIVE_MEMBERS:
             raise AuditFailure("archive_member_limit_exceeded")
         for info in infos:
             if info.is_dir():
-                _zip_member_path(
-                    info, allow_current_directory=True
-                )
+                _zip_member_path(info, allow_current_directory=True)
                 continue
             relative = _zip_member_path(info)
             mode = (info.external_attr >> 16) & 0o170000
@@ -223,9 +222,6 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
             total += info.file_size
             if info.file_size < 0 or total > max_bytes:
                 raise AuditFailure("extracted_size_limit_exceeded")
-            entries.append((info, relative))
-        written = 0
-        for info, relative in entries:
             target = _safe_destination(root, relative)
             target.parent.mkdir(parents=True, exist_ok=True)
             with bundle.open(info) as source, target.open("xb") as output:
@@ -234,14 +230,18 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
 
 
 def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
-    entries: list[tuple[tarfile.TarInfo, PurePosixPath]] = []
+    """Stream TAR members so an archive cannot force a full member index into RAM."""
     seen: set[str] = set()
     total = 0
-    with tarfile.open(archive, "r:*") as bundle:
-        tar_members = bundle.getmembers()
-        if len(tar_members) > MAX_ARCHIVE_MEMBERS:
-            raise AuditFailure("archive_member_limit_exceeded")
-        for member in tar_members:
+    written = 0
+    member_count = 0
+    # Stream mode is supported by Python 3.10+ and avoids TarFile.getmembers()
+    # caching every TarInfo object. Any later failure removes the partial tree.
+    with tarfile.open(archive, "r|*") as bundle:
+        for member in bundle:
+            member_count += 1
+            if member_count > MAX_ARCHIVE_MEMBERS:
+                raise AuditFailure("archive_member_limit_exceeded")
             if member.isdir():
                 _safe_member_path(member.name.rstrip("/") or ".", allow_current_directory=True)
                 continue
@@ -255,9 +255,6 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
             total += member.size
             if member.size < 0 or total > max_bytes:
                 raise AuditFailure("extracted_size_limit_exceeded")
-            entries.append((member, relative))
-        written = 0
-        for member, relative in entries:
             target = _safe_destination(root, relative)
             target.parent.mkdir(parents=True, exist_ok=True)
             source = bundle.extractfile(member)
