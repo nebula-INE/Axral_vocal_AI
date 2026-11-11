@@ -455,3 +455,33 @@ def test_file_selection_rejects_excessive_file_count(monkeypatch):
     ]
     with pytest.raises(AuditFailure, match="selected_file_count_limit_exceeded"):
         select_relevant_files(rows)
+
+
+def test_tar_extraction_streams_without_caching_member_objects(tmp_path, monkeypatch):
+    archive = tmp_path / "tar-stream.tar"
+    with tarfile.open(archive, "w") as bundle:
+        for name, payload in (("Voice/oto.ini", b"alias"), ("Voice/sample.wav", b"RIFF")):
+            member = tarfile.TarInfo(name)
+            member.size = len(payload)
+            bundle.addfile(member, io.BytesIO(payload))
+
+    original_open = tarfile.open
+    opened = []
+
+    def capture_open(*args, **kwargs):
+        bundle = original_open(*args, **kwargs)
+        opened.append(bundle)
+        return bundle
+
+    monkeypatch.setattr("scripts.audit_hf_voicebanks.tarfile.open", capture_open)
+    destination = tmp_path / "tar-stream-out"
+    written = safe_extract_archive(archive, destination, 1024)
+
+    assert written == len(b"alias") + len(b"RIFF")
+    assert (destination / "Voice" / "oto.ini").read_bytes() == b"alias"
+    assert (destination / "Voice" / "sample.wav").read_bytes() == b"RIFF"
+    # is_tarfile() opens the archive once for probing; the final open is the
+    # actual r|* extraction stream. Its TarInfo cache must stay empty.
+    assert len(opened) >= 2
+    assert opened[-1].stream is True
+    assert opened[-1].members == []
