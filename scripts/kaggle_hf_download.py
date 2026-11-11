@@ -19,6 +19,7 @@ import zipfile
 DEFAULT_MAX_DOWNLOAD_MB = 4096
 DEFAULT_MAX_EXTRACTED_MB = 8192
 MAX_ARCHIVE_MEMBERS = 100_000
+MAX_SELECTED_FILES = 250_000
 ARCHIVE_SUFFIXES = (".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".zip", ".uar", ".tar")
 
 
@@ -134,6 +135,8 @@ def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise DownloadAuditError("hub_file_size_unavailable")
         selected[path] = HubFile(path, size)
+        if len(selected) > MAX_SELECTED_FILES:
+            raise DownloadAuditError("selected_file_count_limit_exceeded")
     return sorted(selected.values(), key=lambda item: item.path.casefold())
 
 
