@@ -15,6 +15,11 @@ TARGET_KIND = "pitch_delta_semitones"
 MAX_TRAINING_DELTA_SEMITONES = 2.0
 FORBIDDEN_KEYS = {"audio", "audio_bytes", "audio_file", "audio_path", "waveform", "wav_path", "file_path", "source_path", "relative_path", "absolute_path", "local_path", "checkpoint", "credentials", "token", "secret"}
 
+# Bound manifest parsing before any record payload can exhaust Kaggle memory.
+MAX_MANIFEST_BYTES = 256 * 1024 * 1024
+MAX_JSONL_LINE_BYTES = 1024 * 1024
+MAX_MANIFEST_RECORDS = 100_000
+
 
 class DatasetValidationError(ValueError):
     """Raised when a dataset manifest violates the training gate."""
@@ -155,6 +160,8 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
     total = 0
     labeled_records = 0
     for line_number, record in enumerate(records, start=1):
+        _require(total < MAX_MANIFEST_RECORDS,
+                 f"manifest record limit exceeded ({MAX_MANIFEST_RECORDS})")
         validated = validate_record(record, line_number, require_labeled=require_labeled)
         record_id = validated["record_id"]
         _require(record_id not in seen_ids, f"line {line_number}: duplicate record_id {record_id!r}")
@@ -195,19 +202,53 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
     }
 
 
-def validate_jsonl(path: str | Path, require_labeled: bool = False) -> dict[str, Any]:
-    """Validate a JSON Lines manifest; the file is metadata only, never audio."""
+def iter_jsonl_records(path: str | Path) -> Iterable[Any]:
+    """Yield JSONL records one line at a time under strict byte/record limits."""
     manifest_path = Path(path)
-    records: list[Any] = []
     try:
-        with manifest_path.open("r", encoding="utf-8-sig") as stream:
-            for line_number, line in enumerate(stream, start=1):
+        file_size = manifest_path.stat().st_size
+        _require(
+            file_size <= MAX_MANIFEST_BYTES,
+            f"manifest byte limit exceeded ({MAX_MANIFEST_BYTES})",
+        )
+        bytes_read = 0
+        with manifest_path.open("rb") as stream:
+            line_number = 0
+            while True:
+                raw_line = stream.readline(MAX_JSONL_LINE_BYTES + 1)
+                if not raw_line:
+                    break
+                line_number += 1
+                if len(raw_line) > MAX_JSONL_LINE_BYTES:
+                    raise DatasetValidationError(
+                        f"line {line_number}: JSONL line byte limit exceeded ({MAX_JSONL_LINE_BYTES})"
+                    )
+                bytes_read += len(raw_line)
+                _require(
+                    bytes_read <= MAX_MANIFEST_BYTES,
+                    f"manifest byte limit exceeded ({MAX_MANIFEST_BYTES})",
+                )
+                try:
+                    line = raw_line.decode("utf-8-sig" if line_number == 1 else "utf-8")
+                except UnicodeDecodeError:
+                    raise DatasetValidationError(
+                        f"line {line_number}: manifest must be valid UTF-8"
+                    ) from None
                 if not line.strip() or line.lstrip().startswith("#"):
                     continue
                 try:
-                    records.append(json.loads(line))
+                    yield json.loads(line)
                 except json.JSONDecodeError as exc:
-                    raise DatasetValidationError(f"line {line_number}: invalid JSON: {exc.msg}") from exc
+                    raise DatasetValidationError(
+                        f"line {line_number}: invalid JSON: {exc.msg}"
+                    ) from exc
     except OSError as exc:
         raise DatasetValidationError(f"cannot read manifest: {exc}") from exc
-    return validate_records(records, require_labeled=require_labeled)
+
+
+def validate_jsonl(path: str | Path, require_labeled: bool = False) -> dict[str, Any]:
+    """Validate a JSON Lines manifest incrementally; the file is metadata only."""
+    return validate_records(
+        iter_jsonl_records(path),
+        require_labeled=require_labeled,
+    )
