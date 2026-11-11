@@ -37,6 +37,31 @@ class HubFile:
     size: int
 
 
+def _validate_repo_id(value: Any) -> str:
+    """Keep repository identifiers safe for Hub requests and Markdown summaries."""
+    pattern = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}"
+    if not isinstance(value, str) or not re.fullmatch(pattern, value):
+        raise AuditFailure("invalid_dataset_repo_id")
+    return value
+
+
+def _validate_requested_revision(value: Any) -> str:
+    """Allow ordinary Hub refs while excluding Markdown/control characters."""
+    if (
+        not isinstance(value, str)
+        or len(value) > 128
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", value)
+    ):
+        raise AuditFailure("invalid_requested_revision")
+    parts = value.split("/")
+    if any(
+        not part or part in {".", ".."} or part.startswith(".") or part.endswith(".")
+        for part in parts
+    ) or ".." in value:
+        raise AuditFailure("invalid_requested_revision")
+    return value
+
+
 def _field(item: Any, name: str) -> Any:
     return item.get(name) if isinstance(item, dict) else getattr(item, name, None)
 
@@ -358,26 +383,30 @@ def _args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     summary: dict[str, Any] = {
-        "schema_version": 1, "dataset": args.repo_id, "requested_revision": args.revision,
+        "schema_version": 1, "dataset": None, "requested_revision": None,
         "resolved_revision": None, "status": "running", "selected_files": 0,
         "download_bytes": 0, "voicebank_roots": 0, "archive_errors": 0,
         "archive_error_codes": {}, "banks": [], "totals": {},
         "fail_on": args.fail_on, "fatal_error_code": None,
     }
     try:
+        repo_id = _validate_repo_id(args.repo_id)
+        requested_revision = _validate_requested_revision(args.revision)
+        summary["dataset"] = repo_id
+        summary["requested_revision"] = requested_revision
         try:
             from huggingface_hub import HfApi, snapshot_download
         except ImportError as exc:
             raise AuditFailure("huggingface_hub_not_installed") from exc
         logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
         api = HfApi(token=os.environ.get("HF_TOKEN") or None)
-        info = api.dataset_info(args.repo_id, revision=args.revision)
+        info = api.dataset_info(repo_id, revision=requested_revision)
         revision_sha = getattr(info, "sha", None)
         if not isinstance(revision_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", revision_sha):
             raise AuditFailure("dataset_revision_unresolved")
         summary["resolved_revision"] = revision_sha.lower()
         repo_files = api.list_repo_tree(
-            args.repo_id, repo_type="dataset", revision=revision_sha,
+            repo_id, repo_type="dataset", revision=revision_sha,
             recursive=True, expand=False,
         )
         selected = select_relevant_files(repo_files, path_filter=args.file_path_filter)
@@ -399,7 +428,7 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             extract_root = temp_root / "extracted"
             extract_root.mkdir()
             snapshot_download(
-                repo_id=args.repo_id, repo_type="dataset", revision=revision_sha,
+                repo_id=repo_id, repo_type="dataset", revision=revision_sha,
                 local_dir=str(download_root),
                 allow_patterns=[item.path for item in selected],
                 token=os.environ.get("HF_TOKEN") or None,
