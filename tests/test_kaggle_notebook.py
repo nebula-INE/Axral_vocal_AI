@@ -11,7 +11,7 @@ NOTEBOOK = ROOT / "kaggle" / "Axral_Vocal_AI_OneCell.ipynb"
 def test_trusted_axral_origin_accepts_only_single_canonical_remote():
     notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     source = "".join(
-        cell["source"] for cell in notebook["cells"]
+        "".join(cell["source"]) for cell in notebook["cells"]
         if cell.get("cell_type") == "code"
     )
     tree = ast.parse(source)
