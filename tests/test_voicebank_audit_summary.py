@@ -150,7 +150,7 @@ def test_public_download_summary_omits_archive_and_license_document_paths():
     private_summary = {
         "dataset": "SEKOIA2900/VO-US",
         "requested_revision": "main",
-        "resolved_revision": "abc123",
+        "resolved_revision": "0123456789abcdef0123456789abcdef01234567",
         "dataset_card_license": "other",
         "license_documents": [
             {"path": "secret_voicebank/README.md", "sha256": "abc"},
@@ -176,7 +176,7 @@ def test_public_download_summary_omits_archive_and_license_document_paths():
         "schema_version": 1,
         "dataset": "SEKOIA2900/VO-US",
         "requested_revision": "main",
-        "resolved_revision": "abc123",
+        "resolved_revision": "0123456789abcdef0123456789abcdef01234567",
         "dataset_card_license": "other",
         "license_documents_indexed": 2,
         "selected_files": 12,
@@ -192,6 +192,29 @@ def test_public_download_summary_omits_archive_and_license_document_paths():
     assert "private/" not in rendered
     assert "secret_voicebank" not in rendered
     assert "音源.zip" not in rendered
+
+
+def test_public_download_summary_rejects_unbounded_or_path_like_metadata():
+    public = build_public_download_summary({
+        "dataset": "../../private/voicebank",
+        "requested_revision": "../../secret",
+        "resolved_revision": "not-a-commit-path",
+        "dataset_card_license": "license text containing a private path",
+        "status": {"unexpected": "object"},
+        "archive_results": [
+            {"status": "private/path", "error_code": "path/to/file"},
+            {"status": "failed", "error_code": "archive_broken"},
+        ],
+    })
+
+    assert public["dataset"] is None
+    assert public["requested_revision"] is None
+    assert public["resolved_revision"] is None
+    assert public["dataset_card_license"] is None
+    assert public["status"] is None
+    assert public["archive_status_counts"] == {"failed": 1}
+    assert public["archive_error_code_counts"] == {"archive_broken": 1}
+    assert "private" not in json.dumps(public)
 
 
 
