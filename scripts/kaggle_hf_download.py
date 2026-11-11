@@ -244,9 +244,10 @@ def _copy_bounded(source: Any, output: Any, remaining: int, expected: int) -> in
 
 
 def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
-    members: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
+    """Validate and extract ZIP members in one pass without a second index."""
     seen: set[str] = set()
     declared = 0
+    written = 0
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
         if len(infos) > MAX_ARCHIVE_MEMBERS:
@@ -266,9 +267,6 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
             declared += info.file_size
             if info.file_size < 0 or declared > maximum_bytes:
                 raise DownloadAuditError("extracted_size_limit_exceeded")
-            members.append((info, relative))
-        written = 0
-        for info, relative in members:
             target = _safe_target(destination, relative)
             target.parent.mkdir(parents=True, exist_ok=True)
             with bundle.open(info) as source, target.open("xb") as output:
@@ -277,14 +275,18 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
 
 
 def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
-    members: list[tuple[tarfile.TarInfo, PurePosixPath]] = []
+    """Stream TAR members so an archive cannot force a full member index into RAM."""
     seen: set[str] = set()
     declared = 0
-    with tarfile.open(archive, "r:*") as bundle:
-        tar_members = bundle.getmembers()
-        if len(tar_members) > MAX_ARCHIVE_MEMBERS:
-            raise DownloadAuditError("archive_member_limit_exceeded")
-        for member in tar_members:
+    written = 0
+    member_count = 0
+    # Stream mode is supported by Python 3.10+ and avoids TarFile.getmembers()
+    # caching every TarInfo object. Any later failure removes the partial tree.
+    with tarfile.open(archive, "r|*") as bundle:
+        for member in bundle:
+            member_count += 1
+            if member_count > MAX_ARCHIVE_MEMBERS:
+                raise DownloadAuditError("archive_member_limit_exceeded")
             if member.isdir():
                 _safe_member_path(member.name.rstrip("/") or ".", allow_dot=True)
                 continue
@@ -298,9 +300,6 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
             declared += member.size
             if member.size < 0 or declared > maximum_bytes:
                 raise DownloadAuditError("extracted_size_limit_exceeded")
-            members.append((member, relative))
-        written = 0
-        for member, relative in members:
             target = _safe_target(destination, relative)
             target.parent.mkdir(parents=True, exist_ok=True)
             source = bundle.extractfile(member)
