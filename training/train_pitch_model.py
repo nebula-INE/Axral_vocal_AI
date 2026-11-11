@@ -17,7 +17,7 @@ from axral_vocal_ai.pitch_model import (
     compare_with_zero_baseline,
     fit_ridge,
 )
-from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
+from axral_vocal_ai.training_data import DatasetValidationError, iter_jsonl_records, validate_jsonl
 
 
 def main() -> int:
@@ -34,9 +34,9 @@ def main() -> int:
 
     try:
         summary = validate_jsonl(args.manifest, require_labeled=True)
-        with args.manifest.open("r", encoding="utf-8") as stream:
-            records = [json.loads(line) for line in stream if line.strip() and not line.lstrip().startswith("#")]
-        examples, counts = examples_from_records(records)
+        # Re-read the validated JSONL as a bounded stream instead of retaining
+        # the complete manifest (and a second parsed copy) in memory.
+        examples, counts = examples_from_records(iter_jsonl_records(args.manifest))
         by_split = {split: [row for row in examples if row.split == split]
                     for split in ("train", "validation", "test")}
         if not by_split["train"]:
