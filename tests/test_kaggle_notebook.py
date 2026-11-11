@@ -35,3 +35,4 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "git reset --hard FETCH_HEAD" in source
     assert "local changes" in source
     assert "source_commit" in source
+    assert 'p.suffix.casefold() == ".jsonl"' in source
