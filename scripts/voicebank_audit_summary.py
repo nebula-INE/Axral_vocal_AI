@@ -4,6 +4,8 @@ from __future__ import annotations
 from collections import Counter
 import json
 from pathlib import Path
+import math
+import re
 from typing import Iterable
 
 
@@ -11,7 +13,12 @@ REQUIRED_AUDIT_COUNTERS = {"errors", "warnings"}
 
 
 def build_public_download_summary(summary: dict[str, object]) -> dict[str, object]:
-    """Create an artifact-safe download summary without dataset file paths."""
+    """Create an artifact-safe download summary without paths or unbounded Hub text."""
+    allowed_statuses = {
+        "completed", "completed_with_archive_errors", "no_voicebank_roots_found"
+    }
+    allowed_archive_statuses = {"extracted", "failed", "skipped"}
+
     archive_rows = summary.get("archive_results", [])
     status_counts: Counter[str] = Counter()
     error_counts: Counter[str] = Counter()
@@ -20,10 +27,13 @@ def build_public_download_summary(summary: dict[str, object]) -> dict[str, objec
             if not isinstance(row, dict):
                 continue
             status = row.get("status")
-            if isinstance(status, str):
+            if isinstance(status, str) and status in allowed_archive_statuses:
                 status_counts[status] += 1
             error_code = row.get("error_code")
-            if isinstance(error_code, str) and error_code:
+            if (
+                isinstance(error_code, str)
+                and re.fullmatch(r"[a-z0-9_]{1,80}", error_code)
+            ):
                 error_counts[error_code] += 1
 
     license_documents = summary.get("license_documents", [])
@@ -33,16 +43,43 @@ def build_public_download_summary(summary: dict[str, object]) -> dict[str, objec
         value = summary.get(key, 0)
         return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
-    def safe_optional_text(key: str) -> str | None:
-        value = summary.get(key)
-        return value if isinstance(value, str) and value else None
+    def safe_dataset_id() -> str | None:
+        value = summary.get("dataset")
+        if not isinstance(value, str):
+            return None
+        pattern = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}"
+        return value if re.fullmatch(pattern, value) else None
+
+    def safe_requested_revision() -> str | None:
+        value = summary.get("requested_revision")
+        if not isinstance(value, str) or len(value) > 128:
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", value):
+            return None
+        if any(part in {".", ".."} for part in value.split("/")):
+            return None
+        return value
+
+    def safe_license_identifier() -> str | None:
+        value = summary.get("dataset_card_license")
+        if not isinstance(value, str) or len(value) > 128:
+            return None
+        return value if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}", value) else None
+
+    revision = summary.get("resolved_revision")
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", revision):
+        revision = None
+
+    status = summary.get("status")
+    if status not in allowed_statuses:
+        status = None
 
     return {
         "schema_version": 1,
-        "dataset": safe_optional_text("dataset"),
-        "requested_revision": safe_optional_text("requested_revision"),
-        "resolved_revision": safe_optional_text("resolved_revision"),
-        "dataset_card_license": safe_optional_text("dataset_card_license"),
+        "dataset": safe_dataset_id(),
+        "requested_revision": safe_requested_revision(),
+        "resolved_revision": revision.lower() if isinstance(revision, str) else None,
+        "dataset_card_license": safe_license_identifier(),
         "license_documents_indexed": license_count,
         "selected_files": safe_nonnegative_int("selected_files"),
         "download_bytes": safe_nonnegative_int("download_bytes"),
@@ -51,7 +88,7 @@ def build_public_download_summary(summary: dict[str, object]) -> dict[str, objec
         "archive_error_code_counts": dict(sorted(error_counts.items())),
         "extracted_bytes": safe_nonnegative_int("extracted_bytes"),
         "voicebank_roots": safe_nonnegative_int("voicebank_roots"),
-        "status": safe_optional_text("status"),
+        "status": status,
     }
 
 
@@ -72,7 +109,11 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
         for key, item in value.items():
             if isinstance(key, str) and (
                 item is None
-                or (isinstance(item, (int, float)) and not isinstance(item, bool))
+                or (
+                    isinstance(item, (int, float))
+                    and not isinstance(item, bool)
+                    and math.isfinite(float(item))
+                )
             ):
                 result[key] = item
         return result
