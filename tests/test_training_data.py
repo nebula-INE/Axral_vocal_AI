@@ -322,7 +322,7 @@ def test_validate_jsonl_passes_a_streaming_iterator_to_record_validation(tmp_pat
         make_record("test", "bank-c", "test", target=make_target()),
     ]
     manifest.write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+        chr(10).join(json.dumps(row, ensure_ascii=False) for row in rows) + chr(10),
         encoding="utf-8",
     )
     original = training_data.validate_records
