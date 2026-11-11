@@ -134,7 +134,7 @@ def test_zip_extraction_rejects_symlinks(tmp_path):
     info.external_attr = (stat.S_IFLNK | 0o777) << 16
     with zipfile.ZipFile(archive, "w") as bundle:
         bundle.writestr(info, "../../outside.wav")
-    with pytest.raises(AuditFailure, match="archive_link_rejected"):
+    with pytest.raises(AuditFailure, match="archive_link_or_special_file_rejected"):
         safe_extract_archive(archive, tmp_path / "out", 1024)
 
 
