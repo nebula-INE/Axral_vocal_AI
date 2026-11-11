@@ -52,14 +52,17 @@ def test_select_relevant_files_includes_utau_files_and_jsonl_but_skips_directori
         {"path": "banks/raw/a.wav", "size": 2048},
         {"path": "labels/pitch_training_manifest.jsonl", "size": 512},
         {"path": "docs/README.md", "size": 20},
+        {"path": "banks/Voice/LICENSE.txt", "size": 40},
+        {"path": "banks/Voice/notes.JSONL", "size": 10},
         {"path": "banks/raw/", "size": None},
     ]
     selected = select_relevant_files(entries)
     assert {item.path for item in selected} == {
         "banks/voice.zip", "banks/raw/oto.ini", "banks/raw/prefix.map",
         "banks/raw/a.wav", "labels/pitch_training_manifest.jsonl", "docs/README.md",
+        "banks/Voice/LICENSE.txt", "banks/Voice/notes.JSONL",
     }
-    assert sum(item.size for item in selected) == 3724
+    assert sum(item.size for item in selected) == 3774
 
 
 def test_select_relevant_files_rejects_traversal():
