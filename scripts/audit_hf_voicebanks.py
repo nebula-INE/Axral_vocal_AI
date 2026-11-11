@@ -110,6 +110,37 @@ def _safe_member_path(name: str, *, allow_current_directory: bool = False) -> Pu
     return PurePosixPath(*parts)
 
 
+def _contains_japanese_text(value: str) -> bool:
+    return any(
+        "\\u3040" <= char <= "\\u30ff"
+        or "\\u3400" <= char <= "\\u9fff"
+        or "\\uff00" <= char <= "\\uffef"
+        for char in value
+    )
+
+
+def _zip_member_path(info: zipfile.ZipInfo, *, allow_current_directory: bool = False) -> PurePosixPath:
+    """Decode legacy CP932 names before validating or extracting ZIP members.
+
+    Some older Japanese UTAU archives store CP932 filename bytes without
+    setting the ZIP UTF-8 flag. Python exposes those names as CP437 text.
+    Restore only candidates that decode to Japanese-script text, leaving
+    UTF-8-flagged and ordinary CP437 names unchanged.
+    """
+    filename = info.filename
+    if not info.flag_bits & 0x800:
+        try:
+            legacy_candidate = filename.encode("cp437").decode("cp932")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+        else:
+            if legacy_candidate != filename and _contains_japanese_text(legacy_candidate):
+                filename = legacy_candidate
+    return _safe_member_path(
+        filename, allow_current_directory=allow_current_directory
+    )
+
+
 def _safe_destination(root: Path, relative: PurePosixPath) -> Path:
     destination = root.joinpath(*relative.parts)
     if not destination.resolve(strict=False).is_relative_to(root.resolve()):
@@ -142,12 +173,14 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
     with zipfile.ZipFile(archive) as bundle:
         for info in bundle.infolist():
             if info.is_dir():
-                _safe_member_path(info.filename.rstrip("/") or ".", allow_current_directory=True)
+                _zip_member_path(
+                    info, allow_current_directory=True
+                )
                 continue
-            relative = _safe_member_path(info.filename)
+            relative = _zip_member_path(info)
             mode = (info.external_attr >> 16) & 0o170000
-            if mode == stat.S_IFLNK:
-                raise AuditFailure("archive_link_rejected")
+            if mode not in (0, stat.S_IFREG):
+                raise AuditFailure("archive_link_or_special_file_rejected")
             key = relative.as_posix().casefold()
             if key in seen:
                 raise AuditFailure("archive_duplicate_path")
