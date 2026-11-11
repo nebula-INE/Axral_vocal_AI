@@ -106,6 +106,12 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert '["git", "reset", "--hard", "FETCH_HEAD"]' in source
     assert "local changes" in source
     assert "source_commit" in source
+    assert "MAX_MANIFEST_BYTES" in source
+    assert "MAX_JSONL_LINE_BYTES" in source
+    assert "MAX_MANIFEST_RECORDS" in source
+    assert "MAX_TRAINING_EXAMPLES" in source
+    assert "MAX_TRAINING_LABEL_POINTS" in source
+    assert '"training_limits": training_limits' in source
     assert 'p.suffix.casefold() == ".jsonl"' in source
     assert "from scripts.voicebank_audit_summary import build_audit_index" in source
     assert "voicebank_audit_summary.json" in source
