@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.voicebank_audit_summary import build_audit_index
+from scripts.voicebank_audit_summary import build_audit_index, build_public_download_summary
 
 
 def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
@@ -139,3 +139,52 @@ def test_required_audit_counters_must_be_present_and_valid(tmp_path):
     assert result["aggregate"] == {}
     assert result["failures"][0]["error_code"] == "invalid_or_missing_audit_report"
     assert result["banks"][0]["status"] == "invalid_or_missing_report"
+
+
+
+def test_public_download_summary_omits_archive_and_license_document_paths():
+    private_summary = {
+        "dataset": "SEKOIA2900/VO-US",
+        "requested_revision": "main",
+        "resolved_revision": "abc123",
+        "dataset_card_license": "other",
+        "license_documents": [
+            {"path": "secret_voicebank/README.md", "sha256": "abc"},
+            {"path": "secret_voicebank/LICENSE.txt", "sha256": "def"},
+        ],
+        "selected_files": 12,
+        "download_bytes": 1024,
+        "archives_found": 2,
+        "archive_results": [
+            {"path": "private/音源.zip", "status": "extracted", "error_code": None},
+            {"path": "private/another.zip", "status": "failed",
+             "error_code": "archive_duplicate_path"},
+        ],
+        "archive_errors": ["archive_duplicate_path"],
+        "extracted_bytes": 2048,
+        "voicebank_roots": 3,
+        "status": "completed_with_archive_errors",
+    }
+
+    public = build_public_download_summary(private_summary)
+
+    assert public == {
+        "schema_version": 1,
+        "dataset": "SEKOIA2900/VO-US",
+        "requested_revision": "main",
+        "resolved_revision": "abc123",
+        "dataset_card_license": "other",
+        "license_documents_indexed": 2,
+        "selected_files": 12,
+        "download_bytes": 1024,
+        "archives_found": 2,
+        "archive_status_counts": {"extracted": 1, "failed": 1},
+        "archive_error_code_counts": {"archive_duplicate_path": 1},
+        "extracted_bytes": 2048,
+        "voicebank_roots": 3,
+        "status": "completed_with_archive_errors",
+    }
+    rendered = json.dumps(public, ensure_ascii=False)
+    assert "private/" not in rendered
+    assert "secret_voicebank" not in rendered
+    assert "音源.zip" not in rendered
