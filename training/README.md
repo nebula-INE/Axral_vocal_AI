@@ -76,3 +76,17 @@ The Kaggle notebook writes `voicebank_audit_summary.json`, aggregating numeric i
 ## Japanese text and legacy ZIP filenames
 
 The voicebank audit reader prefers UTF-8 for BOM-less metadata, accepts UTF-8 BOM and BOM-marked UTF-16, and falls back to CP932 when UTF-8 decoding fails. This preserves Japanese aliases in common UTAU `oto.ini` and `prefix.map` files without rewriting the source files. The Kaggle archive extractor also repairs a ZIP member name only when the ZIP UTF-8 flag is absent and the CP932 interpretation produces Japanese-script characters; UTF-8 names and non-Japanese CP437 names are left unchanged. Path-safety and duplicate-path checks run after this decoding step, so the repaired path—not the mojibake display string—is what gets validated and extracted. Ambiguous or already-corrupted source text cannot be reliably reconstructed automatically and remains subject to the audit report and manual review.
+
+
+## Kaggle manifest diagnostics
+
+The one-cell Kaggle run records path-free `training_diagnostic_code` and
+`manifest_validation_failure_codes` in `summary.json` and `pipeline.log`.
+Each rejected JSONL candidate is represented only by its numeric candidate
+index and a stable error code; exception messages, record IDs, voicebank
+names, lyrics, filenames, and local paths are not copied into the artifact.
+Codes distinguish missing manifests, invalid UTF-8/JSON, size and record
+limits, permission/provenance failures, split leakage, malformed note data,
+and missing or invalid pitch labels. These diagnostics explain why the
+metadata-only pitch-delta MVP did not train; they do not imply that WAV
+inventory alone is sufficient training data.
