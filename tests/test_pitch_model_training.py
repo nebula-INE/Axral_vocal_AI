@@ -9,6 +9,7 @@ import pytest
 import axral_vocal_ai.pitch_model as pitch_model
 from axral_vocal_ai.pitch_model import (
     _features_for_time,
+    _features_for_sorted_points,
     LinearPitchDeltaModel,
     compare_with_zero_baseline,
     examples_from_records,
@@ -81,6 +82,38 @@ def test_boundary_into_unvoiced_note_is_not_assigned_to_previous_note():
         {"start_sec": 1.0, "end_sec": 2.0, "midi_note": 0, "voiced": False},
     ]
     assert _features_for_time(notes, 1.0) is None
+
+
+
+def test_sorted_sweep_matches_reference_for_overlaps_and_boundaries():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True},
+        {"start_sec": 0.5, "end_sec": 1.5, "midi_note": 72, "voiced": True},
+        {"start_sec": 1.5, "end_sec": 2.0, "midi_note": 0, "voiced": False},
+        {"start_sec": 2.0, "end_sec": 3.0, "midi_note": 67, "voiced": True},
+        {"start_sec": 4.0, "end_sec": 5.0, "midi_note": 69, "voiced": True},
+    ]
+    times = [0.0, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+    points = [{"time_sec": value} for value in times]
+
+    actual = list(_features_for_sorted_points(notes, points))
+    expected = [_features_for_time(notes, value) for value in times]
+
+    assert actual == expected
+
+
+def test_unsorted_training_labels_keep_reference_mapping_semantics():
+    rows = synthetic_records()[:1]
+    rows[0]["target"]["points"] = [
+        {"time_sec": 1.0, "delta_semitones": 0.5},
+        {"time_sec": 0.0, "delta_semitones": 0.0},
+        {"time_sec": 0.5, "delta_semitones": 0.25},
+    ]
+
+    examples, counts = examples_from_records(rows)
+
+    assert [row.features[2] for row in examples] == [1.0, 0.0, 0.5]
+    assert counts["labels_used"] == 3
 
 
 def test_ridge_training_is_finite_and_serializable():
