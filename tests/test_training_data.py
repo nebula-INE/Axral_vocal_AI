@@ -322,7 +322,7 @@ def test_validate_jsonl_passes_a_streaming_iterator_to_record_validation(tmp_pat
         make_record("test", "bank-c", "test", target=make_target()),
     ]
     manifest.write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\\n" for row in rows),
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
         encoding="utf-8",
     )
     original = training_data.validate_records
@@ -352,7 +352,7 @@ def test_jsonl_reader_rejects_oversized_manifest_before_parsing(tmp_path, monkey
 
 def test_jsonl_reader_rejects_oversized_single_line(tmp_path, monkeypatch):
     manifest = tmp_path / "long-line.jsonl"
-    manifest.write_text(json.dumps(make_record()) + "\\n", encoding="utf-8")
+    manifest.write_text(json.dumps(make_record()) + "\n", encoding="utf-8")
     monkeypatch.setattr(training_data, "MAX_MANIFEST_BYTES", 1024 * 1024)
     monkeypatch.setattr(training_data, "MAX_JSONL_LINE_BYTES", 64)
 
