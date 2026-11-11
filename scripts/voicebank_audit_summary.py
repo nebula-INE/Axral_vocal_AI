@@ -71,7 +71,7 @@ def build_public_download_summary(summary: dict[str, object]) -> dict[str, objec
         revision = None
 
     status = summary.get("status")
-    if status not in allowed_statuses:
+    if not isinstance(status, str) or status not in allowed_statuses:
         status = None
 
     return {
