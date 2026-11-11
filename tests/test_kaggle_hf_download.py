@@ -167,7 +167,7 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
 
         def dataset_info(self, repo_id, revision):
             calls["dataset_info"] = (repo_id, revision)
-            return SimpleNamespace(sha="abc123", cardData={"license": "cc-by-4.0"})
+            return SimpleNamespace(sha="a" * 40, cardData={"license": "cc-by-4.0"})
 
         def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
             calls["list_repo_tree"] = (repo_id, repo_type, revision, recursive, expand)
@@ -200,10 +200,10 @@ def test_download_dataset_pins_revision_and_downloads_only_selected_files(tmp_pa
 
     assert calls["token"] == "private-token"
     assert calls["dataset_info"] == ("SEKOIA2900/VO-US", "main")
-    assert calls["list_repo_tree"] == ("SEKOIA2900/VO-US", "dataset", "abc123", True, False)
-    assert calls["snapshot_download"]["revision"] == "abc123"
+    assert calls["list_repo_tree"] == ("SEKOIA2900/VO-US", "dataset", "a" * 40, True, False)
+    assert calls["snapshot_download"]["revision"] == "a" * 40
     assert calls["snapshot_download"]["allow_patterns"] == ["README.md", "voicebank.zip"]
-    assert result["resolved_revision"] == "abc123"
+    assert result["resolved_revision"] == "a" * 40
     assert result["dataset_card_license"] == "cc-by-4.0"
     assert result["voicebank_roots"] == 1
     assert result["license_documents"] == [{
@@ -258,7 +258,7 @@ def test_download_summary_reports_archive_failures_with_paths(tmp_path, monkeypa
             pass
 
         def dataset_info(self, repo_id, revision):
-            return SimpleNamespace(sha="abc123", cardData=None)
+            return SimpleNamespace(sha="a" * 40, cardData=None)
 
         def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
             return [
@@ -305,3 +305,36 @@ def test_download_summary_reports_archive_failures_with_paths(tmp_path, monkeypa
     )
     assert saved["status"] == "completed_with_archive_errors"
 
+
+
+def test_download_dataset_rejects_non_commit_revision_before_listing_or_download(tmp_path, monkeypatch):
+    calls = []
+
+    class FakeApi:
+        def __init__(self, token=None):
+            pass
+
+        def dataset_info(self, repo_id, revision):
+            return SimpleNamespace(sha="not-a-commit-sha", cardData=None)
+
+        def list_repo_tree(self, *args, **kwargs):
+            calls.append("list_repo_tree")
+            return []
+
+    def fake_snapshot_download(**kwargs):
+        calls.append("snapshot_download")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeApi, snapshot_download=fake_snapshot_download),
+    )
+
+    with pytest.raises(DownloadAuditError, match="dataset_revision_unresolved"):
+        download_dataset(
+            "https://huggingface.co/datasets/owner/repo",
+            tmp_path / "dataset",
+        )
+
+    assert calls == []
+    assert not (tmp_path / "dataset").exists()
