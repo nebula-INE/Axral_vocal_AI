@@ -333,7 +333,7 @@ def download_dataset(
     dataset_card_license = _field(card_data, "license")
     if not isinstance(dataset_card_license, str) or not dataset_card_license.strip():
         dataset_card_license = None
-    if not isinstance(revision, str) or not revision:
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", revision):
         raise DownloadAuditError("dataset_revision_unresolved")
     entries = api.list_repo_tree(
         repo_id, repo_type="dataset", revision=revision, recursive=True, expand=False
