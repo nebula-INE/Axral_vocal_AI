@@ -84,6 +84,24 @@ def test_zip_extracts_files_under_destination(tmp_path):
     assert (destination / "voice" / "a.wav").read_bytes() == b"RIFF-test"
 
 
+def test_zip_extraction_preserves_utf8_and_ascii_member_names(tmp_path):
+    archive = tmp_path / "ordinary-names.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("plain/readme.txt", "ASCII name")
+        bundle.writestr("日本語音源/あ.wav", b"RIFF-utf8-name")
+
+    with zipfile.ZipFile(archive) as bundle:
+        members = {info.filename: info.flag_bits for info in bundle.infolist()}
+    assert not (members["plain/readme.txt"] & 0x800)
+    assert members["日本語音源/あ.wav"] & 0x800
+
+    destination = tmp_path / "ordinary-out"
+    safe_extract_archive(archive, destination, 1024)
+
+    assert (destination / "plain" / "readme.txt").read_text(encoding="utf-8") == "ASCII name"
+    assert (destination / "日本語音源" / "あ.wav").read_bytes() == b"RIFF-utf8-name"
+
+
 def test_zip_extraction_repairs_legacy_cp932_member_names(tmp_path, monkeypatch):
     archive = tmp_path / "legacy-japanese.zip"
 
