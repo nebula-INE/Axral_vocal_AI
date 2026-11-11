@@ -213,3 +213,49 @@ def test_extract_tar_rejects_hardlink(tmp_path):
     with pytest.raises(DownloadAuditError, match="archive_link_or_special_file_rejected"):
         safe_extract_archive(archive, tmp_path / "out", 1024)
     assert not (tmp_path / "out").exists()
+
+
+def test_download_summary_reports_archive_failures_with_paths(tmp_path, monkeypatch):
+    class FakeApi:
+        def __init__(self, token=None):
+            pass
+
+        def dataset_info(self, repo_id, revision):
+            return SimpleNamespace(sha="abc123", cardData=None)
+
+        def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
+            return [{"path": "banks/broken.zip", "size": 4}]
+
+    def fake_snapshot_download(**kwargs):
+        target = Path(kwargs["local_dir"]) / "banks" / "broken.zip"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"nope")
+        return str(kwargs["local_dir"])
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeApi, snapshot_download=fake_snapshot_download),
+    )
+
+    with pytest.raises(DownloadAuditError, match="no_voicebank_roots_found"):
+        download_dataset(
+            "https://huggingface.co/datasets/owner/repo",
+            tmp_path / "dataset",
+            max_download_mb=1,
+            max_extracted_mb=1,
+        )
+
+    summary = __import__("json").loads(
+        (tmp_path / "dataset" / "download_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["status"] == "no_voicebank_roots_found"
+    assert summary["archives_found"] == 1
+    assert summary["archive_results"] == [{
+        "path": "banks/broken.zip",
+        "size_bytes": 4,
+        "status": "failed",
+        "error_code": "unsupported_or_invalid_archive",
+        "extracted_bytes": 0,
+    }]
+    assert summary["archive_errors"] == ["unsupported_or_invalid_archive"]
