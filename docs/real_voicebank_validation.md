@@ -102,6 +102,7 @@ Manual inputs:
 - `fail_on`: `error` (default), `warning`, or `never`.
 
 The downloader selects supported ZIP/UAR and tar archives plus standalone `oto.ini`, `prefix.map`, and WAV files. ZIP/tar members that are absolute, escape the extraction root, or represent links/special files are rejected. Archive extraction runs in a temporary directory and its contents are deleted when the job ends.
+For ZIP entries without the UTF-8 filename flag, the extractor tries CP932 and restores the member path only when the decoded result contains Japanese-script characters. Path traversal and duplicate-path checks run on that restored name. UTF-8 names and non-Japanese CP437 names remain unchanged; ambiguous names still require manual review.
 
 The CLI audit is read-only. The Actions artifact and step summary contain only aggregate counts and issue codes; detailed JSON containing aliases, filenames, and paths is deliberately not uploaded. WAVs, extracted voicebanks, and detailed parser output remain on the ephemeral runner.
 
