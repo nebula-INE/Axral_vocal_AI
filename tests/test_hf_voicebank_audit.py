@@ -23,7 +23,77 @@ from scripts.audit_hf_voicebanks import (
     safe_extract_archive,
     select_relevant_files,
     summarize_analysis,
+    _validate_repo_id,
+    _validate_requested_revision,
 )
+
+
+@pytest.mark.parametrize("revision", ["main", "release/2026.11", "feature/voicebank-audit"])
+def test_requested_hub_revision_accepts_safe_refs(revision):
+    assert _validate_requested_revision(revision) == revision
+
+
+@pytest.mark.parametrize("revision", [
+    "", "../main", "refs/../main", "feature\n# injected markdown",
+    "release|[link](https://example.invalid)", "a" * 129, ".hidden", "feature//branch",
+])
+def test_requested_hub_revision_rejects_unsafe_values(revision):
+    with pytest.raises(AuditFailure, match="invalid_requested_revision"):
+        _validate_requested_revision(revision)
+
+
+@pytest.mark.parametrize("repo_id", [
+    "SEKOIA2900/VO-US", "owner/repo-name", "owner/repo_name"
+])
+def test_hub_repo_id_accepts_safe_identifiers(repo_id):
+    assert _validate_repo_id(repo_id) == repo_id
+
+
+@pytest.mark.parametrize("repo_id", [
+    "../private/repo", "owner/repo\n# injected", "owner/repo|[link](x)", "owner"
+])
+def test_hub_repo_id_rejects_unsafe_values(repo_id):
+    with pytest.raises(AuditFailure, match="invalid_dataset_repo_id"):
+        _validate_repo_id(repo_id)
+
+
+def test_run_audit_rejects_markdown_injection_revision_before_hub_request(tmp_path, monkeypatch):
+    calls = []
+
+    class FakeHfApi:
+        def __init__(self, token=None):
+            calls.append("client_created")
+
+        def dataset_info(self, repo_id, revision):
+            calls.append("dataset_info")
+            raise AssertionError("invalid revision must be rejected before Hub API calls")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeHfApi, snapshot_download=lambda **kwargs: calls.append("download")),
+    )
+    malicious = "feature\n# injected markdown"
+    args = SimpleNamespace(
+        repo_id="SEKOIA2900/VO-US",
+        revision=malicious,
+        file_path_filter="",
+        voicebank_filter="",
+        max_download_mb=10,
+        max_extracted_mb=10,
+        fail_on="error",
+        output_dir=tmp_path / "summary",
+    )
+
+    summary, exit_code = run_audit(args)
+
+    assert exit_code == 2
+    assert summary["status"] == "failed"
+    assert summary["fatal_error_code"] == "invalid_requested_revision"
+    assert summary["requested_revision"] is None
+    assert calls == []
+    markdown = build_markdown(summary)
+    assert "injected markdown" not in markdown
 
 
 def test_file_selection_keeps_archives_utau_metadata_and_wav_only():
