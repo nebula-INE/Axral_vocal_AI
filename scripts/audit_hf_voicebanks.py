@@ -111,12 +111,15 @@ def _safe_member_path(name: str, *, allow_current_directory: bool = False) -> Pu
 
 
 def _contains_japanese_text(value: str) -> bool:
-    return any(
-        "\\u3040" <= char <= "\\u30ff"
-        or "\\u3400" <= char <= "\\u9fff"
-        or "\\uff00" <= char <= "\\uffef"
-        for char in value
-    )
+    for char in value:
+        codepoint = ord(char)
+        if (
+            0x3040 <= codepoint <= 0x30FF
+            or 0x3400 <= codepoint <= 0x9FFF
+            or 0xFF00 <= codepoint <= 0xFFEF
+        ):
+            return True
+    return False
 
 
 def _zip_member_path(info: zipfile.ZipInfo, *, allow_current_directory: bool = False) -> PurePosixPath:
