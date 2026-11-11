@@ -329,23 +329,49 @@ def download_dataset(
     max_extracted_bytes = max_extracted_mb * 1024 * 1024
     extracted_bytes = 0
     archive_errors: list[str] = []
+    archive_results: list[dict[str, Any]] = []
     archives = sorted(
         (path for path in download_dir.rglob("*")
          if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES)),
         key=lambda path: path.as_posix().casefold(),
     )
     for index, archive in enumerate(archives, start=1):
+        relative_archive = archive.relative_to(download_dir).as_posix()
+        archive_size = archive.stat().st_size
         remaining = max_extracted_bytes - extracted_bytes
         if remaining <= 0:
-            archive_errors.append("extracted_size_limit_exceeded")
+            code = "extracted_size_limit_exceeded"
+            archive_errors.append(code)
+            archive_results.append({
+                "path": relative_archive,
+                "size_bytes": archive_size,
+                "status": "skipped",
+                "error_code": code,
+                "extracted_bytes": 0,
+            })
             continue
         safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", archive.name)[:80] or f"archive_{index}"
         destination = extracted_dir / f"{index:04d}_{safe_name}"
         try:
-            extracted_bytes += safe_extract_archive(archive, destination, remaining)
+            written = safe_extract_archive(archive, destination, remaining)
+            extracted_bytes += written
+            archive_results.append({
+                "path": relative_archive,
+                "size_bytes": archive_size,
+                "status": "extracted",
+                "error_code": None,
+                "extracted_bytes": written,
+            })
         except Exception as exc:
-            code = exc.code if isinstance(exc, DownloadAuditError) else "archive_extraction_failed"
+            code = str(exc) if isinstance(exc, DownloadAuditError) else "archive_extraction_failed"
             archive_errors.append(code)
+            archive_results.append({
+                "path": relative_archive,
+                "size_bytes": archive_size,
+                "status": "failed",
+                "error_code": code,
+                "extracted_bytes": 0,
+            })
 
     roots = discover_voicebank_roots(download_dir, extracted_dir)
     license_documents = collect_license_document_metadata(download_dir, extracted_dir)
@@ -358,10 +384,15 @@ def download_dataset(
         "selected_files": len(selected),
         "download_bytes": download_bytes,
         "archives_found": len(archives),
+        "archive_results": archive_results,
         "archive_errors": archive_errors,
         "extracted_bytes": extracted_bytes,
         "voicebank_roots": len(roots),
-        "status": "completed" if roots else "no_voicebank_roots_found",
+        "status": (
+            "no_voicebank_roots_found" if not roots
+            else "completed_with_archive_errors" if archive_errors
+            else "completed"
+        ),
     }
     (output_dir / "download_summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
