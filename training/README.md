@@ -71,7 +71,7 @@ Each archive receives its own summary entry with its repository-relative path, c
 
 ## Compact voicebank audit index
 
-The Kaggle notebook writes `voicebank_audit_summary.json`, aggregating numeric inventory/WAV/error/warning counters by bank index and recording stable failure codes without bank paths, aliases, or raw filenames. Full per-bank JSON reports are created under `/kaggle/temp/hf_voicebanks/audit_reports` only while the cell is running; they are deleted during finalization and are not included in the downloadable artifact. The ZIP contains only an allowlist: sanitized `pipeline.log`, path-free `download_summary.json`, `voicebank_audit_summary.json`, `summary.json`, and the metadata-only model metrics report when one exists.
+The Kaggle notebook writes `voicebank_audit_summary.json`, aggregating numeric inventory/WAV/error/warning counters by bank index and recording stable failure codes without bank paths, aliases, or raw filenames. Full per-bank JSON reports are created under `/kaggle/temp/hf_voicebanks/audit_reports` only while the cell is running; they are deleted during finalization and are not included in the downloadable artifact. The ZIP contains only an allowlist: sanitized `pipeline.log`, path-free `download_summary.json`, `voicebank_audit_summary.json`, `summary.json`, and an ID-free metadata-only model metrics projection when one exists. The trainer's original report (which contains voicebank IDs by split) stays under `/kaggle/temp` and is deleted before packaging; only aggregate split counts, MAE/baseline metrics, and model weights are retained.
 
 ## Japanese text and legacy ZIP filenames
 
