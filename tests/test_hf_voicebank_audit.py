@@ -445,3 +445,13 @@ def test_archive_extraction_rejects_member_count_limit(tmp_path, monkeypatch, ar
     with pytest.raises(AuditFailure, match="archive_member_limit_exceeded"):
         safe_extract_archive(archive, destination, 1024)
     assert not destination.exists()
+
+
+def test_file_selection_rejects_excessive_file_count(monkeypatch):
+    monkeypatch.setattr(audit_script, "MAX_SELECTED_FILES", 1)
+    rows = [
+        {"path": "bank-a/oto.ini", "size": 1},
+        {"path": "bank-b/oto.ini", "size": 1},
+    ]
+    with pytest.raises(AuditFailure, match="selected_file_count_limit_exceeded"):
+        select_relevant_files(rows)
