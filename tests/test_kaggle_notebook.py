@@ -1,6 +1,7 @@
 """Structural checks for the single-cell Kaggle notebook."""
 import ast
 import json
+import re
 from pathlib import Path
 
 
@@ -55,6 +56,8 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "sanitize_dataset_paths" in source
     assert "redact_output=False" in source
     assert "detailed dataset output suppressed" in source
+    assert "safe_command_diagnostic(p.stdout)" in source
+    assert "safe diagnostic=" in source
     assert "output_tail=0, redact_output=True" in source
 
     audit_start = source.index("audit_rc = run")
@@ -121,3 +124,39 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "voicebank_audit_summary.json" in source
     assert "audit_index[\"aggregate\"]" in source
     assert 'json.dumps(download_summary, ensure_ascii=False, indent=2) + "\\\\n",' not in source
+
+
+def test_safe_command_diagnostic_keeps_codes_without_private_payload():
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    source = "".join(
+        "".join(cell["source"]) for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+    )
+    tree = ast.parse(source)
+    function = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "safe_command_diagnostic"
+    )
+    isolated = ast.Module(body=[function], type_ignores=[])
+    namespace = {"json": json, "re": re}
+    exec(compile(isolated, str(NOTEBOOK), "exec"), namespace)
+    diagnose = namespace["safe_command_diagnostic"]
+
+    output = (
+        "download starting\n"
+        + json.dumps({
+            "status": "failed",
+            "error_code": "selected_file_count_limit_exceeded",
+            "path": "/kaggle/temp/private/voicebank.zip",
+            "alias": "SECRET_ALIAS",
+        })
+    )
+    assert diagnose(output) == {
+        "status": "failed",
+        "error_code": "selected_file_count_limit_exceeded",
+    }
+    assert diagnose(json.dumps({
+        "status": "private/path",
+        "error_code": "private/error",
+    })) == {}
+    assert diagnose("not json") == {}
