@@ -102,6 +102,17 @@ def test_sorted_sweep_matches_reference_for_overlaps_and_boundaries():
     assert actual == expected
 
 
+def test_sorted_sweep_keeps_endpoint_when_first_label_is_after_note_start():
+    notes = [
+        {"start_sec": 0.5, "end_sec": 1.0, "midi_note": 64, "voiced": True},
+    ]
+    points = [{"time_sec": 1.0}]
+
+    assert list(_features_for_sorted_points(notes, points)) == [
+        _features_for_time(notes, 1.0)
+    ]
+
+
 def test_unsorted_training_labels_keep_reference_mapping_semantics():
     rows = synthetic_records()[:1]
     rows[0]["target"]["points"] = [
