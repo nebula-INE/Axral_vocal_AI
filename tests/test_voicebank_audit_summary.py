@@ -248,10 +248,10 @@ def test_public_model_report_omits_voicebank_and_record_identifiers():
             "model_type": "linear_ridge_pitch_delta",
             "schema_version": 1,
             "feature_version": 1,
-            "feature_names": ["bias", "midi_normalized"],
+            "feature_names": ["bias", "midi_normalized", "../private"],
             "target_kind": "pitch_delta_semitones",
-            "weights": [0.01, 0.02],
-            "safety": {"proposal_only": True},
+            "weights": [0.01, 0.02, float("inf"), "PRIVATE_WEIGHT"],
+            "safety": {"proposal_only": True, "private_flag": True},
         },
         "private_record_id": "SECRET_RECORD_123",
     }
@@ -264,6 +264,8 @@ def test_public_model_report_omits_voicebank_and_record_identifiers():
     }
     assert public["mae_semitones"]["test"] == 0.3
     assert public["model"]["weights"] == [0.01, 0.02]
+    assert public["model"]["feature_names"] == ["bias", "midi_normalized"]
+    assert public["model"]["safety"] == {"proposal_only": True}
     rendered = json.dumps(public)
     assert "PRIVATE_BANK" not in rendered
     assert "SECRET_RECORD_123" not in rendered
