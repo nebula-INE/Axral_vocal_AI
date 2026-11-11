@@ -43,4 +43,4 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "from scripts.voicebank_audit_summary import build_audit_index" in source
     assert "voicebank_audit_summary.json" in source
     assert "audit_index[\"aggregate\"]" in source
-    assert 'json.dumps(download_summary, ensure_ascii=False, indent=2) + "\\n",' not in source
+    assert 'json.dumps(download_summary, ensure_ascii=False, indent=2) + "\\\\n",' not in source
