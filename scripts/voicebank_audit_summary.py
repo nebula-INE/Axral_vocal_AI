@@ -22,6 +22,7 @@ ALLOWED_LABEL_USAGE = frozenset({
 })
 TRAINING_BLOCKING_AUDIT_WARNINGS = frozenset({
     "metadata_replacement_character",
+    "metadata_suspected_mojibake",
 })
 
 
