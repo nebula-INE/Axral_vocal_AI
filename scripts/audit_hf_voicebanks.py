@@ -23,6 +23,8 @@ DEFAULT_REPO_ID = "SEKOIA2900/VO-US"
 MAX_DOWNLOAD_MB = 4096
 MAX_EXTRACTED_MB = 8192
 MAX_ARCHIVE_MEMBERS = 100_000
+MAX_TOTAL_ARCHIVE_MEMBERS = 250_000
+MAX_ARCHIVES = 512
 MAX_SELECTED_FILES = 250_000
 MAX_HUB_PATH_BYTES = 4096
 MAX_SELECTED_PATH_BYTES = 16 * 1024 * 1024
@@ -242,7 +244,10 @@ def _copy_bounded(source: Any, output: Any, maximum_bytes: int, expected_bytes: 
     return copied
 
 
-def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
+def _extract_zip(
+    archive: Path, root: Path, max_bytes: int,
+    maximum_members: int, member_counter: list[int] | None,
+) -> int:
     """Validate and extract ZIP members in one pass without a second index."""
     seen: set[str] = set()
     total = 0
@@ -250,8 +255,16 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
     path_bytes = 0
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
+        if len(infos) > maximum_members:
+            if member_counter is not None:
+                member_counter[0] = maximum_members
+            raise AuditFailure("archive_total_member_limit_exceeded")
         if len(infos) > MAX_ARCHIVE_MEMBERS:
+            if member_counter is not None:
+                member_counter[0] = MAX_ARCHIVE_MEMBERS
             raise AuditFailure("archive_member_limit_exceeded")
+        if member_counter is not None:
+            member_counter[0] = len(infos)
         for info in infos:
             if info.is_dir():
                 relative = _zip_member_path(info, allow_current_directory=True)
@@ -276,7 +289,10 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
     return written
 
 
-def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
+def _extract_tar(
+    archive: Path, root: Path, max_bytes: int,
+    maximum_members: int, member_counter: list[int] | None,
+) -> int:
     """Stream TAR members so an archive cannot force a full member index into RAM."""
     seen: set[str] = set()
     total = 0
@@ -294,6 +310,10 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
             bundle.stream = True
         for member in bundle:
             member_count += 1
+            if member_counter is not None:
+                member_counter[0] = min(member_count, maximum_members)
+            if member_count > maximum_members:
+                raise AuditFailure("archive_total_member_limit_exceeded")
             if member_count > MAX_ARCHIVE_MEMBERS:
                 raise AuditFailure("archive_member_limit_exceeded")
             if member.isdir():
@@ -321,14 +341,24 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
     return written
 
 
-def safe_extract_archive(archive: Path, destination: Path, max_bytes: int) -> int:
+def safe_extract_archive(
+    archive: Path, destination: Path, max_bytes: int, *,
+    maximum_members: int = MAX_ARCHIVE_MEMBERS,
+    member_counter: list[int] | None = None,
+) -> int:
     """Extract ZIP/UAR or tar data while rejecting traversal and links."""
+    if isinstance(maximum_members, bool) or not isinstance(maximum_members, int) or maximum_members < 0:
+        raise AuditFailure("invalid_archive_member_budget")
+    if member_counter is not None:
+        if len(member_counter) != 1:
+            raise AuditFailure("invalid_archive_member_counter")
+        member_counter[0] = 0
     destination.mkdir(parents=True, exist_ok=False)
     try:
         if zipfile.is_zipfile(archive):
-            return _extract_zip(archive, destination, max_bytes)
+            return _extract_zip(archive, destination, max_bytes, maximum_members, member_counter)
         if tarfile.is_tarfile(archive):
-            return _extract_tar(archive, destination, max_bytes)
+            return _extract_tar(archive, destination, max_bytes, maximum_members, member_counter)
         raise AuditFailure("unsupported_or_invalid_archive")
     except Exception:
         shutil.rmtree(destination, ignore_errors=True)
@@ -506,12 +536,15 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 allow_patterns=[item.path for item in selected],
                 token=os.environ.get("HF_TOKEN") or None,
             )
-            archives = sorted(
-                (path for path in download_root.rglob("*")
-                 if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES)),
-                key=lambda path: path.as_posix().casefold(),
-            )
+            archives = []
+            for path in download_root.rglob("*"):
+                if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES):
+                    archives.append(path)
+                    if len(archives) > MAX_ARCHIVES:
+                        raise AuditFailure("archive_count_limit_exceeded")
+            archives.sort(key=lambda path: path.as_posix().casefold())
             extracted_size = 0
+            archive_members_processed = 0
             archive_errors = 0
             archive_error_codes: Counter[str] = Counter()
             for index, archive in enumerate(archives, start=1):
@@ -522,14 +555,21 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     continue
                 safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", archive.name)[:80] or f"archive_{index}"
                 destination = extract_root / f"{index:04d}_{safe_name}"
+                member_counter = [0]
                 try:
-                    extracted_size += safe_extract_archive(archive, destination, remaining)
+                    extracted_size += safe_extract_archive(
+                        archive, destination, remaining,
+                        maximum_members=MAX_TOTAL_ARCHIVE_MEMBERS - archive_members_processed,
+                        member_counter=member_counter,
+                    )
                 except AuditFailure as exc:
                     archive_errors += 1
                     archive_error_codes[exc.code] += 1
                 except Exception:
                     archive_errors += 1
                     archive_error_codes["archive_extraction_failed"] += 1
+                finally:
+                    archive_members_processed += member_counter[0]
 
             voicebank_roots = discover_voicebank_roots(download_root, extract_root)
             summary["archive_errors"] = archive_errors
