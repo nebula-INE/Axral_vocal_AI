@@ -30,6 +30,12 @@ MAX_HUB_PATH_BYTES = 4096
 MAX_SELECTED_PATH_BYTES = 16 * 1024 * 1024
 MAX_ARCHIVE_PATH_BYTES = 4096
 MAX_TOTAL_ARCHIVE_PATH_BYTES = 16 * 1024 * 1024
+PUBLIC_VOICEBANK_COUNTERS = frozenset({
+    "oto_files", "prefix_map_files", "oto_entries", "unique_aliases",
+    "duplicate_alias_groups", "prefix_map_entries", "wav_files_checked",
+    "wav_files_invalid", "wav_files_with_signal_issues", "wav_files_digital_silence",
+    "wav_files_near_silence", "wav_files_clipping_suspected", "errors", "warnings",
+})
 
 
 class _DiscardTarMembers(list):
@@ -424,13 +430,24 @@ def discover_voicebank_roots(*roots_to_scan: Path) -> list[Path]:
 
 
 def summarize_analysis(index: int, analysis: Any) -> dict[str, Any]:
-    """Return counts and issue codes only; never serialize aliases or paths."""
-    issue_counts = Counter((item.severity, item.code) for item in analysis.issues)
+    """Return fixed-schema counts and issue codes; never serialize aliases or paths."""
+    issue_counts = Counter(
+        (item.severity, item.code)
+        for item in analysis.issues
+        if item.severity in {"error", "warning"}
+        and isinstance(item.code, str)
+        and re.fullmatch(r"[a-z0-9_]{1,80}", item.code)
+    )
+    raw_counts = analysis.summary
     return {
         "bank_index": index,
         "counts": {
-            key: int(value) for key, value in sorted(analysis.summary.items())
-            if isinstance(value, int)
+            key: int(value)
+            for key, value in sorted(raw_counts.items())
+            if key in PUBLIC_VOICEBANK_COUNTERS
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+            and value >= 0
         },
         "issue_counts": {
             f"{severity}:{code}": count
