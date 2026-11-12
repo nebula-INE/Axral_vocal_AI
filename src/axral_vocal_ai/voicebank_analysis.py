@@ -177,6 +177,22 @@ class VoicebankAnalysis:
         )
 
 
+def _record_replacement_character_issue(
+    text: str, relative_path: str, issues: list[VoicebankIssue]
+) -> None:
+    """Warn when metadata already contains U+FFFD and cannot be losslessly restored."""
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if "\ufffd" in line:
+            issues.append(VoicebankIssue(
+                "warning",
+                "metadata_replacement_character",
+                relative_path,
+                line_number,
+                "Metadata contains U+FFFD replacement text; the original characters cannot be reconstructed safely. Review the source encoding or archive.",
+            ))
+            return
+
+
 def _read_text(path: Path) -> str:
     """Decode UTAU metadata using BOM-aware Unicode and Japanese legacy encodings.
 
@@ -338,7 +354,9 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
             ))
             continue
         try:
-            parsed = parse_oto_ini(_read_text(path))
+            metadata_text = _read_text(path)
+            _record_replacement_character_issue(metadata_text, relative_path, issues)
+            parsed = parse_oto_ini(metadata_text)
         except (OSError, UnicodeError) as exc:
             issues.append(VoicebankIssue("error", "oto_read_failed", relative_path, None, str(exc)))
             continue
@@ -445,7 +463,9 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
             ))
             continue
         try:
-            parsed = parse_prefix_map(_read_text(path))
+            metadata_text = _read_text(path)
+            _record_replacement_character_issue(metadata_text, relative_path, issues)
+            parsed = parse_prefix_map(metadata_text)
         except (OSError, UnicodeError) as exc:
             issues.append(VoicebankIssue("error", "prefix_map_read_failed", relative_path, None, str(exc)))
             continue
