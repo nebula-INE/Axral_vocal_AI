@@ -29,6 +29,8 @@ def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
                 "path": "/private/voicebank.wav",
                 "message": "private sample details",
             },
+            {"severity": [], "code": "private_bank_name"},
+            {"severity": "info", "code": "informational_only"},
         ],
         "summary": {
             "oto_files": 2,
