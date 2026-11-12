@@ -57,6 +57,49 @@ def test_hub_repo_id_rejects_unsafe_values(repo_id):
         _validate_repo_id(repo_id)
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "error_code"),
+    [
+        ("max_download_mb", 4097, "download_limit_out_of_range"),
+        ("max_download_mb", 0, "download_limit_out_of_range"),
+        ("max_extracted_mb", 8193, "extraction_limit_out_of_range"),
+        ("max_extracted_mb", -1, "extraction_limit_out_of_range"),
+    ],
+)
+def test_run_audit_rejects_resource_limits_outside_hard_caps_before_hub(
+    tmp_path, monkeypatch, field, value, error_code
+):
+    calls = []
+
+    class FakeHfApi:
+        def __init__(self, token=None):
+            calls.append("client_created")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeHfApi, snapshot_download=lambda **kwargs: calls.append("download")),
+    )
+    args = SimpleNamespace(
+        repo_id="SEKOIA2900/VO-US",
+        revision="main",
+        file_path_filter="",
+        voicebank_filter="",
+        max_download_mb=4096,
+        max_extracted_mb=8192,
+        fail_on="error",
+        output_dir=tmp_path / "summary",
+    )
+    setattr(args, field, value)
+
+    summary, exit_code = run_audit(args)
+
+    assert exit_code == 2
+    assert summary["status"] == "failed"
+    assert summary["fatal_error_code"] == error_code
+    assert calls == []
+
+
 def test_run_audit_rejects_markdown_injection_revision_before_hub_request(tmp_path, monkeypatch):
     calls = []
 
