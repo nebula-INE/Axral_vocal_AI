@@ -191,8 +191,13 @@ def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
 
 
 def enforce_download_limit(files: Iterable[HubFile], maximum_bytes: int) -> int:
-    if maximum_bytes < 1:
-        raise DownloadAuditError("invalid_download_limit")
+    if (
+        isinstance(maximum_bytes, bool)
+        or not isinstance(maximum_bytes, int)
+        or maximum_bytes < 1
+        or maximum_bytes > MAX_DOWNLOAD_MB * 1024 * 1024
+    ):
+        raise DownloadAuditError("download_limit_out_of_range")
     total = sum(item.size for item in files)
     if total > maximum_bytes:
         raise DownloadAuditError("download_size_limit_exceeded")
@@ -405,6 +410,18 @@ def download_dataset(
     max_extracted_mb: int = DEFAULT_MAX_EXTRACTED_MB,
 ) -> dict[str, Any]:
     """Resolve a pinned revision, download only selected files, and extract archives."""
+    if (
+        isinstance(max_download_mb, bool)
+        or not isinstance(max_download_mb, int)
+        or not 1 <= max_download_mb <= MAX_DOWNLOAD_MB
+    ):
+        raise DownloadAuditError("download_limit_out_of_range")
+    if (
+        isinstance(max_extracted_mb, bool)
+        or not isinstance(max_extracted_mb, int)
+        or not 1 <= max_extracted_mb <= MAX_EXTRACTED_MB
+    ):
+        raise DownloadAuditError("extraction_limit_out_of_range")
     try:
         from huggingface_hub import HfApi, snapshot_download
     except ImportError as exc:
@@ -427,9 +444,6 @@ def download_dataset(
     if not selected:
         raise DownloadAuditError("no_relevant_voicebank_files")
     download_bytes = enforce_download_limit(selected, max_download_mb * 1024 * 1024)
-    if max_extracted_mb < 1:
-        raise DownloadAuditError("invalid_extraction_limit")
-
     output_dir.mkdir(parents=True, exist_ok=True)
     download_dir = output_dir / "downloads"
     extracted_dir = output_dir / "extracted"
