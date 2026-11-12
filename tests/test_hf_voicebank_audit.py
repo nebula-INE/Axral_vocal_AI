@@ -25,6 +25,7 @@ from scripts.audit_hf_voicebanks import (
     safe_extract_archive,
     select_relevant_files,
     summarize_analysis,
+    _voicebank_path_fingerprint,
     _validate_repo_id,
     _validate_requested_revision,
 )
@@ -658,6 +659,38 @@ def test_tar_extraction_streams_without_caching_member_objects(tmp_path, monkeyp
     assert len(opened) >= 2
     assert getattr(opened[-1], "stream", True) is True
     assert opened[-1].members == []
+
+
+def test_voicebank_path_fingerprint_is_stable_and_path_free(tmp_path):
+    downloads = tmp_path / "downloaded"
+    extracted = tmp_path / "extracted"
+    bank = downloads / "JP" / "bank-name"
+    bank.mkdir(parents=True)
+
+    first = _voicebank_path_fingerprint(bank, downloads, extracted)
+    second = _voicebank_path_fingerprint(bank, downloads, extracted)
+
+    assert first == second
+    assert len(first) == 16
+    assert all(char in "0123456789abcdef" for char in first)
+    assert str(bank) not in first
+
+
+def test_summarize_analysis_includes_only_valid_bank_fingerprint():
+    analysis = SimpleNamespace(
+        summary={"oto_entries": 1, "errors": 0, "warnings": 0},
+        issues=[],
+    )
+
+    result = summarize_analysis(
+        2, analysis, bank_fingerprint="0123456789abcdef"
+    )
+    invalid = summarize_analysis(
+        2, analysis, bank_fingerprint="../../private"
+    )
+
+    assert result["bank_fingerprint"] == "0123456789abcdef"
+    assert "bank_fingerprint" not in invalid
 
 
 def test_summarize_analysis_exports_only_fixed_public_counters():
