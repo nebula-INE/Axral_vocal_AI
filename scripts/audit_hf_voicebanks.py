@@ -22,6 +22,10 @@ from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 DEFAULT_REPO_ID = "SEKOIA2900/VO-US"
 MAX_ARCHIVE_MEMBERS = 100_000
 MAX_SELECTED_FILES = 250_000
+MAX_HUB_PATH_BYTES = 4096
+MAX_SELECTED_PATH_BYTES = 16 * 1024 * 1024
+MAX_ARCHIVE_PATH_BYTES = 4096
+MAX_TOTAL_ARCHIVE_PATH_BYTES = 16 * 1024 * 1024
 
 
 class _DiscardTarMembers(list):
@@ -79,6 +83,12 @@ def _field(item: Any, name: str) -> Any:
 def _safe_repo_path(value: Any) -> str:
     if not isinstance(value, str) or not value or "\x00" in value:
         raise AuditFailure("invalid_hub_file_path")
+    try:
+        encoded_length = len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        raise AuditFailure("invalid_hub_file_path") from None
+    if encoded_length > MAX_HUB_PATH_BYTES:
+        raise AuditFailure("hub_path_length_limit_exceeded")
     normalized = value.replace("\\", "/")
     path = PurePosixPath(normalized)
     if path.is_absolute() or ".." in path.parts or re.match(r"^[A-Za-z]:", normalized):
@@ -101,6 +111,7 @@ def is_relevant_voicebank_file(path: str) -> bool:
 def select_relevant_files(entries: Iterable[Any], path_filter: str = "") -> list[HubFile]:
     """Select relevant files, optionally restricting Hub paths before download."""
     selected: dict[str, HubFile] = {}
+    selected_path_bytes = 0
     for entry in entries:
         raw_path = _field(entry, "path")
         if raw_path is None:
@@ -113,6 +124,10 @@ def select_relevant_files(entries: Iterable[Any], path_filter: str = "") -> list
         size = _field(entry, "size")
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise AuditFailure("hub_file_size_unavailable")
+        if path not in selected:
+            selected_path_bytes += len(path.encode("utf-8"))
+            if selected_path_bytes > MAX_SELECTED_PATH_BYTES:
+                raise AuditFailure("selected_path_bytes_limit_exceeded")
         selected[path] = HubFile(path, size)
         if len(selected) > MAX_SELECTED_FILES:
             raise AuditFailure("selected_file_count_limit_exceeded")
@@ -144,7 +159,21 @@ def _safe_member_path(name: str, *, allow_current_directory: bool = False) -> Pu
         if allow_current_directory and not path.is_absolute():
             return PurePosixPath(".")
         raise AuditFailure("unsafe_archive_member")
-    return PurePosixPath(*parts)
+    relative = PurePosixPath(*parts)
+    try:
+        encoded_length = len(relative.as_posix().encode("utf-8"))
+    except UnicodeEncodeError:
+        raise AuditFailure("unsafe_archive_member") from None
+    if encoded_length > MAX_ARCHIVE_PATH_BYTES:
+        raise AuditFailure("archive_path_length_limit_exceeded")
+    return relative
+
+
+def _account_archive_path(relative: PurePosixPath, current_bytes: int) -> int:
+    total = current_bytes + len(relative.as_posix().encode("utf-8"))
+    if total > MAX_TOTAL_ARCHIVE_PATH_BYTES:
+        raise AuditFailure("archive_path_bytes_limit_exceeded")
+    return total
 
 
 def _contains_japanese_text(value: str) -> bool:
@@ -211,15 +240,18 @@ def _extract_zip(archive: Path, root: Path, max_bytes: int) -> int:
     seen: set[str] = set()
     total = 0
     written = 0
+    path_bytes = 0
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
         if len(infos) > MAX_ARCHIVE_MEMBERS:
             raise AuditFailure("archive_member_limit_exceeded")
         for info in infos:
             if info.is_dir():
-                _zip_member_path(info, allow_current_directory=True)
+                relative = _zip_member_path(info, allow_current_directory=True)
+                path_bytes = _account_archive_path(relative, path_bytes)
                 continue
             relative = _zip_member_path(info)
+            path_bytes = _account_archive_path(relative, path_bytes)
             mode = (info.external_attr >> 16) & 0o170000
             if mode not in (0, stat.S_IFREG):
                 raise AuditFailure("archive_link_or_special_file_rejected")
@@ -243,6 +275,7 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
     total = 0
     written = 0
     member_count = 0
+    path_bytes = 0
     # Stream mode is supported by Python 3.10+ and avoids TarFile.getmembers()
     # caching every TarInfo object. Any later failure removes the partial tree.
     with tarfile.open(archive, "r|*") as bundle:
@@ -257,9 +290,11 @@ def _extract_tar(archive: Path, root: Path, max_bytes: int) -> int:
             if member_count > MAX_ARCHIVE_MEMBERS:
                 raise AuditFailure("archive_member_limit_exceeded")
             if member.isdir():
-                _safe_member_path(member.name.rstrip("/") or ".", allow_current_directory=True)
+                relative = _safe_member_path(member.name.rstrip("/") or ".", allow_current_directory=True)
+                path_bytes = _account_archive_path(relative, path_bytes)
                 continue
             relative = _safe_member_path(member.name)
+            path_bytes = _account_archive_path(relative, path_bytes)
             if not member.isfile():
                 raise AuditFailure("archive_link_or_special_file_rejected")
             key = relative.as_posix().casefold()
