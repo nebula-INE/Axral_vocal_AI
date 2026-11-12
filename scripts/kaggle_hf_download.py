@@ -289,6 +289,21 @@ def _copy_bounded(source: Any, output: Any, remaining: int, expected: int) -> in
     return copied
 
 
+def _zip_central_directory_member_count(archive: Path) -> int:
+    """Read the EOCD member count before ZipFile builds its in-memory index."""
+    try:
+        with archive.open("rb") as source:
+            end_record = zipfile._EndRecData(source)
+    except (AttributeError, OSError):
+        raise DownloadAuditError("unsupported_or_invalid_archive") from None
+    if end_record is None:
+        raise DownloadAuditError("unsupported_or_invalid_archive")
+    count = end_record[zipfile._ECD_ENTRIES_TOTAL]
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise DownloadAuditError("archive_member_count_invalid")
+    return count
+
+
 def _extract_zip(
     archive: Path, destination: Path, maximum_bytes: int,
     maximum_members: int, member_counter: list[int] | None,
@@ -298,16 +313,22 @@ def _extract_zip(
     declared = 0
     written = 0
     path_bytes = 0
+    # zipfile eagerly materializes a ZipInfo for every central-directory entry.
+    # Inspect the small EOCD tail first so oversized indexes are rejected
+    # before ZipFile allocates that per-member metadata list.
+    central_count = _zip_central_directory_member_count(archive)
+    if central_count > maximum_members:
+        if member_counter is not None:
+            member_counter[0] = maximum_members
+        raise DownloadAuditError("archive_total_member_limit_exceeded")
+    if central_count > MAX_ARCHIVE_MEMBERS:
+        if member_counter is not None:
+            member_counter[0] = MAX_ARCHIVE_MEMBERS
+        raise DownloadAuditError("archive_member_limit_exceeded")
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
-        if len(infos) > maximum_members:
-            if member_counter is not None:
-                member_counter[0] = maximum_members
-            raise DownloadAuditError("archive_total_member_limit_exceeded")
-        if len(infos) > MAX_ARCHIVE_MEMBERS:
-            if member_counter is not None:
-                member_counter[0] = MAX_ARCHIVE_MEMBERS
-            raise DownloadAuditError("archive_member_limit_exceeded")
+        if len(infos) != central_count:
+            raise DownloadAuditError("archive_member_count_mismatch")
         if member_counter is not None:
             member_counter[0] = len(infos)
         for info in infos:
