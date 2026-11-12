@@ -11,6 +11,7 @@ import zipfile
 
 import pytest
 
+import scripts.kaggle_hf_download as kaggle_download
 from scripts.kaggle_hf_download import (
     DownloadAuditError,
     HubFile,
@@ -76,6 +77,43 @@ def test_select_relevant_files_rejects_traversal():
 def test_download_limit_is_checked_before_transfer():
     with pytest.raises(DownloadAuditError, match="download_size_limit_exceeded"):
         enforce_download_limit([HubFile("a.zip", 6), HubFile("b.zip", 5)], 10)
+
+
+def test_hub_file_paths_have_individual_and_aggregate_byte_limits(monkeypatch):
+    monkeypatch.setattr(kaggle_download, "MAX_HUB_PATH_BYTES", 8)
+    with pytest.raises(DownloadAuditError, match="hub_path_length_limit_exceeded"):
+        select_relevant_files([{"path": "bank/oto.ini", "size": 1}])
+
+    monkeypatch.setattr(kaggle_download, "MAX_HUB_PATH_BYTES", 128)
+    monkeypatch.setattr(kaggle_download, "MAX_SELECTED_PATH_BYTES", 15)
+    with pytest.raises(DownloadAuditError, match="selected_path_bytes_limit_exceeded"):
+        select_relevant_files([
+            {"path": "a/oto.ini", "size": 1},
+            {"path": "b/oto.ini", "size": 1},
+        ])
+
+
+def test_archive_path_metadata_has_aggregate_byte_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(kaggle_download, "MAX_TOTAL_ARCHIVE_PATH_BYTES", 5)
+    archive = tmp_path / "many-paths.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("aaa", b"a")
+        bundle.writestr("bbb", b"b")
+
+    destination = tmp_path / "bounded-paths-out"
+    with pytest.raises(DownloadAuditError, match="archive_path_bytes_limit_exceeded"):
+        safe_extract_archive(archive, destination, 1024)
+    assert not destination.exists()
+
+
+def test_archive_member_path_has_individual_byte_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(kaggle_download, "MAX_ARCHIVE_PATH_BYTES", 3)
+    archive = tmp_path / "long-path.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("long", b"x")
+
+    with pytest.raises(DownloadAuditError, match="archive_path_length_limit_exceeded"):
+        safe_extract_archive(archive, tmp_path / "long-path-out", 1024)
 
 
 def test_extract_zip_and_discover_nested_oto_files_as_one_bank(tmp_path):
