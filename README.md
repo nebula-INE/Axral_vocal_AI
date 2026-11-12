@@ -60,3 +60,5 @@ Axral Vocal AI can audit selected UTAU voicebanks directly from the Hugging Face
 - Only sanitized aggregate reports are uploaded. Raw WAVs and detailed aliases/paths stay on the ephemeral runner.
 
 See [Real UTAU Voicebank Validation Gate](docs/real_voicebank_validation.md) and [plan.md](plan.md) for inputs, limits, supported formats, and the remaining live-data verification step. This workflow performs technical auditing only; machine-learning training and redistribution permissions must be reviewed separately.
+
+The read-only audit also reports path-free `metadata_replacement_character` and `metadata_suspected_mojibake` issue-code counts for Japanese UTAU metadata. It does not attempt to reconstruct damaged text; use `fail_on: warning` to make metadata warnings fail the workflow.
