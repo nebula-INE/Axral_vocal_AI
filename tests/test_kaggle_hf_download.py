@@ -93,12 +93,22 @@ def test_hub_file_paths_have_individual_and_aggregate_byte_limits(monkeypatch):
         ])
 
 
-def test_archive_path_metadata_has_aggregate_byte_limit(tmp_path, monkeypatch):
+@pytest.mark.parametrize("archive_kind", ("zip", "tar"))
+def test_archive_path_metadata_has_aggregate_byte_limit(
+    tmp_path, monkeypatch, archive_kind
+):
     monkeypatch.setattr(kaggle_download, "MAX_TOTAL_ARCHIVE_PATH_BYTES", 5)
-    archive = tmp_path / "many-paths.zip"
-    with zipfile.ZipFile(archive, "w") as bundle:
-        bundle.writestr("aaa", b"a")
-        bundle.writestr("bbb", b"b")
+    archive = tmp_path / f"many-paths.{archive_kind}"
+    if archive_kind == "zip":
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr("aaa", b"a")
+            bundle.writestr("bbb", b"b")
+    else:
+        with tarfile.open(archive, "w") as bundle:
+            for name, payload in (("aaa", b"a"), ("bbb", b"b")):
+                member = tarfile.TarInfo(name)
+                member.size = len(payload)
+                bundle.addfile(member, io.BytesIO(payload))
 
     destination = tmp_path / "bounded-paths-out"
     with pytest.raises(DownloadAuditError, match="archive_path_bytes_limit_exceeded"):
