@@ -16,6 +16,7 @@ from scripts.kaggle_hf_download import (
     DownloadAuditError,
     HubFile,
     discover_voicebank_roots,
+    collect_archive_paths,
     download_dataset,
     enforce_download_limit,
     parse_dataset_url,
@@ -466,6 +467,57 @@ def test_parse_dataset_url_rejects_non_string_and_oversized_input():
         parse_dataset_url(None)
     with pytest.raises(DownloadAuditError, match="dataset_url_invalid"):
         parse_dataset_url("x" * 2049)
+
+
+@pytest.mark.parametrize("archive_kind", ("zip", "tar"))
+def test_aggregate_archive_member_budget_applies_across_archives(
+    tmp_path, monkeypatch, archive_kind
+):
+    monkeypatch.setattr(kaggle_download, "MAX_TOTAL_ARCHIVE_MEMBERS", 3)
+    archives = []
+    for index in range(2):
+        archive = tmp_path / f"voice-{index}.{archive_kind}"
+        if archive_kind == "zip":
+            with zipfile.ZipFile(archive, "w") as bundle:
+                bundle.writestr("Voice/oto.ini", "alias")
+                bundle.writestr("Voice/sample.wav", b"RIFF")
+        else:
+            with tarfile.open(archive, "w") as bundle:
+                for name, payload in (("Voice/oto.ini", b"alias"), ("Voice/sample.wav", b"RIFF")):
+                    member = tarfile.TarInfo(name)
+                    member.size = len(payload)
+                    bundle.addfile(member, io.BytesIO(payload))
+        archives.append(archive)
+
+    processed = 0
+    first_counter = [0]
+    safe_extract_archive(
+        archives[0], tmp_path / "first-out", 1024,
+        maximum_members=3 - processed, member_counter=first_counter,
+    )
+    processed += first_counter[0]
+    assert processed == 2
+
+    second_counter = [0]
+    with pytest.raises(
+        DownloadAuditError, match="archive_total_member_limit_exceeded"
+    ):
+        safe_extract_archive(
+            archives[1], tmp_path / "second-out", 1024,
+            maximum_members=3 - processed, member_counter=second_counter,
+        )
+    assert second_counter == [1]
+    assert not (tmp_path / "second-out").exists()
+
+
+def test_archive_discovery_rejects_excessive_archive_count(tmp_path, monkeypatch):
+    monkeypatch.setattr(kaggle_download, "MAX_ARCHIVES", 1)
+    for index in range(2):
+        with zipfile.ZipFile(tmp_path / f"bank-{index}.zip", "w") as bundle:
+            bundle.writestr("oto.ini", "alias")
+
+    with pytest.raises(DownloadAuditError, match="archive_count_limit_exceeded"):
+        collect_archive_paths(tmp_path)
 
 
 def test_tar_extraction_streams_without_caching_member_objects(tmp_path, monkeypatch):
