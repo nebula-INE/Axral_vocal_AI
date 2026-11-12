@@ -20,6 +20,10 @@ DEFAULT_MAX_DOWNLOAD_MB = 4096
 DEFAULT_MAX_EXTRACTED_MB = 8192
 MAX_ARCHIVE_MEMBERS = 100_000
 MAX_SELECTED_FILES = 250_000
+MAX_HUB_PATH_BYTES = 4096
+MAX_SELECTED_PATH_BYTES = 16 * 1024 * 1024
+MAX_ARCHIVE_PATH_BYTES = 4096
+MAX_TOTAL_ARCHIVE_PATH_BYTES = 16 * 1024 * 1024
 
 
 class _DiscardTarMembers(list):
@@ -94,6 +98,12 @@ def _field(item: Any, key: str) -> Any:
 def _safe_hub_path(value: Any) -> str:
     if not isinstance(value, str) or not value or "\x00" in value:
         raise DownloadAuditError("invalid_hub_path")
+    try:
+        encoded_length = len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        raise DownloadAuditError("invalid_hub_path") from None
+    if encoded_length > MAX_HUB_PATH_BYTES:
+        raise DownloadAuditError("hub_path_length_limit_exceeded")
     normalized = value.replace("\\", "/")
     path = PurePosixPath(normalized)
     if path.is_absolute() or ".." in path.parts or re.match(r"^[A-Za-z]:", normalized):
@@ -154,6 +164,7 @@ def collect_license_document_metadata(*scan_roots: Path) -> list[dict[str, Any]]
 def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
     """Select voicebank archives, loose UTAU files, WAVs, and JSONL manifests."""
     selected: dict[str, HubFile] = {}
+    selected_path_bytes = 0
     for entry in entries:
         raw_path = _field(entry, "path")
         if raw_path is None:
@@ -167,6 +178,10 @@ def select_relevant_files(entries: Iterable[Any]) -> list[HubFile]:
             continue
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise DownloadAuditError("hub_file_size_unavailable")
+        if path not in selected:
+            selected_path_bytes += len(path.encode("utf-8"))
+            if selected_path_bytes > MAX_SELECTED_PATH_BYTES:
+                raise DownloadAuditError("selected_path_bytes_limit_exceeded")
         selected[path] = HubFile(path, size)
         if len(selected) > MAX_SELECTED_FILES:
             raise DownloadAuditError("selected_file_count_limit_exceeded")
@@ -196,7 +211,21 @@ def _safe_member_path(name: str, allow_dot: bool = False) -> PurePosixPath:
         if allow_dot:
             return PurePosixPath(".")
         raise DownloadAuditError("unsafe_archive_member")
-    return PurePosixPath(*parts)
+    relative = PurePosixPath(*parts)
+    try:
+        encoded_length = len(relative.as_posix().encode("utf-8"))
+    except UnicodeEncodeError:
+        raise DownloadAuditError("unsafe_archive_member") from None
+    if encoded_length > MAX_ARCHIVE_PATH_BYTES:
+        raise DownloadAuditError("archive_path_length_limit_exceeded")
+    return relative
+
+
+def _account_archive_path(relative: PurePosixPath, current_bytes: int) -> int:
+    total = current_bytes + len(relative.as_posix().encode("utf-8"))
+    if total > MAX_TOTAL_ARCHIVE_PATH_BYTES:
+        raise DownloadAuditError("archive_path_bytes_limit_exceeded")
+    return total
 
 
 def _contains_japanese_text(value: str) -> bool:
@@ -256,15 +285,18 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
     seen: set[str] = set()
     declared = 0
     written = 0
+    path_bytes = 0
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
         if len(infos) > MAX_ARCHIVE_MEMBERS:
             raise DownloadAuditError("archive_member_limit_exceeded")
         for info in infos:
             if info.is_dir():
-                _zip_member_path(info, allow_dot=True)
+                relative = _zip_member_path(info, allow_dot=True)
+                path_bytes = _account_archive_path(relative, path_bytes)
                 continue
             relative = _zip_member_path(info)
+            path_bytes = _account_archive_path(relative, path_bytes)
             mode = (info.external_attr >> 16) & 0o170000
             if mode not in (0, stat.S_IFREG):
                 raise DownloadAuditError("archive_link_or_special_file_rejected")
@@ -288,6 +320,7 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
     declared = 0
     written = 0
     member_count = 0
+    path_bytes = 0
     # Stream mode is supported by Python 3.10+ and avoids TarFile.getmembers()
     # caching every TarInfo object. Any later failure removes the partial tree.
     with tarfile.open(archive, "r|*") as bundle:
@@ -302,9 +335,11 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
             if member_count > MAX_ARCHIVE_MEMBERS:
                 raise DownloadAuditError("archive_member_limit_exceeded")
             if member.isdir():
-                _safe_member_path(member.name.rstrip("/") or ".", allow_dot=True)
+                relative = _safe_member_path(member.name.rstrip("/") or ".", allow_dot=True)
+                path_bytes = _account_archive_path(relative, path_bytes)
                 continue
             relative = _safe_member_path(member.name)
+            path_bytes = _account_archive_path(relative, path_bytes)
             if not member.isfile():
                 raise DownloadAuditError("archive_link_or_special_file_rejected")
             key = relative.as_posix().casefold()
