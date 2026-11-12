@@ -116,18 +116,21 @@ def _safe_hub_path(value: Any) -> str:
 
 
 def _is_license_document_name(name: str) -> bool:
+    """Recognize common and localized README/license file naming variants."""
     lowered = name.casefold()
-    return (
-        lowered in {
-            "readme.md", "readme.txt", "readme.rst",
-            "license", "licence", "copying", "notice", "copyright", "terms", "eula",
-        }
-        or lowered.startswith((
-            "license.", "license-", "licence.", "licence-",
-            "copying.", "copying-", "notice.", "notice-",
-            "copyright.", "copyright-", "terms.", "terms-",
-        ))
+    exact_names = {
+        "readme", "license", "licence", "copying", "notice",
+        "copyright", "terms", "eula",
+    }
+    variant_prefixes = tuple(
+        f"{stem}{separator}"
+        for stem in (
+            "readme", "license", "licence", "copying",
+            "notice", "copyright", "terms", "eula",
+        )
+        for separator in (".", "-", "_")
     )
+    return lowered in exact_names or lowered.startswith(variant_prefixes)
 
 
 def _is_relevant(path: str) -> bool:
