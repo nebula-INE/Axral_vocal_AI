@@ -21,6 +21,8 @@ DEFAULT_MAX_EXTRACTED_MB = 8192
 MAX_DOWNLOAD_MB = DEFAULT_MAX_DOWNLOAD_MB
 MAX_EXTRACTED_MB = DEFAULT_MAX_EXTRACTED_MB
 MAX_ARCHIVE_MEMBERS = 100_000
+MAX_TOTAL_ARCHIVE_MEMBERS = 250_000
+MAX_ARCHIVES = 512
 MAX_SELECTED_FILES = 250_000
 MAX_HUB_PATH_BYTES = 4096
 MAX_SELECTED_PATH_BYTES = 16 * 1024 * 1024
@@ -287,7 +289,10 @@ def _copy_bounded(source: Any, output: Any, remaining: int, expected: int) -> in
     return copied
 
 
-def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
+def _extract_zip(
+    archive: Path, destination: Path, maximum_bytes: int,
+    maximum_members: int, member_counter: list[int] | None,
+) -> int:
     """Validate and extract ZIP members in one pass without a second index."""
     seen: set[str] = set()
     declared = 0
@@ -295,8 +300,16 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
     path_bytes = 0
     with zipfile.ZipFile(archive) as bundle:
         infos = bundle.infolist()
+        if len(infos) > maximum_members:
+            if member_counter is not None:
+                member_counter[0] = maximum_members
+            raise DownloadAuditError("archive_total_member_limit_exceeded")
         if len(infos) > MAX_ARCHIVE_MEMBERS:
+            if member_counter is not None:
+                member_counter[0] = MAX_ARCHIVE_MEMBERS
             raise DownloadAuditError("archive_member_limit_exceeded")
+        if member_counter is not None:
+            member_counter[0] = len(infos)
         for info in infos:
             if info.is_dir():
                 relative = _zip_member_path(info, allow_dot=True)
@@ -321,7 +334,10 @@ def _extract_zip(archive: Path, destination: Path, maximum_bytes: int) -> int:
     return written
 
 
-def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
+def _extract_tar(
+    archive: Path, destination: Path, maximum_bytes: int,
+    maximum_members: int, member_counter: list[int] | None,
+) -> int:
     """Stream TAR members so an archive cannot force a full member index into RAM."""
     seen: set[str] = set()
     declared = 0
@@ -339,6 +355,10 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
             bundle.stream = True
         for member in bundle:
             member_count += 1
+            if member_counter is not None:
+                member_counter[0] = min(member_count, maximum_members)
+            if member_count > maximum_members:
+                raise DownloadAuditError("archive_total_member_limit_exceeded")
             if member_count > MAX_ARCHIVE_MEMBERS:
                 raise DownloadAuditError("archive_member_limit_exceeded")
             if member.isdir():
@@ -366,14 +386,24 @@ def _extract_tar(archive: Path, destination: Path, maximum_bytes: int) -> int:
     return written
 
 
-def safe_extract_archive(archive: Path, destination: Path, maximum_bytes: int) -> int:
+def safe_extract_archive(
+    archive: Path, destination: Path, maximum_bytes: int, *,
+    maximum_members: int = MAX_ARCHIVE_MEMBERS,
+    member_counter: list[int] | None = None,
+) -> int:
     """Extract ZIP/UAR-compatible or tar archives without traversing links."""
+    if isinstance(maximum_members, bool) or not isinstance(maximum_members, int) or maximum_members < 0:
+        raise DownloadAuditError("invalid_archive_member_budget")
+    if member_counter is not None:
+        if len(member_counter) != 1:
+            raise DownloadAuditError("invalid_archive_member_counter")
+        member_counter[0] = 0
     destination.mkdir(parents=True, exist_ok=False)
     try:
         if zipfile.is_zipfile(archive):
-            return _extract_zip(archive, destination, maximum_bytes)
+            return _extract_zip(archive, destination, maximum_bytes, maximum_members, member_counter)
         if tarfile.is_tarfile(archive):
-            return _extract_tar(archive, destination, maximum_bytes)
+            return _extract_tar(archive, destination, maximum_bytes, maximum_members, member_counter)
         raise DownloadAuditError("unsupported_or_invalid_archive")
     except Exception:
         shutil.rmtree(destination, ignore_errors=True)
@@ -459,11 +489,14 @@ def download_dataset(
     extracted_bytes = 0
     archive_errors: list[str] = []
     archive_results: list[dict[str, Any]] = []
-    archives = sorted(
-        (path for path in download_dir.rglob("*")
-         if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES)),
-        key=lambda path: path.as_posix().casefold(),
-    )
+    archives = []
+    for path in download_dir.rglob("*"):
+        if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES):
+            archives.append(path)
+            if len(archives) > MAX_ARCHIVES:
+                raise DownloadAuditError("archive_count_limit_exceeded")
+    archives.sort(key=lambda path: path.as_posix().casefold())
+    archive_members_processed = 0
     for index, archive in enumerate(archives, start=1):
         relative_archive = archive.relative_to(download_dir).as_posix()
         archive_size = archive.stat().st_size
@@ -481,8 +514,13 @@ def download_dataset(
             continue
         safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", archive.name)[:80] or f"archive_{index}"
         destination = extracted_dir / f"{index:04d}_{safe_name}"
+        member_counter = [0]
         try:
-            written = safe_extract_archive(archive, destination, remaining)
+            written = safe_extract_archive(
+                archive, destination, remaining,
+                maximum_members=MAX_TOTAL_ARCHIVE_MEMBERS - archive_members_processed,
+                member_counter=member_counter,
+            )
             extracted_bytes += written
             archive_results.append({
                 "path": relative_archive,
@@ -501,6 +539,8 @@ def download_dataset(
                 "error_code": code,
                 "extracted_bytes": 0,
             })
+        finally:
+            archive_members_processed += member_counter[0]
 
     roots = discover_voicebank_roots(download_dir, extracted_dir)
     license_documents = collect_license_document_metadata(download_dir, extracted_dir)
