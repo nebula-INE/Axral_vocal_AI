@@ -79,6 +79,26 @@ def test_download_limit_is_checked_before_transfer():
         enforce_download_limit([HubFile("a.zip", 6), HubFile("b.zip", 5)], 10)
 
 
+def test_download_and_extraction_limits_cannot_exceed_hard_caps(tmp_path):
+    with pytest.raises(DownloadAuditError, match="download_limit_out_of_range"):
+        kaggle_download.download_dataset(
+            "https://huggingface.co/datasets/owner/repo",
+            tmp_path / "download-too-large",
+            max_download_mb=kaggle_download.MAX_DOWNLOAD_MB + 1,
+        )
+    with pytest.raises(DownloadAuditError, match="extraction_limit_out_of_range"):
+        kaggle_download.download_dataset(
+            "https://huggingface.co/datasets/owner/repo",
+            tmp_path / "extract-too-large",
+            max_extracted_mb=kaggle_download.MAX_EXTRACTED_MB + 1,
+        )
+    with pytest.raises(DownloadAuditError, match="download_limit_out_of_range"):
+        enforce_download_limit(
+            [HubFile("voice.zip", 1)],
+            (kaggle_download.MAX_DOWNLOAD_MB + 1) * 1024 * 1024,
+        )
+
+
 def test_hub_file_paths_have_individual_and_aggregate_byte_limits(monkeypatch):
     monkeypatch.setattr(kaggle_download, "MAX_HUB_PATH_BYTES", 8)
     with pytest.raises(DownloadAuditError, match="hub_path_length_limit_exceeded"):
