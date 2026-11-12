@@ -410,6 +410,17 @@ def safe_extract_archive(
         raise
 
 
+def collect_archive_paths(download_dir: Path) -> list[Path]:
+    """Collect a bounded, deterministic list of supported archive paths."""
+    archives: list[Path] = []
+    for path in download_dir.rglob("*"):
+        if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES):
+            archives.append(path)
+            if len(archives) > MAX_ARCHIVES:
+                raise DownloadAuditError("archive_count_limit_exceeded")
+    return sorted(archives, key=lambda path: path.as_posix().casefold())
+
+
 def discover_voicebank_roots(*scan_roots: Path) -> list[Path]:
     """Return outer voicebank roots, grouping nested oto.ini files together."""
     candidates: set[Path] = set()
@@ -489,13 +500,7 @@ def download_dataset(
     extracted_bytes = 0
     archive_errors: list[str] = []
     archive_results: list[dict[str, Any]] = []
-    archives = []
-    for path in download_dir.rglob("*"):
-        if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES):
-            archives.append(path)
-            if len(archives) > MAX_ARCHIVES:
-                raise DownloadAuditError("archive_count_limit_exceeded")
-    archives.sort(key=lambda path: path.as_posix().casefold())
+    archives = collect_archive_paths(download_dir)
     archive_members_processed = 0
     for index, archive in enumerate(archives, start=1):
         relative_archive = archive.relative_to(download_dir).as_posix()
