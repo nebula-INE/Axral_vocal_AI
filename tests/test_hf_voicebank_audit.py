@@ -457,6 +457,53 @@ def test_file_selection_rejects_excessive_file_count(monkeypatch):
         select_relevant_files(rows)
 
 
+def test_hub_file_paths_have_individual_and_aggregate_byte_limits(monkeypatch):
+    monkeypatch.setattr(audit_script, "MAX_HUB_PATH_BYTES", 8)
+    with pytest.raises(AuditFailure, match="hub_path_length_limit_exceeded"):
+        select_relevant_files([{"path": "bank/oto.ini", "size": 1}])
+
+    monkeypatch.setattr(audit_script, "MAX_HUB_PATH_BYTES", 128)
+    monkeypatch.setattr(audit_script, "MAX_SELECTED_PATH_BYTES", 15)
+    with pytest.raises(AuditFailure, match="selected_path_bytes_limit_exceeded"):
+        select_relevant_files([
+            {"path": "a/oto.ini", "size": 1},
+            {"path": "b/oto.ini", "size": 1},
+        ])
+
+
+@pytest.mark.parametrize("archive_kind", ("zip", "tar"))
+def test_archive_path_metadata_has_aggregate_byte_limit(
+    tmp_path, monkeypatch, archive_kind
+):
+    monkeypatch.setattr(audit_script, "MAX_TOTAL_ARCHIVE_PATH_BYTES", 5)
+    archive = tmp_path / f"many-paths.{archive_kind}"
+    if archive_kind == "zip":
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr("aaa", b"a")
+            bundle.writestr("bbb", b"b")
+    else:
+        with tarfile.open(archive, "w") as bundle:
+            for name, payload in (("aaa", b"a"), ("bbb", b"b")):
+                member = tarfile.TarInfo(name)
+                member.size = len(payload)
+                bundle.addfile(member, io.BytesIO(payload))
+
+    destination = tmp_path / "bounded-paths-out"
+    with pytest.raises(AuditFailure, match="archive_path_bytes_limit_exceeded"):
+        safe_extract_archive(archive, destination, 1024)
+    assert not destination.exists()
+
+
+def test_archive_member_path_has_individual_byte_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(audit_script, "MAX_ARCHIVE_PATH_BYTES", 3)
+    archive = tmp_path / "long-path.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("long", b"x")
+
+    with pytest.raises(AuditFailure, match="archive_path_length_limit_exceeded"):
+        safe_extract_archive(archive, tmp_path / "long-path-out", 1024)
+
+
 def test_tar_extraction_streams_without_caching_member_objects(tmp_path, monkeypatch):
     archive = tmp_path / "tar-stream.tar"
     with tarfile.open(archive, "w") as bundle:
