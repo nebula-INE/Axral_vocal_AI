@@ -16,6 +16,20 @@ def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
     first.write_text(json.dumps({
         "root": "/private/voicebank-a",
         "entries": [{"alias": "sensitive alias"}],
+        "issues": [
+            {
+                "severity": "warning",
+                "code": "metadata_replacement_character",
+                "path": "voicebank/oto.ini",
+                "message": "private alias text",
+            },
+            {
+                "severity": "error",
+                "code": "private/path.wav",
+                "path": "/private/voicebank.wav",
+                "message": "private sample details",
+            },
+        ],
         "summary": {
             "oto_files": 2,
             "oto_entries": 20,
@@ -50,6 +64,12 @@ def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
         "warnings": 5,
         "wav_files_checked": 22,
     }
+    assert result["issue_code_counts"] == {
+        "warning:metadata_replacement_character": 1
+    }
+    assert result["banks"][0]["issue_code_counts"] == {
+        "warning:metadata_replacement_character": 1
+    }
     assert result["failures"] == [{
         "bank_index": 1,
         "exit_code": 1,
@@ -73,6 +93,7 @@ def test_build_audit_index_records_invalid_or_missing_report(tmp_path):
         "bank_index": 7,
         "status": "invalid_or_missing_report",
         "summary": {},
+        "issue_code_counts": {},
     }]
     assert result["failures"] == [{
         "bank_index": 7,
@@ -97,6 +118,8 @@ def test_build_audit_index_ignores_bool_and_negative_counters(tmp_path):
     }), encoding="utf-8")
     result = build_audit_index([(1, report, 0)])
     assert result["aggregate"] == {"errors": 0, "warnings": 0}
+    assert result["issue_code_counts"] == {}
+    assert result["banks"][0]["issue_code_counts"] == {}
     assert "private/voicebank.wav" not in json.dumps(result)
     assert "PRIVATE_BANK_A" not in json.dumps(result)
 
