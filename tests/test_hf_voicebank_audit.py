@@ -353,10 +353,10 @@ def test_voicebank_discovery_ignores_symlinked_directories(tmp_path):
 
 def test_real_voicebank_analysis_flags_mojibake_and_preserves_source_text(tmp_path):
     (tmp_path / "oto.ini").write_text(
-        "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\n", encoding="utf-8"
     )
     (tmp_path / "prefix.map").write_text(
-        "C4\\t-\\t繧｢繝九Γ\\n", encoding="utf-8"
+        "C4\t-\t繧｢繝九Γ\n", encoding="utf-8"
     )
 
     analysis = analyze_voicebank(tmp_path)
@@ -381,10 +381,10 @@ def test_real_voicebank_analysis_flags_mojibake_and_preserves_source_text(tmp_pa
 
 def test_real_voicebank_analysis_does_not_flag_normal_japanese_or_single_marker(tmp_path):
     (tmp_path / "oto.ini").write_text(
-        "a.wav=こんにちは,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=こんにちは,0,100,-100,20,10\n", encoding="utf-8"
     )
     (tmp_path / "prefix.map").write_text(
-        "C4\\t-\\t糸が縺れる\\n", encoding="utf-8"
+        "C4\t-\t糸が縺れる\n", encoding="utf-8"
     )
 
     analysis = analyze_voicebank(tmp_path)
@@ -397,10 +397,10 @@ def test_real_voicebank_analysis_does_not_flag_normal_japanese_or_single_marker(
 
 def test_real_voicebank_analysis_reports_replacement_character(tmp_path):
     (tmp_path / "oto.ini").write_text(
-        "a.wav=\\ufffd,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=\ufffd,0,100,-100,20,10\n", encoding="utf-8"
     )
     (tmp_path / "prefix.map").write_text(
-        "C4\\t-\\t\\ufffd\\n", encoding="utf-8"
+        "C4\t-\t\ufffd\n", encoding="utf-8"
     )
 
     analysis = analyze_voicebank(tmp_path)
