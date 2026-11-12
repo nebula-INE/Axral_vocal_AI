@@ -278,7 +278,8 @@ def build_audit_index(
                     severity = issue.get("severity")
                     code = issue.get("code")
                     if (
-                        severity in {"error", "warning"}
+                        isinstance(severity, str)
+                        and severity in {"error", "warning"}
                         and isinstance(code, str)
                         and re.fullmatch(r"[a-z0-9_]{1,80}", code)
                     ):
