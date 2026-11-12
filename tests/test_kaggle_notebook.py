@@ -93,6 +93,9 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert source.index("TEMP_DATA_CLEANED") < source.index("with zipfile.ZipFile(archive")
     assert "sys.path.insert(0, str(PROJECT))" in source
     assert "audit_results = []" in source
+    assert "hashlib.sha256" in source
+    assert "bank_fingerprints" in source
+    assert "bank_fingerprints=bank_fingerprints" in source
     audit_start = source.index("audit_rc = run")
     audit_end = source.index("audit_results.append", audit_start)
     assert "redact_output=True" in source[audit_start:audit_end]
