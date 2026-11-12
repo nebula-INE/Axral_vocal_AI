@@ -20,6 +20,9 @@ ALLOWED_SPLITS = frozenset({"train", "validation", "test"})
 ALLOWED_LABEL_USAGE = frozenset({
     "labels_seen", "labels_used", "labels_without_voiced_note"
 })
+TRAINING_BLOCKING_AUDIT_WARNINGS = frozenset({
+    "metadata_replacement_character",
+})
 
 
 def build_public_download_summary(summary: dict[str, object]) -> dict[str, object]:
@@ -306,6 +309,11 @@ def build_audit_index(
             failure_code = "audit_cli_nonzero_exit"
         elif counts.get("errors", 0) > 0:
             failure_code = "audit_report_contains_errors"
+        elif any(
+            bank_issue_codes.get(f"warning:{code}", 0) > 0
+            for code in TRAINING_BLOCKING_AUDIT_WARNINGS
+        ):
+            failure_code = "audit_report_contains_critical_metadata_warning"
 
         if failure_code is not None:
             failure: dict[str, int | str] = {
