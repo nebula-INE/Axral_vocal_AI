@@ -243,9 +243,11 @@ def build_audit_index(
     banks: list[dict[str, object]] = []
     failures: list[dict[str, int | str]] = []
     aggregate: Counter[str] = Counter()
+    aggregate_issue_codes: Counter[str] = Counter()
 
     for bank_index, report_path, exit_code in results:
         counts: dict[str, int] = {}
+        bank_issue_codes: Counter[str] = Counter()
         report_status = "missing"
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -268,8 +270,22 @@ def build_audit_index(
                 and not isinstance(value, bool)
                 and value >= 0
             }
+            raw_issues = report.get("issues", []) if isinstance(report, dict) else []
+            if isinstance(raw_issues, list):
+                for issue in raw_issues:
+                    if not isinstance(issue, dict):
+                        continue
+                    severity = issue.get("severity")
+                    code = issue.get("code")
+                    if (
+                        severity in {"error", "warning"}
+                        and isinstance(code, str)
+                        and re.fullmatch(r"[a-z0-9_]{1,80}", code)
+                    ):
+                        bank_issue_codes[f"{severity}:{code}"] += 1
             report_status = "completed"
             aggregate.update(counts)
+            aggregate_issue_codes.update(bank_issue_codes)
         except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
             report_status = "invalid_or_missing_report"
 
@@ -294,6 +310,7 @@ def build_audit_index(
             "bank_index": bank_index,
             "status": report_status,
             "summary": counts,
+            "issue_code_counts": dict(sorted(bank_issue_codes.items())),
         })
 
     return {
@@ -304,6 +321,7 @@ def build_audit_index(
             for bank in banks
         ),
         "aggregate": dict(sorted(aggregate.items())),
+        "issue_code_counts": dict(sorted(aggregate_issue_codes.items())),
         "failures": failures,
         "banks": banks,
     }
