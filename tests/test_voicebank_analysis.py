@@ -124,10 +124,10 @@ def test_warns_for_strong_mojibake_signatures_in_oto_and_prefix_metadata(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "oto.ini").write_text(
-        "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\n", encoding="utf-8"
     )
     (tmp_path / "prefix.map").write_text(
-        "C4\\t-\\t繧｢繝九Γ\\n", encoding="utf-8"
+        "C4\t-\t繧｢繝九Γ\\n", encoding="utf-8"
     )
     write_silent_wav(tmp_path / "a.wav")
 
@@ -150,10 +150,10 @@ def test_does_not_flag_normal_japanese_or_a_single_valid_kanji_marker(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "oto.ini").write_text(
-        "a.wav=こんにちは,0,100,-100,20,10\\n", encoding="utf-8"
+        "a.wav=こんにちは,0,100,-100,20,10\n", encoding="utf-8"
     )
     (tmp_path / "prefix.map").write_text(
-        "C4\\t-\\t糸が縺れる\\n", encoding="utf-8"
+        "C4\t-\t糸が縺れる\\n", encoding="utf-8"
     )
     write_silent_wav(tmp_path / "a.wav")
 
