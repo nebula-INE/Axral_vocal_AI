@@ -86,7 +86,9 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Validate dataset IDs and requested Hub revisions before any Hub request or Markdown summary rendering; reject control characters, malformed path components, and oversized refs.
 - [x] Require the Hub API's resolved revision to be a full 40-character hexadecimal commit SHA before file listing/download; record it in lowercase.
 - [x] Aggregate archive failures by stable error code without exposing archive paths.
-- [x] CI green on Python 3.10 and Python 3.12: latest run passed 589 tests in each matrix job.
+- [x] Detect U+FFFD replacement characters and conservative UTF-8/CP932 mojibake signatures in `oto.ini` and `prefix.map`; preserve source text and publish only aggregate issue-code counts.
+- [x] Add tests for both metadata formats, normal Japanese false-positive resistance, and path-free audit summary output.
+- [x] CI green on Python 3.10 and Python 3.12: the pre-diagnostic run passed 611 tests in each matrix job; updated diagnostic tests are being verified.
 
 ### Remaining verification
 
