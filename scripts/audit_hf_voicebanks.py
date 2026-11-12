@@ -20,6 +20,8 @@ import zipfile
 from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 
 DEFAULT_REPO_ID = "SEKOIA2900/VO-US"
+MAX_DOWNLOAD_MB = 4096
+MAX_EXTRACTED_MB = 8192
 MAX_ARCHIVE_MEMBERS = 100_000
 MAX_SELECTED_FILES = 250_000
 MAX_HUB_PATH_BYTES = 4096
