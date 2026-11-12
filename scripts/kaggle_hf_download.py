@@ -115,6 +115,11 @@ def _safe_hub_path(value: Any) -> str:
     return path.as_posix()
 
 
+def _exact_hub_allow_pattern(path: str) -> str:
+    """Escape fnmatch metacharacters so allow_patterns selects one literal Hub path."""
+    return path.replace("[", "[[]").replace("*", "[*]").replace("?", "[?]")
+
+
 def _is_license_document_name(name: str) -> bool:
     """Recognize common and localized README/license file naming variants."""
     lowered = name.casefold()
@@ -516,7 +521,8 @@ def download_dataset(
     extracted_dir.mkdir()
     snapshot_download(
         repo_id=repo_id, repo_type="dataset", revision=revision,
-        local_dir=str(download_dir), allow_patterns=[item.path for item in selected],
+        local_dir=str(download_dir),
+        allow_patterns=[_exact_hub_allow_pattern(item.path) for item in selected],
         token=token or None,
     )
 
