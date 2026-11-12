@@ -160,3 +160,18 @@ def test_safe_command_diagnostic_keeps_codes_without_private_payload():
         "error_code": "private/error",
     })) == {}
     assert diagnose("not json") == {}
+
+def test_notebook_exception_logging_omits_exception_messages_and_full_paths():
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    source = "".join(
+        "".join(cell["source"]) for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+    )
+
+    assert "traceback.format_exc()" not in source
+    assert "log(traceback.format_exc())" not in source
+    assert "traceback.extract_tb(exc.__traceback__)" in source
+    assert "Path(frame.filename).name" in source
+    assert 'log(f"Artifact link display unavailable: {display_error}")' not in source
+    assert 'type(display_error).__name__' in source
+    assert 'log(f"pipeline failed: unexpected_{error_name}")' in source
