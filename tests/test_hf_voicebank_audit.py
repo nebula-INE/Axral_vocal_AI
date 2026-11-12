@@ -658,3 +658,32 @@ def test_tar_extraction_streams_without_caching_member_objects(tmp_path, monkeyp
     assert len(opened) >= 2
     assert getattr(opened[-1], "stream", True) is True
     assert opened[-1].members == []
+
+
+def test_summarize_analysis_exports_only_fixed_public_counters():
+    analysis = SimpleNamespace(
+        summary={
+            "oto_entries": 12,
+            "errors": 0,
+            "PRIVATE_BANK_A": 9,
+            "private/voicebank.wav": 4,
+            "negative_count": -1,
+            "boolean_count": True,
+        },
+        issues=[
+            SimpleNamespace(severity="warning", code="oto_alias_missing"),
+            SimpleNamespace(severity="error", code="private/voicebank.wav"),
+            SimpleNamespace(severity="secret", code="private_bank_name"),
+        ],
+    )
+
+    result = summarize_analysis(3, analysis)
+
+    assert result == {
+        "bank_index": 3,
+        "counts": {"errors": 0, "oto_entries": 12},
+        "issue_counts": {"warning:oto_alias_missing": 1},
+    }
+    rendered = str(result)
+    assert "PRIVATE_BANK_A" not in rendered
+    assert "voicebank.wav" not in rendered
