@@ -219,6 +219,37 @@ def test_replacement_character_warning_blocks_training_even_when_cli_returns_zer
     assert "private alias text" not in rendered
 
 
+def test_suspected_mojibake_warning_blocks_training_even_when_cli_returns_zero(tmp_path):
+    report = tmp_path / "suspected-mojibake.json"
+    report.write_text(json.dumps({
+        "summary": {"errors": 0, "warnings": 1, "oto_entries": 4},
+        "issues": [{
+            "severity": "warning",
+            "code": "metadata_suspected_mojibake",
+            "path": "private/oto.ini",
+            "line_number": 2,
+            "message": "private source text",
+        }],
+    }), encoding="utf-8")
+
+    result = build_audit_index([(7, report, 0)])
+
+    assert result["aggregate"]["errors"] == 0
+    assert result["aggregate"]["warnings"] == 1
+    assert result["issue_code_counts"] == {
+        "warning:metadata_suspected_mojibake": 1
+    }
+    assert result["failures"] == [{
+        "bank_index": 7,
+        "exit_code": 0,
+        "error_count": 0,
+        "error_code": "audit_report_contains_critical_metadata_warning",
+    }]
+    rendered = json.dumps(result)
+    assert "private/oto.ini" not in rendered
+    assert "private source text" not in rendered
+
+
 def test_required_audit_counters_must_be_present_and_valid(tmp_path):
     report = tmp_path / "malformed.json"
     report.write_text(json.dumps({"summary": {"errors": False, "warnings": 0}}),
