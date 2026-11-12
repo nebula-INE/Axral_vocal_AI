@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import fnmatch
 from pathlib import Path
 import stat
 import sys
@@ -182,6 +183,20 @@ def test_unknown_relevant_file_size_is_rejected():
 def test_download_limit_fails_before_download():
     with pytest.raises(AuditFailure, match="download_size_limit_exceeded"):
         enforce_download_limit([HubFile("bank.zip", 1024)], 100)
+
+
+@pytest.mark.parametrize(
+    "path,near_match",
+    (
+        ("banks/voice[1].zip", "banks/voice1.zip"),
+        ("banks/raw/*.wav", "banks/raw/sample.wav"),
+        ("banks/voice?.zip", "banks/voice1.zip"),
+    ),
+)
+def test_exact_hub_allow_pattern_does_not_expand_glob_characters(path, near_match):
+    pattern = audit_script._exact_hub_allow_pattern(path)
+    assert fnmatch.fnmatchcase(path, pattern)
+    assert not fnmatch.fnmatchcase(near_match, pattern)
 
 
 def test_safe_archive_member_rejects_parent_and_absolute_paths():
