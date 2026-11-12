@@ -233,6 +233,8 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
 
 def build_audit_index(
     results: Iterable[tuple[int, Path, int]],
+    *,
+    bank_fingerprints: dict[int, str] | None = None,
 ) -> dict[str, object]:
     """Build a compact index from (bank index, report path, CLI exit code) rows.
 
@@ -246,6 +248,13 @@ def build_audit_index(
     aggregate_issue_codes: Counter[str] = Counter()
 
     for bank_index, report_path, exit_code in results:
+        fingerprint = (
+            bank_fingerprints.get(bank_index)
+            if isinstance(bank_fingerprints, dict)
+            else None
+        )
+        if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{16}", fingerprint):
+            fingerprint = None
         counts: dict[str, int] = {}
         bank_issue_codes: Counter[str] = Counter()
         report_status = "missing"
@@ -299,20 +308,26 @@ def build_audit_index(
             failure_code = "audit_report_contains_errors"
 
         if failure_code is not None:
-            failures.append({
+            failure: dict[str, int | str] = {
                 "bank_index": bank_index,
                 "exit_code": exit_code,
                 "error_count": counts.get("errors", 0),
                 "error_code": failure_code,
-            })
+            }
+            if fingerprint is not None:
+                failure["bank_fingerprint"] = fingerprint
+            failures.append(failure)
             if report_status == "completed":
                 report_status = "completed_with_findings"
-        banks.append({
+        bank_result: dict[str, object] = {
             "bank_index": bank_index,
             "status": report_status,
             "summary": counts,
             "issue_code_counts": dict(sorted(bank_issue_codes.items())),
-        })
+        }
+        if fingerprint is not None:
+            bank_result["bank_fingerprint"] = fingerprint
+        banks.append(bank_result)
 
     return {
         "schema_version": 1,
