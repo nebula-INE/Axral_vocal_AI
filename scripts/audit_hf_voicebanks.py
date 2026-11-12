@@ -365,6 +365,17 @@ def safe_extract_archive(
         raise
 
 
+def collect_archive_paths(download_root: Path) -> list[Path]:
+    """Collect a bounded, deterministic list of supported archive paths."""
+    archives: list[Path] = []
+    for path in download_root.rglob("*"):
+        if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES):
+            archives.append(path)
+            if len(archives) > MAX_ARCHIVES:
+                raise AuditFailure("archive_count_limit_exceeded")
+    return sorted(archives, key=lambda path: path.as_posix().casefold())
+
+
 def discover_voicebank_roots(*roots_to_scan: Path) -> list[Path]:
     """Find oto.ini roots; group nested oto.ini files under their bank root."""
     candidates: set[Path] = set()
@@ -536,13 +547,7 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 allow_patterns=[item.path for item in selected],
                 token=os.environ.get("HF_TOKEN") or None,
             )
-            archives = []
-            for path in download_root.rglob("*"):
-                if path.is_file() and any(path.name.casefold().endswith(s) for s in ARCHIVE_SUFFIXES):
-                    archives.append(path)
-                    if len(archives) > MAX_ARCHIVES:
-                        raise AuditFailure("archive_count_limit_exceeded")
-            archives.sort(key=lambda path: path.as_posix().casefold())
+            archives = collect_archive_paths(download_root)
             extracted_size = 0
             archive_members_processed = 0
             archive_errors = 0
