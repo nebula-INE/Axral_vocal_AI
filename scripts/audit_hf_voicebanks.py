@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from hashlib import sha256
 from dataclasses import dataclass
 import json
 import logging
@@ -429,7 +430,24 @@ def discover_voicebank_roots(*roots_to_scan: Path) -> list[Path]:
     )
 
 
-def summarize_analysis(index: int, analysis: Any) -> dict[str, Any]:
+def _voicebank_path_fingerprint(
+    voicebank_root: Path, download_root: Path, extract_root: Path
+) -> str:
+    """Return a stable short identifier without exposing the source directory."""
+    resolved = voicebank_root.resolve()
+    for namespace, base in (("downloads", download_root), ("extracted", extract_root)):
+        try:
+            relative = resolved.relative_to(base.resolve()).as_posix()
+        except (ValueError, OSError, RuntimeError):
+            continue
+        material = f"{namespace}/{relative}".casefold().encode("utf-8")
+        return sha256(material).hexdigest()[:16]
+    raise AuditFailure("voicebank_root_outside_scan_roots")
+
+
+def summarize_analysis(
+    index: int, analysis: Any, *, bank_fingerprint: str | None = None
+) -> dict[str, Any]:
     """Return fixed-schema counts and issue codes; never serialize aliases or paths."""
     issue_counts = Counter(
         (item.severity, item.code)
@@ -439,7 +457,7 @@ def summarize_analysis(index: int, analysis: Any) -> dict[str, Any]:
         and re.fullmatch(r"[a-z0-9_]{1,80}", item.code)
     )
     raw_counts = analysis.summary
-    return {
+    result = {
         "bank_index": index,
         "counts": {
             key: int(value)
@@ -454,6 +472,12 @@ def summarize_analysis(index: int, analysis: Any) -> dict[str, Any]:
             for (severity, code), count in sorted(issue_counts.items())
         },
     }
+    if (
+        isinstance(bank_fingerprint, str)
+        and re.fullmatch(r"[0-9a-f]{16}", bank_fingerprint)
+    ):
+        result["bank_fingerprint"] = bank_fingerprint
+    return result
 
 
 def build_markdown(summary: dict[str, Any]) -> str:
@@ -487,12 +511,15 @@ def build_markdown(summary: dict[str, Any]) -> str:
                 and count > 0
             ):
                 lines.append(f"| {code} | {count} |")
-    lines.extend(["", "| Bank | OTO entries | WAV checked | Errors | Warnings |",
-                  "| ---: | ---: | ---: | ---: | ---: |"])
+    lines.extend(["", "| Bank | Fingerprint | OTO entries | WAV checked | Errors | Warnings |",
+                  "| ---: | --- | ---: | ---: | ---: | ---: |"])
     for bank in summary.get("banks", []):
         counts = bank.get("counts", {})
+        fingerprint = bank.get("bank_fingerprint", "unavailable")
+        if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{16}", fingerprint):
+            fingerprint = "unavailable"
         lines.append(
-            f"| {bank.get('bank_index')} | {counts.get('oto_entries', 0)} | "
+            f"| {bank.get('bank_index')} | {fingerprint} | {counts.get('oto_entries', 0)} | "
             f"{counts.get('wav_files_checked', 0)} | {counts.get('errors', 0)} | "
             f"{counts.get('warnings', 0)} |"
         )
@@ -639,11 +666,21 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 except (OSError, ValueError, UnicodeError):
                     totals["errors"] += 1
                     banks.append({
-                        "bank_index": index, "counts": {"errors": 1, "warnings": 0},
+                        "bank_index": index,
+                        "bank_fingerprint": _voicebank_path_fingerprint(
+                            voicebank_root, download_root, extract_root
+                        ),
+                        "counts": {"errors": 1, "warnings": 0},
                         "issue_counts": {"error:analysis_failed": 1},
                     })
                     continue
-                item = summarize_analysis(index, analysis)
+                item = summarize_analysis(
+                    index,
+                    analysis,
+                    bank_fingerprint=_voicebank_path_fingerprint(
+                        voicebank_root, download_root, extract_root
+                    ),
+                )
                 banks.append(item)
                 totals.update(item["counts"])
             summary["voicebank_roots"] = len(voicebank_roots)
