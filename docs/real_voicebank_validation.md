@@ -97,8 +97,8 @@ Manual inputs:
 - `revision`: Hub branch, tag, or commit SHA; default `main`. Invalid dataset IDs/revisions (including control characters, path traversal components, and Markdown-injection text) are rejected before Hub API access. The resolved Hub revision must be a full 40-character commit SHA before file listing and download.
 - `file_path_filter`: optional case-insensitive substring matched against Hugging Face file paths before download, reducing the selected bytes. Use a path fragment present in the Hub repository (for example a bank folder or archive name).
 - `voicebank_filter`: optional case-insensitive substring matched against discovered bank directories after extraction. This narrows audited roots but does not reduce the download selection.
-- `max_download_mb`: pre-download limit for selected archive/metadata/WAV files; default 4096 MiB.
-- `max_extracted_mb`: aggregate uncompressed archive limit; default 8192 MiB.
+- `max_download_mb`: pre-download limit for selected archive/metadata/WAV files; default and hard ceiling 4096 MiB. Lower values are allowed; higher values are rejected before Hub API access.
+- `max_extracted_mb`: aggregate uncompressed archive limit; default and hard ceiling 8192 MiB. Lower values are allowed; higher values are rejected before Hub API access.
 - `fail_on`: `error` (default), `warning`, or `never`.
 
 The downloader selects supported ZIP/UAR and tar archives plus standalone `oto.ini`, `prefix.map`, and WAV files. ZIP/tar members that are absolute, escape the extraction root, or represent links/special files are rejected. Archive extraction runs in a temporary directory and its contents are deleted when the job ends.
