@@ -70,6 +70,25 @@ def test_select_relevant_files_includes_utau_files_and_jsonl_but_skips_directori
     assert sum(item.size for item in selected) == 3774
 
 
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "README_ja.md",
+        "README-ja.txt",
+        "README.en.rst",
+        "LICENSE_JP.md",
+        "LICENCE.ja.txt",
+        "COPYING_ja",
+        "NOTICE-JP.txt",
+        "TERMS_ja.md",
+        "EULA.en.md",
+    ),
+)
+def test_select_relevant_files_includes_localized_license_documents(filename):
+    selected = select_relevant_files([{"path": f"docs/{filename}", "size": 12}])
+    assert [item.path for item in selected] == [f"docs/{filename}"]
+
+
 def test_select_relevant_files_rejects_traversal():
     with pytest.raises(DownloadAuditError, match="unsafe_hub_path"):
         select_relevant_files([{"path": "../secret.zip", "size": 1}])
