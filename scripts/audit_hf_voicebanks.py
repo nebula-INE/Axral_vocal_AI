@@ -100,6 +100,11 @@ def _safe_repo_path(value: Any) -> str:
     return path.as_posix()
 
 
+def _exact_hub_allow_pattern(path: str) -> str:
+    """Escape fnmatch metacharacters so allow_patterns selects one literal Hub path."""
+    return path.replace("[", "[[]").replace("*", "[*]").replace("?", "[?]")
+
+
 def is_relevant_voicebank_file(path: str) -> bool:
     """Keep supported UTAU archives, oto.ini, prefix.map and WAV files."""
     normalized = _safe_repo_path(path)
@@ -565,7 +570,7 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             snapshot_download(
                 repo_id=repo_id, repo_type="dataset", revision=revision_sha,
                 local_dir=str(download_root),
-                allow_patterns=[item.path for item in selected],
+                allow_patterns=[_exact_hub_allow_pattern(item.path) for item in selected],
                 token=os.environ.get("HF_TOKEN") or None,
             )
             archives = collect_archive_paths(download_root)
