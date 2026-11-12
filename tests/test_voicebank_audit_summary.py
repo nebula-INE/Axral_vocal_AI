@@ -291,10 +291,10 @@ def test_public_model_report_omits_voicebank_and_record_identifiers():
 
     unsafe_metrics = build_public_model_report({
         "mae_semitones": {
-            "nan": float("nan"),
-            "infinity": float("inf"),
-            "huge_integer": 10 ** 10000,
-            "valid": 0.25,
+            "train": 0.25,
+            "validation": float("nan"),
+            "test": float("inf"),
+            "private_record_id": 9.9,
         }
     })
-    assert unsafe_metrics["mae_semitones"] == {"valid": 0.25}
+    assert unsafe_metrics["mae_semitones"] == {"train": 0.25}
