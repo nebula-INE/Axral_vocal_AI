@@ -192,6 +192,43 @@ def _record_replacement_character_issue(
             ))
             return
 
+_MOJIBAKE_MARKERS = frozenset("縺繧繝譁蜿陦")
+
+
+def _record_suspected_mojibake_issue(
+    text: str, relative_path: str, issues: list[VoicebankIssue]
+) -> None:
+    """Flag strong UTF-8/CP932 mojibake signatures without attempting repair.
+
+    A single character such as 縺 can occur in valid Japanese text. Detection
+    therefore requires repeated high-signal markers, a mixed marker cluster,
+    or the characteristic 繧/繝 plus half-width-katakana pattern.
+    """
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        marker_counts = Counter(character for character in line if character in _MOJIBAKE_MARKERS)
+        repeated_marker = any(
+            marker_counts.get(character, 0) >= 2
+            for character in ("縺", "繧", "繝")
+        )
+        mixed_marker_cluster = (
+            sum(marker_counts.values()) >= 3 and len(marker_counts) >= 2
+        )
+        half_width_katakana = any("\uff61" <= character <= "\uff9f" for character in line)
+        cp932_katakana_signature = (
+            marker_counts.get("繧", 0) >= 1
+            and marker_counts.get("繝", 0) >= 1
+            and half_width_katakana
+        )
+        if repeated_marker or mixed_marker_cluster or cp932_katakana_signature:
+            issues.append(VoicebankIssue(
+                "warning",
+                "metadata_suspected_mojibake",
+                relative_path,
+                line_number,
+                "Metadata contains a strong mojibake pattern commonly caused by UTF-8/CP932 mis-decoding. Source text was preserved; review the original bytes and encoding rather than applying an automatic repair.",
+            ))
+            return
+
 
 def _read_text(path: Path) -> str:
     """Decode UTAU metadata using BOM-aware Unicode and Japanese legacy encodings.
@@ -356,6 +393,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         try:
             metadata_text = _read_text(path)
             _record_replacement_character_issue(metadata_text, relative_path, issues)
+            _record_suspected_mojibake_issue(metadata_text, relative_path, issues)
             parsed = parse_oto_ini(metadata_text)
         except (OSError, UnicodeError) as exc:
             issues.append(VoicebankIssue("error", "oto_read_failed", relative_path, None, str(exc)))
@@ -465,6 +503,7 @@ def analyze_voicebank(root: str | Path) -> VoicebankAnalysis:
         try:
             metadata_text = _read_text(path)
             _record_replacement_character_issue(metadata_text, relative_path, issues)
+            _record_suspected_mojibake_issue(metadata_text, relative_path, issues)
             parsed = parse_prefix_map(metadata_text)
         except (OSError, UnicodeError) as exc:
             issues.append(VoicebankIssue("error", "prefix_map_read_failed", relative_path, None, str(exc)))
