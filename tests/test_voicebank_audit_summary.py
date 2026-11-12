@@ -85,6 +85,32 @@ def test_build_audit_index_aggregates_counts_and_redacts_file_paths(tmp_path):
     assert str(first) not in rendered
 
 
+
+
+
+def test_build_audit_index_includes_valid_stable_bank_fingerprints_only(tmp_path):
+    report = tmp_path / "audit.json"
+    report.write_text(json.dumps({
+        "summary": {"errors": 0, "warnings": 0, "oto_entries": 4},
+        "issues": [],
+    }), encoding="utf-8")
+
+    result = build_audit_index(
+        [(1, report, 0), (2, report, 1)],
+        bank_fingerprints={
+            1: "0123456789abcdef",
+            2: "../../private/voicebank",
+        },
+    )
+
+    assert result["banks"][0]["bank_fingerprint"] == "0123456789abcdef"
+    assert "bank_fingerprint" not in result["banks"][1]
+    assert "bank_fingerprint" not in result["failures"][0]
+    rendered = json.dumps(result)
+    assert str(tmp_path) not in rendered
+    assert "private/voicebank" not in rendered
+
+
 def test_build_audit_index_records_invalid_or_missing_report(tmp_path):
     missing = tmp_path / "missing.json"
     result = build_audit_index([(7, missing, 2)])
