@@ -375,7 +375,7 @@ def test_real_voicebank_analysis_flags_mojibake_and_preserves_source_text(tmp_pa
     assert analysis.prefix_entries[0].suffix == "繧｢繝九Γ"
     assert summary["issue_counts"] == {
         "warning:metadata_suspected_mojibake": 2,
-        "warning:wav_missing": 1,
+        "error:wav_missing": 1,
     }
 
 
