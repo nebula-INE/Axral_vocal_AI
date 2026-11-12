@@ -138,8 +138,13 @@ def select_relevant_files(entries: Iterable[Any], path_filter: str = "") -> list
 
 def enforce_download_limit(files: Iterable[HubFile], maximum_bytes: int) -> int:
     total = sum(item.size for item in files)
-    if maximum_bytes < 1:
-        raise AuditFailure("invalid_download_limit")
+    if (
+        isinstance(maximum_bytes, bool)
+        or not isinstance(maximum_bytes, int)
+        or maximum_bytes < 1
+        or maximum_bytes > MAX_DOWNLOAD_MB * 1024 * 1024
+    ):
+        raise AuditFailure("download_limit_out_of_range")
     if total > maximum_bytes:
         raise AuditFailure("download_size_limit_exceeded")
     return total
@@ -450,6 +455,18 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     try:
         repo_id = _validate_repo_id(args.repo_id)
         requested_revision = _validate_requested_revision(args.revision)
+        if (
+            isinstance(args.max_download_mb, bool)
+            or not isinstance(args.max_download_mb, int)
+            or not 1 <= args.max_download_mb <= MAX_DOWNLOAD_MB
+        ):
+            raise AuditFailure("download_limit_out_of_range")
+        if (
+            isinstance(args.max_extracted_mb, bool)
+            or not isinstance(args.max_extracted_mb, int)
+            or not 1 <= args.max_extracted_mb <= MAX_EXTRACTED_MB
+        ):
+            raise AuditFailure("extraction_limit_out_of_range")
         summary["dataset"] = repo_id
         summary["requested_revision"] = requested_revision
         try:
@@ -475,8 +492,6 @@ def run_audit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             selected, args.max_download_mb * 1024 * 1024
         )
         max_extracted = args.max_extracted_mb * 1024 * 1024
-        if max_extracted < 1:
-            raise AuditFailure("invalid_extraction_limit")
         summary["selected_files"] = len(selected)
         summary["download_bytes"] = total_download
 
