@@ -88,7 +88,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Aggregate archive failures by stable error code without exposing archive paths.
 - [x] Detect U+FFFD replacement characters and conservative UTF-8/CP932 mojibake signatures in `oto.ini` and `prefix.map`; preserve source text and publish only aggregate issue-code counts.
 - [x] Add tests for both metadata formats, normal Japanese false-positive resistance, and path-free audit summary output.
-- [x] CI green on Python 3.10 and Python 3.12: the pre-diagnostic run passed 611 tests in each matrix job; updated diagnostic tests are being verified.
+- [x] CI green on Python 3.10 and Python 3.12 after the Japanese metadata diagnostics: latest matrix run passed 614 tests in each job ([run 43329792435](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/43329792435)).
 
 ### Remaining verification
 
