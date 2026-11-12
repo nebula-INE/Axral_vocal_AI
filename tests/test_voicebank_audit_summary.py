@@ -91,10 +91,14 @@ def test_build_audit_index_ignores_bool_and_negative_counters(tmp_path):
             "unexpected": True,
             "negative": -1,
             "valid": 3,
+            "private/voicebank.wav": 99,
+            "PRIVATE_BANK_A": 17,
         },
     }), encoding="utf-8")
     result = build_audit_index([(1, report, 0)])
-    assert result["aggregate"] == {"errors": 0, "warnings": 0, "valid": 3}
+    assert result["aggregate"] == {"errors": 0, "warnings": 0}
+    assert "private/voicebank.wav" not in json.dumps(result)
+    assert "PRIVATE_BANK_A" not in json.dumps(result)
 
 
 
@@ -220,10 +224,10 @@ def test_public_download_summary_rejects_unbounded_or_path_like_metadata():
 
 def test_public_model_report_omits_voicebank_and_record_identifiers():
     private_report = {
-        "status": "experimental_training_complete",
+        "status": "PRIVATE_BANK_A",
         "test_evaluation_included": True,
         "manifest_validation": {
-            "status": "valid",
+            "status": "private/voicebank.wav",
             "records": 30,
             "labeled_records": 30,
             "records_by_split": {"train": 10, "validation": 10, "test": 10},
@@ -235,14 +239,15 @@ def test_public_model_report_omits_voicebank_and_record_identifiers():
             "require_labeled": True,
         },
         "label_usage": {"labels_seen": 100, "labels_used": 95,
-                        "labels_without_voiced_note": 5},
-        "usable_examples_by_split": {"train": 30, "validation": 30, "test": 35},
-        "mae_semitones": {"train": 0.1, "validation": 0.2, "test": 0.3},
+                        "labels_without_voiced_note": 5, "private/voicebank.wav": 999},
+        "usable_examples_by_split": {"train": 30, "validation": 30, "test": 35, "PRIVATE_BANK_A": 99},
+        "mae_semitones": {"train": 0.1, "validation": 0.2, "test": 0.3, "private_record_id": 7.7},
         "zero_delta_baseline_mae_semitones": {"train": 0.4, "validation": 0.5,
                                               "test": 0.6},
         "evaluation_by_split": {
             "test": {"mae_semitones": 0.3,
-                     "zero_delta_baseline_mae_semitones": 0.6}
+                     "zero_delta_baseline_mae_semitones": 0.6},
+            "private/voicebank.wav": {"mae_semitones": 9.9}
         },
         "model": {
             "model_type": "linear_ridge_pitch_delta",
@@ -258,7 +263,19 @@ def test_public_model_report_omits_voicebank_and_record_identifiers():
 
     public = build_public_model_report(private_report)
 
+    assert public["status"] == "unknown"
+    assert public["manifest_validation"]["status"] == "unknown"
     assert public["manifest_validation"]["records"] == 30
+    assert public["label_usage"] == {
+        "labels_seen": 100, "labels_used": 95, "labels_without_voiced_note": 5
+    }
+    assert public["usable_examples_by_split"] == {
+        "train": 30, "validation": 30, "test": 35
+    }
+    assert public["mae_semitones"] == {
+        "train": 0.1, "validation": 0.2, "test": 0.3
+    }
+    assert list(public["evaluation_by_split"]) == ["test"]
     assert public["manifest_validation"]["records_by_split"] == {
         "train": 10, "validation": 10, "test": 10
     }
