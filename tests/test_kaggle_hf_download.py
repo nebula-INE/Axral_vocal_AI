@@ -469,6 +469,22 @@ def test_parse_dataset_url_rejects_non_string_and_oversized_input():
         parse_dataset_url("x" * 2049)
 
 
+def test_zip_member_count_is_preflighted_before_zipinfo_index_allocation(tmp_path, monkeypatch):
+    archive = tmp_path / "many-members.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("one.txt", b"1")
+        bundle.writestr("two.txt", b"2")
+    monkeypatch.setattr(kaggle_download, "MAX_ARCHIVE_MEMBERS", 1)
+
+    def forbidden_zipfile_open(*args, **kwargs):
+        raise AssertionError("ZipFile must not allocate its member index before the cap check")
+
+    monkeypatch.setattr(kaggle_download.zipfile, "ZipFile", forbidden_zipfile_open)
+    with pytest.raises(DownloadAuditError, match="archive_member_limit_exceeded"):
+        safe_extract_archive(archive, tmp_path / "many-members-out", 1024)
+    assert not (tmp_path / "many-members-out").exists()
+
+
 @pytest.mark.parametrize("archive_kind", ("zip", "tar"))
 def test_aggregate_archive_member_budget_applies_across_archives(
     tmp_path, monkeypatch, archive_kind
