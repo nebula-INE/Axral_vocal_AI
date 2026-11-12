@@ -10,6 +10,16 @@ from typing import Iterable
 
 
 REQUIRED_AUDIT_COUNTERS = {"errors", "warnings"}
+ALLOWED_AUDIT_COUNTERS = frozenset({
+    "oto_files", "prefix_map_files", "oto_entries", "unique_aliases",
+    "duplicate_alias_groups", "prefix_map_entries", "wav_files_checked",
+    "wav_files_invalid", "wav_files_with_signal_issues", "wav_files_digital_silence",
+    "wav_files_near_silence", "wav_files_clipping_suspected", "errors", "warnings",
+})
+ALLOWED_SPLITS = frozenset({"train", "validation", "test"})
+ALLOWED_LABEL_USAGE = frozenset({
+    "labels_seen", "labels_used", "labels_without_voiced_note"
+})
 
 
 def build_public_download_summary(summary: dict[str, object]) -> dict[str, object]:
@@ -93,7 +103,7 @@ def build_public_download_summary(summary: dict[str, object]) -> dict[str, objec
 
 
 def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
-    """Project a private trainer report to metrics/weights without bank IDs."""
+    """Project a private trainer report to a fixed, path-free metrics schema."""
     validation = report.get("manifest_validation")
     validation = validation if isinstance(validation, dict) else {}
     raw_split_counts = validation.get("records_by_split")
@@ -102,37 +112,47 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
     def safe_count(value: object) -> int:
         return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
-    def safe_metrics(value: object) -> dict[str, object]:
+    def safe_split_counts(value: object) -> dict[str, int]:
         if not isinstance(value, dict):
             return {}
-        result: dict[str, object] = {}
-        for key, item in value.items():
-            finite_number = False
+        return {split: safe_count(value.get(split)) for split in sorted(ALLOWED_SPLITS)}
+
+    def safe_split_metrics(value: object) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        result: dict[str, float] = {}
+        for split in sorted(ALLOWED_SPLITS):
+            item = value.get(split)
             if isinstance(item, (int, float)) and not isinstance(item, bool):
                 try:
-                    finite_number = math.isfinite(item)
+                    if math.isfinite(item):
+                        result[split] = float(item)
                 except (OverflowError, TypeError, ValueError):
-                    finite_number = False
-            if (
-                isinstance(key, str)
-                and re.fullmatch(r"[a-z0-9_]{1,80}", key)
-                and (item is None or finite_number)
-            ):
-                result[key] = item
+                    continue
+        return result
+
+    def safe_evaluation_metrics(value: object) -> dict[str, float]:
+        if not isinstance(value, dict):
+            return {}
+        allowed = {"mae_semitones", "zero_delta_baseline_mae_semitones"}
+        result: dict[str, float] = {}
+        for key in allowed:
+            item = value.get(key)
+            if isinstance(item, (int, float)) and not isinstance(item, bool):
+                try:
+                    if math.isfinite(item):
+                        result[key] = float(item)
+                except (OverflowError, TypeError, ValueError):
+                    continue
         return result
 
     raw_usage = report.get("label_usage")
     label_usage = {
-        key: safe_count(value)
-        for key, value in raw_usage.items()
-        if isinstance(key, str)
+        key: safe_count(raw_usage.get(key))
+        for key in sorted(ALLOWED_LABEL_USAGE)
     } if isinstance(raw_usage, dict) else {}
     raw_examples = report.get("usable_examples_by_split")
-    examples = {
-        key: safe_count(value)
-        for key, value in raw_examples.items()
-        if isinstance(key, str)
-    } if isinstance(raw_examples, dict) else {}
+    examples = safe_split_counts(raw_examples)
 
     model = report.get("model")
     public_model: dict[str, object] = {}
@@ -177,28 +197,29 @@ def build_public_model_report(report: dict[str, object]) -> dict[str, object]:
 
     return {
         "schema_version": 1,
-        "status": report.get("status") if isinstance(report.get("status"), str) else "unknown",
+        "status": (
+            "experimental_training_complete"
+            if report.get("status") == "experimental_training_complete"
+            else "unknown"
+        ),
         "test_evaluation_included": report.get("test_evaluation_included") is True,
         "manifest_validation": {
-            "status": validation.get("status") if isinstance(validation.get("status"), str) else "unknown",
+            "status": "valid" if validation.get("status") == "valid" else "unknown",
             "records": safe_count(validation.get("records")),
             "labeled_records": safe_count(validation.get("labeled_records")),
-            "records_by_split": {
-                split: safe_count(split_counts.get(split))
-                for split in ("train", "validation", "test")
-            },
+            "records_by_split": safe_split_counts(split_counts),
             "require_labeled": validation.get("require_labeled") is True,
         },
         "label_usage": label_usage,
         "usable_examples_by_split": examples,
-        "mae_semitones": safe_metrics(report.get("mae_semitones")),
-        "zero_delta_baseline_mae_semitones": safe_metrics(
+        "mae_semitones": safe_split_metrics(report.get("mae_semitones")),
+        "zero_delta_baseline_mae_semitones": safe_split_metrics(
             report.get("zero_delta_baseline_mae_semitones")
         ),
         "evaluation_by_split": {
-            split: safe_metrics(metrics)
+            split: safe_evaluation_metrics(metrics)
             for split, metrics in report.get("evaluation_by_split", {}).items()
-            if isinstance(split, str)
+            if split in ALLOWED_SPLITS and isinstance(metrics, dict)
         } if isinstance(report.get("evaluation_by_split"), dict) else {},
         "model": public_model,
         "limitations": [
@@ -242,7 +263,7 @@ def build_audit_index(
             counts = {
                 key: value
                 for key, value in raw_summary.items()
-                if isinstance(key, str)
+                if key in ALLOWED_AUDIT_COUNTERS
                 and isinstance(value, int)
                 and not isinstance(value, bool)
                 and value >= 0
