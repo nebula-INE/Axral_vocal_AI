@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 import scripts.audit_hf_voicebanks as audit_script
+from axral_vocal_ai.voicebank_analysis import analyze_voicebank
 from scripts.audit_hf_voicebanks import (
     build_markdown,
     run_audit,
@@ -348,6 +349,71 @@ def test_voicebank_discovery_ignores_symlinked_directories(tmp_path):
     except OSError as exc:
         pytest.skip(f"symlink creation unavailable: {exc}")
     assert discover_voicebank_roots(root) == []
+
+
+def test_real_voicebank_analysis_flags_mojibake_and_preserves_source_text(tmp_path):
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    (tmp_path / "prefix.map").write_text(
+        "C4\\t-\\t繧｢繝九Γ\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(tmp_path)
+    summary = summarize_analysis(1, analysis)
+
+    findings = [
+        (issue.path, issue.line_number, issue.code)
+        for issue in analysis.issues
+        if issue.code == "metadata_suspected_mojibake"
+    ]
+    assert findings == [
+        ("oto.ini", 1, "metadata_suspected_mojibake"),
+        ("prefix.map", 1, "metadata_suspected_mojibake"),
+    ]
+    assert analysis.entries[0].alias == "縺薙ｓ縺ｫ縺｡縺ｯ"
+    assert analysis.prefix_entries[0].suffix == "繧｢繝九Γ"
+    assert summary["issue_counts"] == {
+        "warning:metadata_suspected_mojibake": 2,
+        "warning:wav_missing": 1,
+    }
+
+
+def test_real_voicebank_analysis_does_not_flag_normal_japanese_or_single_marker(tmp_path):
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=こんにちは,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    (tmp_path / "prefix.map").write_text(
+        "C4\\t-\\t糸が縺れる\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(tmp_path)
+
+    assert not any(
+        issue.code == "metadata_suspected_mojibake"
+        for issue in analysis.issues
+    )
+
+
+def test_real_voicebank_analysis_reports_replacement_character(tmp_path):
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=\\ufffd,0,100,-100,20,10\\n", encoding="utf-8"
+    )
+    (tmp_path / "prefix.map").write_text(
+        "C4\\t-\\t\\ufffd\\n", encoding="utf-8"
+    )
+
+    analysis = analyze_voicebank(tmp_path)
+
+    replacement_issues = [
+        (issue.path, issue.line_number, issue.code)
+        for issue in analysis.issues
+        if issue.code == "metadata_replacement_character"
+    ]
+    assert replacement_issues == [
+        ("oto.ini", 1, "metadata_replacement_character"),
+        ("prefix.map", 1, "metadata_replacement_character"),
+    ]
 
 
 def test_public_summary_contains_counts_only_not_sensitive_names():
