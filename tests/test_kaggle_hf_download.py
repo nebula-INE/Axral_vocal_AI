@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import hashlib
+import fnmatch
 from pathlib import Path
 import stat
 import sys
@@ -87,6 +88,20 @@ def test_select_relevant_files_includes_utau_files_and_jsonl_but_skips_directori
 def test_select_relevant_files_includes_localized_license_documents(filename):
     selected = select_relevant_files([{"path": f"docs/{filename}", "size": 12}])
     assert [item.path for item in selected] == [f"docs/{filename}"]
+
+
+@pytest.mark.parametrize(
+    "path,near_match",
+    (
+        ("banks/voice[1].zip", "banks/voice1.zip"),
+        ("banks/raw/*.wav", "banks/raw/sample.wav"),
+        ("banks/voice?.zip", "banks/voice1.zip"),
+    ),
+)
+def test_exact_hub_allow_pattern_does_not_expand_glob_characters(path, near_match):
+    pattern = kaggle_download._exact_hub_allow_pattern(path)
+    assert fnmatch.fnmatchcase(path, pattern)
+    assert not fnmatch.fnmatchcase(near_match, pattern)
 
 
 def test_select_relevant_files_rejects_traversal():
