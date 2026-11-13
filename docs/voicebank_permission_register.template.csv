@@ -1,0 +1,5 @@
+candidate_id,voicebank_name,exact_release,source_url,terms_url,terms_checked_at_utc,local_processing,hosted_processing,feature_extraction,ml_training,model_distribution,audio_redistribution,attribution_requirements,review_status,evidence_reference,reviewer,reviewed_at_utc,notes
+candidate-001,つくよみちゃん UTAU voicebank,not_identified,,,,review_required,review_required,review_required,review_required,review_required,review_required,,not_started,,,,Exact release and official source must be identified.
+candidate-002,桃音モモ,not_identified,,,,review_required,review_required,review_required,review_required,review_required,review_required,,not_started,,,,Exact distribution and release-specific terms must be identified.
+candidate-003,重音テト UTAU voicebank,not_identified,,,,review_required,review_required,review_required,review_required,review_required,review_required,,not_started,,,,Official voice-use rules and exact UTAU release must be checked.
+candidate-004,デフォ子／唄音ウタ,not_identified,,,,review_required,review_required,review_required,review_required,review_required,review_required,,not_started,,,,Original distribution source and exact release must be identified.
