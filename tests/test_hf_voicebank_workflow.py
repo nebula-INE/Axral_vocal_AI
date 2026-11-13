@@ -62,7 +62,7 @@ def test_workflows_use_read_only_token_and_do_not_persist_checkout_credentials()
     test_workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
     audit_workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "permissions:\\n  contents: read" in test_workflow
-    assert "permissions:\\n  contents: read" in audit_workflow
+    assert "permissions:\n  contents: read" in test_workflow
+    assert "permissions:\n  contents: read" in audit_workflow
     assert test_workflow.count("persist-credentials: false") == 2
     assert audit_workflow.count("persist-credentials: false") == 1
