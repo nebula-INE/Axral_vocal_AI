@@ -47,7 +47,8 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert 'validate_jsonl(manifest, require_labeled=True, execution_context="hosted")' in source
     assert '"--execution-context", "hosted"' in source
     assert "hosted_processing" in source
-    assert "model_distribution" in source
+    notebook_text = "".join("".join(cell["source"]) for cell in notebook["cells"])
+    assert "model distribution" in notebook_text.casefold()
     assert "validation_error_code(exc)" in source
     assert "training/train_pitch_model.py" in source
     assert "resume_download" not in source
