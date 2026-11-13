@@ -16,7 +16,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 ## Execution policy
 
 - Keep the existing `.github/workflows/tests.yml` as the fast, per-pull-request unit/integration CI.
-- Add a separate workflow with `workflow_dispatch` and a weekly `schedule`; do not download third-party voicebank data for arbitrary pull requests.
+- Add a separate manual-only workflow with a default-deny hosted-processing permission gate; keep automatic schedules disabled until per-bank permissions are reviewed.
 - Provide inputs for dataset revision, optional voicebank path/name filter, maximum download size, and failure threshold.
 - Set least-privilege GitHub permissions, a bounded job timeout, and artifact retention.
 - Use a public read-only Hub request by default. An optional Hugging Face read token may be supplied as a GitHub secret; never print it.
