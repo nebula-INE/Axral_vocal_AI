@@ -338,6 +338,24 @@ def test_voicebank_discovery_groups_nested_oto_ini_under_top_bank(tmp_path):
     assert discover_voicebank_roots(tmp_path) == [bank_a.resolve(), bank_b.resolve()]
 
 
+def test_voicebank_discovery_groups_multipitch_oto_files_by_root_prefix_map(tmp_path):
+    bank = tmp_path / "multipitch-bank"
+    (bank / "C4").mkdir(parents=True)
+    (bank / "C5").mkdir()
+    (bank / "prefix.map").write_text("C4\\t-\\t\n", encoding="utf-8")
+    (bank / "C4" / "oto.ini").write_text("", encoding="utf-8")
+    (bank / "C5" / "OTO.INI").write_text("", encoding="utf-8")
+
+    independent = tmp_path / "independent-bank"
+    independent.mkdir()
+    (independent / "oto.ini").write_text("", encoding="utf-8")
+
+    assert discover_voicebank_roots(tmp_path) == [
+        independent.resolve(),
+        bank.resolve(),
+    ]
+
+
 def test_voicebank_discovery_ignores_symlinked_directories(tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
