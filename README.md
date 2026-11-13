@@ -56,7 +56,7 @@ Axral Vocal AI can audit selected UTAU voicebanks directly from the Hugging Face
 - Workflow: `.github/workflows/hf-utau-voicebank-audit.yml`
 - Run: **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**
 - The workflow also supports a weekly scheduled audit after it is merged to the default branch.
-- It resolves the dataset revision to a commit SHA, applies an optional Hub path filter before downloading, checks archive size limits, safely extracts supported ZIP/UAR and tar archives, discovers `oto.ini` roots, and runs the existing read-only audit.
+- It resolves the dataset revision to a commit SHA, applies an optional Hub path filter before downloading, checks archive size limits, safely extracts supported ZIP/UAR and tar archives, discovers `oto.ini` roots, and runs the existing read-only audit.groups nested pitch-layer `oto.ini` folders under an enclosing bank directory with a regular `prefix.map` (while keeping independent roots separate), and runs the existing read-only audit.
 - Only sanitized aggregate reports are uploaded. Raw WAVs and detailed aliases/paths stay on the ephemeral runner.
 
 See [Real UTAU Voicebank Validation Gate](docs/real_voicebank_validation.md) and [plan.md](plan.md) for inputs, limits, supported formats, and the remaining live-data verification step. This workflow performs technical auditing only; machine-learning training and redistribution permissions must be reviewed separately.
