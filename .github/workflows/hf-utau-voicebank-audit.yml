@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload sanitized audit summary
         if: always() && hashFiles('artifacts/hf-voicebank-audit/summary.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hf-utau-voicebank-audit
           path: |
