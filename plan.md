@@ -47,7 +47,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 ## Acceptance criteria
 
 - A maintainer can manually launch a run against `SEKOIA2900/VO-US` without editing workflow code.
-- A scheduled run is bounded by the configured download and execution limits.
+- A manual run stops before checkout/download unless `permission_reviewed=yes` is selected after the operator verifies hosted-processing permission for every selected voicebank.
 - The workflow uses an immutable dataset commit for each run and records its SHA.
 - At least one UTAU voicebank is audited when the dataset exposes eligible content; if no eligible files or `oto.ini` are found, the run fails clearly rather than reporting a false pass.
 - Audit errors/warnings are visible in the sanitized summary and the configured threshold controls the final status.
@@ -67,7 +67,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 1. Commit this plan to the new work branch before implementation.
 2. Add a network-independent Hugging Face selection/download/extraction/audit script.
 3. Add focused unit tests for file selection, archive safety, discovery, and summary redaction.
-4. Add the separate GitHub Actions manual/weekly workflow.
+4. Add the separate GitHub Actions manual workflow with a default-deny hosted-processing review gate.
 5. Run the complete existing test suite and inspect CI results.
 6. Update this plan with implementation status and open limitations before opening the pull request.
 
@@ -80,7 +80,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Add `scripts/audit_hf_voicebanks.py` for Hugging Face revision pinning, file selection, bounded downloads, safe extraction, dynamic voicebank discovery, audit aggregation, and sanitized reporting.
 - [x] Add tests for Hub file selection, pre-download path filtering, unknown-size and download-limit rejection, archive path traversal/link/special-file rejection, extraction-size limits, common tar `./` root directory entries, nested voicebank discovery, symlink directory skipping, and report redaction.
 - [x] Enforce the actual decompressed byte count while streaming archive members, rather than trusting archive size headers alone.
-- [x] Add `.github/workflows/hf-utau-voicebank-audit.yml` with manual dispatch and weekly schedule.
+- [x] Add `.github/workflows/hf-utau-voicebank-audit.yml` with manual dispatch and an explicit per-voicebank hosted-processing permission acknowledgement; keep the workflow manual-only until terms are reviewed.
 - [x] Keep the existing per-PR unit/integration workflow separate and unchanged.
 - [x] Document workflow operation and data-use boundaries in `docs/real_voicebank_validation.md`.
 - [x] Validate dataset IDs and requested Hub revisions before any Hub request or Markdown summary rendering; reject control characters, malformed path components, and oversized refs.
@@ -110,3 +110,11 @@ The live Hub download has not yet been executed from this development session. T
 - `file_path_filter` is applied to Hub paths before download; `voicebank_filter` is applied to discovered roots after download.
 - Only aggregate counts and issue codes are uploaded. Raw audio, detailed parser reports, aliases, and sample filenames are not workflow artifacts.
 - The workflow performs technical auditing only. It does not infer or grant permission for machine-learning training or redistribution.
+### Permission governance hardening (2026-11-13)
+
+- [x] Add a public, blank-safe starter permission register template for the four initial voicebank research candidates. All release and permission decisions start as `review_required`; no license approval is inferred.
+- [x] Extend the validation guide with separate local processing, hosted processing, feature extraction, ML training, model distribution, and audio redistribution scopes.
+- [x] Make the Hugging Face Actions workflow manual-only. Remove the weekly schedule until per-bank hosted-processing permissions have been recorded.
+- [x] Add required `permission_reviewed` input (default `no`) and fail before checkout or Hub access unless the operator explicitly confirms that every selected bank permits hosted processing on GitHub Actions.
+- [x] Keep the optional Hugging Face token scoped to the actual download/audit step, after the permission gate.
+- [ ] Run a live audit only after the selected banks' exact terms and hosted-processing decisions are recorded. The current session has not verified the live Hugging Face repository layout or those permissions.
