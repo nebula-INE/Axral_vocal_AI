@@ -7,6 +7,7 @@ validating a reproducible training loop, not a musically validated model.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import heapq
 from typing import Any, Iterable
 
 import numpy as np
@@ -14,6 +15,10 @@ import numpy as np
 FEATURE_VERSION = 1
 MAX_PREDICTION_DELTA_SEMITONES = 2.0
 FEATURE_NAMES = ("bias", "midi_normalized", "note_phase", "phase_squared", "duration_seconds")
+
+# Bound the experimental MVP before constructing dense NumPy matrices.
+MAX_TRAINING_EXAMPLES = 250_000
+MAX_TRAINING_LABEL_POINTS = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -42,12 +47,7 @@ def _features_for_time(notes: list[dict[str, Any]], time_sec: float) -> tuple[fl
         return None
     if len(active_notes) == 1:
         note = active_notes[0]
-        start = float(note["start_sec"])
-        end = float(note["end_sec"])
-        duration = end - start
-        phase = min(1.0, max(0.0, (time_sec - start) / duration))
-        midi = float(note["midi_note"])
-        return (1.0, midi / 127.0, phase, phase * phase, duration)
+        return _note_features(active_notes[0], time_sec)
 
     # Preserve endpoint labels when no note starts at that timestamp. A note
     # beginning there takes precedence even if it is unvoiced.
@@ -62,13 +62,88 @@ def _features_for_time(notes: list[dict[str, Any]], time_sec: float) -> tuple[fl
     if len(ending_notes) != 1:
         return None
     note = ending_notes[0]
-    duration = float(note["end_sec"]) - float(note["start_sec"])
+    return _note_features(note, time_sec, endpoint=True)
+
+
+
+def _note_features(
+    note: dict[str, Any],
+    time_sec: float,
+    *,
+    endpoint: bool = False,
+) -> tuple[float, ...]:
+    start = float(note["start_sec"])
+    end = float(note["end_sec"])
+    duration = end - start
+    phase = 1.0 if endpoint else min(1.0, max(0.0, (time_sec - start) / duration))
     midi = float(note["midi_note"])
-    return (1.0, midi / 127.0, 1.0, 1.0, duration)
+    return (1.0, midi / 127.0, phase, phase * phase, duration)
 
 
-def examples_from_records(records: Iterable[dict[str, Any]]) -> tuple[list[TrainingExample], dict[str, int]]:
-    """Convert validated manifest rows to per-label examples; no audio is accessed."""
+def _features_for_sorted_points(
+    notes: list[dict[str, Any]],
+    points: Iterable[dict[str, Any]],
+) -> Iterable[tuple[float, ...] | None]:
+    """Resolve sorted labels with a sweep line instead of rescanning every note.
+
+    Manifest validation guarantees notes are sorted by start time and label
+    points are strictly increasing. The active set therefore advances only
+    when a note starts or ends, keeping the mapping O((notes + labels) log notes).
+    """
+    next_note = 0
+    active: dict[int, dict[str, Any]] = {}
+    endings: list[tuple[float, int]] = []
+
+    for point in points:
+        time_sec = float(point["time_sec"])
+        starts_at_time = False
+
+        ended_at_time: list[dict[str, Any]] = []
+        while next_note < len(notes):
+            note = notes[next_note]
+            start = float(note["start_sec"])
+            if start > time_sec:
+                break
+            if start == time_sec:
+                starts_at_time = True
+            end = float(note["end_sec"])
+            if note.get("voiced") is not False and end > start:
+                if end > time_sec:
+                    active[next_note] = note
+                    heapq.heappush(endings, (end, next_note))
+                elif end == time_sec:
+                    # This note may have started after the previous label, so
+                    # it was never inserted into the active heap.
+                    ended_at_time.append(note)
+            next_note += 1
+
+        while endings and endings[0][0] <= time_sec:
+            end, index = heapq.heappop(endings)
+            note = active.pop(index, None)
+            if note is not None and end == time_sec:
+                ended_at_time.append(note)
+
+        if len(active) > 1:
+            yield None
+        elif len(active) == 1:
+            yield _note_features(next(iter(active.values())), time_sec)
+        elif starts_at_time:
+            # A note starting at this timestamp wins over endpoint fallback,
+            # including when that newly-started note is unvoiced.
+            yield None
+        elif len(ended_at_time) == 1:
+            yield _note_features(ended_at_time[0], time_sec, endpoint=True)
+        else:
+            yield None
+
+def examples_from_records(
+    records: Iterable[dict[str, Any]],
+    *,
+    max_examples: int = MAX_TRAINING_EXAMPLES,
+) -> tuple[list[TrainingExample], dict[str, int]]:
+    """Convert a one-pass record stream to bounded per-label examples; no audio is accessed."""
+    if isinstance(max_examples, bool) or not isinstance(max_examples, int) or max_examples < 1:
+        raise ValueError("max_examples must be a positive integer")
     examples: list[TrainingExample] = []
     counts = {"labels_seen": 0, "labels_used": 0, "labels_without_voiced_note": 0}
     for record in records:
@@ -76,12 +151,31 @@ def examples_from_records(records: Iterable[dict[str, Any]]) -> tuple[list[Train
         if not isinstance(target, dict):
             continue
         notes = record["input"]["notes"]
-        for point in target["points"]:
+        points = target["points"]
+        points_are_ordered = all(
+            float(points[index - 1]["time_sec"]) < float(points[index]["time_sec"])
+            for index in range(1, len(points))
+        )
+        notes_are_ordered = all(
+            float(notes[index - 1]["start_sec"]) <= float(notes[index]["start_sec"])
+            for index in range(1, len(notes))
+        )
+        feature_rows = (
+            _features_for_sorted_points(notes, points)
+            if points_are_ordered and notes_are_ordered
+            else (_features_for_time(notes, float(point["time_sec"])) for point in points)
+        )
+        for point, features in zip(points, feature_rows):
             counts["labels_seen"] += 1
-            features = _features_for_time(notes, float(point["time_sec"]))
+            if counts["labels_seen"] > MAX_TRAINING_LABEL_POINTS:
+                raise ValueError(
+                    f"training label point limit exceeded ({MAX_TRAINING_LABEL_POINTS})"
+                )
             if features is None:
                 counts["labels_without_voiced_note"] += 1
                 continue
+            if len(examples) >= max_examples:
+                raise ValueError(f"training example limit exceeded ({max_examples})")
             examples.append(TrainingExample(
                 features=features,
                 target=float(point["delta_semitones"]),

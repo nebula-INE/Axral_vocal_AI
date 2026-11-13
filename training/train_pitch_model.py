@@ -17,7 +17,7 @@ from axral_vocal_ai.pitch_model import (
     compare_with_zero_baseline,
     fit_ridge,
 )
-from axral_vocal_ai.training_data import DatasetValidationError, validate_jsonl
+from axral_vocal_ai.training_data import DatasetValidationError, iter_jsonl_records, validate_jsonl
 
 
 def main() -> int:
@@ -26,6 +26,12 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("pitch_delta_model.json"))
     parser.add_argument("--alpha", type=float, default=1.0, help="ridge regularization strength (default: 1.0)")
     parser.add_argument(
+        "--execution-context",
+        choices=("local", "hosted"),
+        default="local",
+        help="processing environment; hosted requires explicit hosted_processing permission",
+    )
+    parser.add_argument(
         "--evaluate-test",
         action="store_true",
         help="evaluate the held-out test split once model/settings are finalized",
@@ -33,10 +39,13 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        summary = validate_jsonl(args.manifest, require_labeled=True)
-        with args.manifest.open("r", encoding="utf-8") as stream:
-            records = [json.loads(line) for line in stream if line.strip() and not line.lstrip().startswith("#")]
-        examples, counts = examples_from_records(records)
+        summary = validate_jsonl(
+            args.manifest, require_labeled=True,
+            execution_context=args.execution_context,
+        )
+        # Re-read the validated JSONL as a bounded stream instead of retaining
+        # the complete manifest (and a second parsed copy) in memory.
+        examples, counts = examples_from_records(iter_jsonl_records(args.manifest))
         by_split = {split: [row for row in examples if row.split == split]
                     for split in ("train", "validation", "test")}
         if not by_split["train"]:
@@ -61,6 +70,7 @@ def main() -> int:
         report = {
             "status": "experimental_training_complete",
             "test_evaluation_included": args.evaluate_test,
+            "execution_context": args.execution_context,
             "manifest_validation": summary,
             "label_usage": counts,
             "usable_examples_by_split": {split: len(rows) for split, rows in by_split.items()},
@@ -81,6 +91,7 @@ def main() -> int:
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(json.dumps({
             "status": report["status"],
+            "execution_context": report["execution_context"],
             "test_evaluation_included": report["test_evaluation_included"],
             "label_usage": counts,
             "usable_examples_by_split": report["usable_examples_by_split"],

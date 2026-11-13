@@ -88,6 +88,83 @@ def test_missing_inventory_is_actionable(tmp_path: Path) -> None:
     assert {"oto_not_found", "no_oto_entries", "prefix_map_not_found"} <= codes
 
 
+
+
+
+def test_warns_when_oto_and_prefix_metadata_already_contain_replacement_chars(
+    tmp_path: Path,
+) -> None:
+    """Damaged text is detected but never silently rewritten or guessed."""
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=\ufffd,0,100,-100,20,10\n", encoding="utf-8"
+    )
+    (tmp_path / "prefix.map").write_text(
+        "C4\t-\t\ufffd\n", encoding="utf-8"
+    )
+    write_silent_wav(tmp_path / "a.wav")
+
+    result = analyze_voicebank(tmp_path)
+
+    replacement_issues = [
+        issue for issue in result.issues
+        if issue.code == "metadata_replacement_character"
+    ]
+    assert [(issue.path, issue.line_number) for issue in replacement_issues] == [
+        ("oto.ini", 1),
+        ("prefix.map", 1),
+    ]
+    assert all("original characters" in issue.message for issue in replacement_issues)
+    assert result.entries[0].alias == "\ufffd"
+    assert result.prefix_entries[0].suffix == "\ufffd"
+    assert result.summary["oto_entries"] == 1
+    assert result.summary["prefix_map_entries"] == 1
+
+
+def test_warns_for_strong_mojibake_signatures_in_oto_and_prefix_metadata(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\n", encoding="utf-8"
+    )
+    (tmp_path / "prefix.map").write_text(
+        "C4\t-\t繧｢繝九Γ\n", encoding="utf-8"
+    )
+    write_silent_wav(tmp_path / "a.wav")
+
+    result = analyze_voicebank(tmp_path)
+
+    mojibake_issues = [
+        issue for issue in result.issues
+        if issue.code == "metadata_suspected_mojibake"
+    ]
+    assert [(issue.path, issue.line_number) for issue in mojibake_issues] == [
+        ("oto.ini", 1),
+        ("prefix.map", 1),
+    ]
+    # Detection is diagnostic only: source aliases and suffixes are not rewritten.
+    assert result.entries[0].alias == "縺薙ｓ縺ｫ縺｡縺ｯ"
+    assert result.prefix_entries[0].suffix == "繧｢繝九Γ"
+
+
+def test_does_not_flag_normal_japanese_or_a_single_valid_kanji_marker(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "oto.ini").write_text(
+        "a.wav=こんにちは,0,100,-100,20,10\n", encoding="utf-8"
+    )
+    (tmp_path / "prefix.map").write_text(
+        "C4\t-\t糸が縺れる縺糸\n", encoding="utf-8"
+    )
+    write_silent_wav(tmp_path / "a.wav")
+
+    result = analyze_voicebank(tmp_path)
+
+    assert not any(
+        issue.code == "metadata_suspected_mojibake"
+        for issue in result.issues
+    )
+
+
 def test_cp932_voicebank_metadata_is_supported(tmp_path: Path) -> None:
     (tmp_path / "oto.ini").write_bytes("a.wav=あ,0,100,-100,20,10\n".encode("cp932"))
     write_silent_wav(tmp_path / "a.wav")

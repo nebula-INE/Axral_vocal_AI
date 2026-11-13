@@ -16,9 +16,19 @@ def main() -> int:
         action="store_true",
         help="Require pitch-delta labels on every record (training-readiness gate)",
     )
+    parser.add_argument(
+        "--execution-context",
+        choices=("local", "hosted"),
+        default="local",
+        help="processing environment; hosted requires explicit hosted_processing permission",
+    )
     args = parser.parse_args()
     try:
-        summary = validate_jsonl(args.manifest, require_labeled=args.require_labeled)
+        summary = validate_jsonl(
+            args.manifest,
+            require_labeled=args.require_labeled,
+            execution_context=args.execution_context,
+        )
     except DatasetValidationError as exc:
         print(json.dumps({"status": "blocked", "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2

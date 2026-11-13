@@ -1,9 +1,15 @@
+import json
 import math
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
+import axral_vocal_ai.pitch_model as pitch_model
 from axral_vocal_ai.pitch_model import (
     _features_for_time,
+    _features_for_sorted_points,
     LinearPitchDeltaModel,
     compare_with_zero_baseline,
     examples_from_records,
@@ -18,6 +24,14 @@ def record(record_id, bank, split, start, end, midi, targets):
     return {
         "schema_version": 1, "record_id": record_id, "source_id": f"synthetic-source-{record_id}",
         "permission_status": "approved", "license_id": "SYNTHETIC-TEST-ONLY",
+        "permissions": {
+            "local_processing": "approved",
+            "hosted_processing": "approved",
+            "feature_extraction": "approved",
+            "ml_training": "approved",
+            "model_distribution": "review_required",
+            "audio_redistribution": "prohibited",
+        },
         "voicebank_id": bank, "split": split,
         "input": {"notes": [{"start_sec": start, "end_sec": end, "midi_note": midi,
                              "lyric": "synthetic", "voiced": True}]},
@@ -76,6 +90,49 @@ def test_boundary_into_unvoiced_note_is_not_assigned_to_previous_note():
         {"start_sec": 1.0, "end_sec": 2.0, "midi_note": 0, "voiced": False},
     ]
     assert _features_for_time(notes, 1.0) is None
+
+
+
+def test_sorted_sweep_matches_reference_for_overlaps_and_boundaries():
+    notes = [
+        {"start_sec": 0.0, "end_sec": 1.0, "midi_note": 60, "voiced": True},
+        {"start_sec": 0.5, "end_sec": 1.5, "midi_note": 72, "voiced": True},
+        {"start_sec": 1.5, "end_sec": 2.0, "midi_note": 0, "voiced": False},
+        {"start_sec": 2.0, "end_sec": 3.0, "midi_note": 67, "voiced": True},
+        {"start_sec": 4.0, "end_sec": 5.0, "midi_note": 69, "voiced": True},
+    ]
+    times = [0.0, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+    points = [{"time_sec": value} for value in times]
+
+    actual = list(_features_for_sorted_points(notes, points))
+    expected = [_features_for_time(notes, value) for value in times]
+
+    assert actual == expected
+
+
+def test_sorted_sweep_keeps_endpoint_when_first_label_is_after_note_start():
+    notes = [
+        {"start_sec": 0.5, "end_sec": 1.0, "midi_note": 64, "voiced": True},
+    ]
+    points = [{"time_sec": 1.0}]
+
+    assert list(_features_for_sorted_points(notes, points)) == [
+        _features_for_time(notes, 1.0)
+    ]
+
+
+def test_unsorted_training_labels_keep_reference_mapping_semantics():
+    rows = synthetic_records()[:1]
+    rows[0]["target"]["points"] = [
+        {"time_sec": 1.0, "delta_semitones": 0.5},
+        {"time_sec": 0.0, "delta_semitones": 0.0},
+        {"time_sec": 0.5, "delta_semitones": 0.25},
+    ]
+
+    examples, counts = examples_from_records(rows)
+
+    assert [row.features[2] for row in examples] == [1.0, 0.0, 0.5]
+    assert counts["labels_used"] == 3
 
 
 def test_ridge_training_is_finite_and_serializable():
@@ -262,3 +319,92 @@ def test_non_overlapping_note_context_still_resolves_at_shared_boundary():
     assert features is not None
     assert features[1] == pytest.approx(72 / 127)
     assert features[2] == pytest.approx(0.0)
+
+
+def test_pitch_training_cli_streams_a_validated_jsonl_manifest(tmp_path):
+    rows = synthetic_records()
+    manifest = tmp_path / "pitch_training_manifest.jsonl"
+    report_path = tmp_path / "pitch_report.json"
+    manifest.write_text(
+        chr(10).join(json.dumps(row, ensure_ascii=False) for row in rows) + chr(10),
+        encoding="utf-8",
+    )
+
+    repository_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repository_root / "training" / "train_pitch_model.py"),
+            str(manifest),
+            "--output",
+            str(report_path),
+            "--execution-context",
+            "hosted",
+            "--evaluate-test",
+        ],
+        cwd=repository_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["manifest_validation"]["records"] == 4
+    assert report["execution_context"] == "hosted"
+    assert report["test_evaluation_included"] is True
+    assert set(report["evaluation_by_split"]) == {"train", "validation", "test"}
+    assert report["usable_examples_by_split"]["train"] == 6
+
+
+
+def test_pitch_training_cli_requires_hosted_permission_scope(tmp_path):
+    rows = synthetic_records()
+    rows[0]["permissions"]["hosted_processing"] = "review_required"
+    manifest = tmp_path / "pitch_training_manifest.jsonl"
+    report_path = tmp_path / "pitch_report.json"
+    manifest.write_text(
+        chr(10).join(json.dumps(row, ensure_ascii=False) for row in rows) + chr(10),
+        encoding="utf-8",
+    )
+
+    repository_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repository_root / "training" / "train_pitch_model.py"),
+            str(manifest),
+            "--output",
+            str(report_path),
+            "--execution-context",
+            "hosted",
+        ],
+        cwd=repository_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "permission scope hosted_processing is not approved" in result.stdout
+    assert not report_path.exists()
+
+def test_training_examples_accept_one_pass_record_iterators():
+    records = (row for row in synthetic_records())
+
+    examples, counts = examples_from_records(records)
+
+    assert len(examples) == 12
+    assert counts["labels_seen"] == 12
+    assert counts["labels_used"] == 12
+
+
+def test_training_examples_enforce_memory_bound(monkeypatch):
+    with pytest.raises(ValueError, match="training example limit exceeded"):
+        examples_from_records(synthetic_records(), max_examples=2)
+
+    monkeypatch.setattr(pitch_model, "MAX_TRAINING_LABEL_POINTS", 2)
+    with pytest.raises(ValueError, match="training label point limit exceeded"):
+        examples_from_records(synthetic_records())

@@ -10,14 +10,74 @@ from pathlib import Path
 from typing import Any, Iterable
 
 PERMISSION_STATES = {"approved", "review_required", "prohibited"}
+PERMISSION_SCOPES = frozenset({
+    "local_processing", "hosted_processing", "feature_extraction",
+    "ml_training", "model_distribution", "audio_redistribution",
+})
+EXECUTION_CONTEXTS = frozenset({"local", "hosted"})
 SPLITS = {"train", "validation", "test"}
 TARGET_KIND = "pitch_delta_semitones"
 MAX_TRAINING_DELTA_SEMITONES = 2.0
 FORBIDDEN_KEYS = {"audio", "audio_bytes", "audio_file", "audio_path", "waveform", "wav_path", "file_path", "source_path", "relative_path", "absolute_path", "local_path", "checkpoint", "credentials", "token", "secret"}
 
+# Bound manifest parsing before any record payload can exhaust Kaggle memory.
+MAX_MANIFEST_BYTES = 256 * 1024 * 1024
+MAX_JSONL_LINE_BYTES = 1024 * 1024
+MAX_MANIFEST_RECORDS = 100_000
+
 
 class DatasetValidationError(ValueError):
     """Raised when a dataset manifest violates the training gate."""
+
+
+def validation_error_code(error: BaseException) -> str:
+    """Map a private validation exception to a stable, path-free diagnostic code.
+
+    Never return the exception message: it can contain record IDs, bank names,
+    field values, or local paths from a user's manifest.
+    """
+    message = str(error).casefold()
+    if "manifest byte limit exceeded" in message:
+        return "manifest_size_limit"
+    if "jsonl line byte limit exceeded" in message:
+        return "manifest_line_size_limit"
+    if "manifest record limit exceeded" in message:
+        return "manifest_record_limit"
+    if "must be valid utf-8" in message:
+        return "manifest_invalid_encoding"
+    if "invalid json" in message:
+        return "manifest_invalid_json"
+    if "cannot read manifest" in message:
+        return "manifest_unreadable"
+    if "contains no records" in message:
+        return "manifest_empty"
+    if "duplicate record_id" in message:
+        return "duplicate_record_id"
+    if "appears in multiple splits" in message:
+        return "split_leakage"
+    if "training readiness requires" in message:
+        return "split_requirements_not_met"
+    if ("not approved for ml use" in message or "permission_status" in message
+            or "license_id" in message or "permission scope" in message
+            or "permissions object" in message or "permission scopes" in message):
+        return "source_permission_not_approved"
+    if "provenance" in message or "review_status" in message:
+        return "provenance_not_approved"
+    if (
+        "not allowed in a metadata manifest" in message
+        or "local filesystem path" in message
+        or "windows filesystem path" in message
+    ):
+        return "private_payload_rejected"
+    if "input.notes" in message or ".midi_note" in message or "note timeline" in message:
+        return "invalid_note_data"
+    if "target" in message or "pitch_delta_semitones" in message:
+        return "invalid_or_missing_pitch_labels"
+    if "missing required fields" in message or "schema_version" in message:
+        return "manifest_schema_invalid"
+    if "split" in message or "voicebank" in message or "source_id" in message:
+        return "manifest_split_invalid"
+    return "manifest_validation_failed"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -50,7 +110,12 @@ def _check_no_private_payload(value: Any, location: str = "record") -> None:
         _require(not (value.startswith("\\\\") or (len(value) > 2 and value[1] == ":" and value[2] in "\\\\/")), f"{location} must not contain a Windows filesystem path")
 
 
-def validate_record(record: Any, line_number: int, require_labeled: bool = False) -> dict[str, Any]:
+def validate_record(
+    record: Any,
+    line_number: int,
+    require_labeled: bool = False,
+    execution_context: str = "local",
+) -> dict[str, Any]:
     prefix = f"line {line_number}"
     _require(isinstance(record, dict), f"{prefix}: each JSONL row must be an object")
     _check_no_private_payload(record, prefix)
@@ -72,6 +137,38 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     _require(permission == "approved", f"{prefix}: source is not approved for ML use (status={permission})")
     license_id = record["license_id"]
     _require(isinstance(license_id, str) and bool(license_id.strip()), f"{prefix}: approved records require a non-empty license_id")
+
+    _require(
+        execution_context in EXECUTION_CONTEXTS,
+        f"{prefix}: execution_context must be local or hosted",
+    )
+    if require_labeled:
+        permissions = record.get("permissions")
+        _require(
+            isinstance(permissions, dict),
+            f"{prefix}: permissions object is required for training",
+        )
+        missing_scopes = sorted(PERMISSION_SCOPES - permissions.keys())
+        _require(
+            not missing_scopes,
+            f"{prefix}: permission scopes missing: {', '.join(missing_scopes)}",
+        )
+        for scope in sorted(PERMISSION_SCOPES):
+            status = permissions[scope]
+            _require(
+                isinstance(status, str) and status in PERMISSION_STATES,
+                f"{prefix}: invalid permission scope {scope}",
+            )
+        required_approvals = (
+            f"{execution_context}_processing",
+            "feature_extraction",
+            "ml_training",
+        )
+        for scope in required_approvals:
+            _require(
+                permissions[scope] == "approved",
+                f"{prefix}: permission scope {scope} is not approved ({permissions[scope]})",
+            )
 
     _require(isinstance(record["split"], str) and record["split"] in SPLITS, f"{prefix}: split must be train, validation, or test")
     input_data = record["input"]
@@ -147,7 +244,11 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     return record
 
 
-def validate_records(records: Iterable[Any], require_labeled: bool = False) -> dict[str, Any]:
+def validate_records(
+    records: Iterable[Any],
+    require_labeled: bool = False,
+    execution_context: str = "local",
+) -> dict[str, Any]:
     seen_ids: set[str] = set()
     bank_splits: dict[str, str] = {}
     source_splits: dict[str, str] = {}
@@ -155,7 +256,12 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
     total = 0
     labeled_records = 0
     for line_number, record in enumerate(records, start=1):
-        validated = validate_record(record, line_number, require_labeled=require_labeled)
+        _require(total < MAX_MANIFEST_RECORDS,
+                 f"manifest record limit exceeded ({MAX_MANIFEST_RECORDS})")
+        validated = validate_record(
+            record, line_number, require_labeled=require_labeled,
+            execution_context=execution_context,
+        )
         record_id = validated["record_id"]
         _require(record_id not in seen_ids, f"line {line_number}: duplicate record_id {record_id!r}")
         seen_ids.add(record_id)
@@ -192,22 +298,62 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
             for split in sorted(SPLITS)
         },
         "require_labeled": require_labeled,
+        "execution_context": execution_context,
     }
 
 
-def validate_jsonl(path: str | Path, require_labeled: bool = False) -> dict[str, Any]:
-    """Validate a JSON Lines manifest; the file is metadata only, never audio."""
+def iter_jsonl_records(path: str | Path) -> Iterable[Any]:
+    """Yield JSONL records one line at a time under strict byte/record limits."""
     manifest_path = Path(path)
-    records: list[Any] = []
     try:
-        with manifest_path.open("r", encoding="utf-8") as stream:
-            for line_number, line in enumerate(stream, start=1):
+        file_size = manifest_path.stat().st_size
+        _require(
+            file_size <= MAX_MANIFEST_BYTES,
+            f"manifest byte limit exceeded ({MAX_MANIFEST_BYTES})",
+        )
+        bytes_read = 0
+        with manifest_path.open("rb") as stream:
+            line_number = 0
+            while True:
+                raw_line = stream.readline(MAX_JSONL_LINE_BYTES + 1)
+                if not raw_line:
+                    break
+                line_number += 1
+                if len(raw_line) > MAX_JSONL_LINE_BYTES:
+                    raise DatasetValidationError(
+                        f"line {line_number}: JSONL line byte limit exceeded ({MAX_JSONL_LINE_BYTES})"
+                    )
+                bytes_read += len(raw_line)
+                _require(
+                    bytes_read <= MAX_MANIFEST_BYTES,
+                    f"manifest byte limit exceeded ({MAX_MANIFEST_BYTES})",
+                )
+                try:
+                    line = raw_line.decode("utf-8-sig" if line_number == 1 else "utf-8")
+                except UnicodeDecodeError:
+                    raise DatasetValidationError(
+                        f"line {line_number}: manifest must be valid UTF-8"
+                    ) from None
                 if not line.strip() or line.lstrip().startswith("#"):
                     continue
                 try:
-                    records.append(json.loads(line))
+                    yield json.loads(line)
                 except json.JSONDecodeError as exc:
-                    raise DatasetValidationError(f"line {line_number}: invalid JSON: {exc.msg}") from exc
+                    raise DatasetValidationError(
+                        f"line {line_number}: invalid JSON: {exc.msg}"
+                    ) from exc
     except OSError as exc:
         raise DatasetValidationError(f"cannot read manifest: {exc}") from exc
-    return validate_records(records, require_labeled=require_labeled)
+
+
+def validate_jsonl(
+    path: str | Path,
+    require_labeled: bool = False,
+    execution_context: str = "local",
+) -> dict[str, Any]:
+    """Validate a JSON Lines manifest incrementally; the file is metadata only."""
+    return validate_records(
+        iter_jsonl_records(path),
+        require_labeled=require_labeled,
+        execution_context=execution_context,
+    )
