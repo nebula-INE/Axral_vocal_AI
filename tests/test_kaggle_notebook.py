@@ -41,6 +41,9 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     source = "".join(code_cells[0]["source"])
     ast.parse(source)
     assert 'HF_DATA_URL = "https://huggingface.co/datasets/' in source
+    assert "AXRAL_HOSTED_PROCESSING_REVIEWED" in source
+    assert 'hosted_processing_review.strip().casefold() != "yes"' in source
+    assert source.index("AXRAL_HOSTED_PROCESSING_REVIEWED") < source.index("if DATA_ROOT.exists(): shutil.rmtree(DATA_ROOT)")
     assert 'validate_jsonl(manifest, require_labeled=True, execution_context="hosted")' in source
     assert '"--execution-context", "hosted"' in source
     assert "hosted_processing" in source
