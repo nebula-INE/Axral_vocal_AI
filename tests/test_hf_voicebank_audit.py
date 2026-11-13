@@ -511,6 +511,84 @@ def test_run_audit_reports_archive_error_codes_without_archive_paths(tmp_path, m
     assert "banks/voice" not in markdown
 
 
+@pytest.mark.parametrize(
+    ("fail_on", "expected_exit_code"),
+    [("error", 0), ("warning", 1), ("never", 0)],
+)
+def test_run_audit_applies_warning_threshold_to_mojibake_findings(
+    tmp_path, monkeypatch, fail_on, expected_exit_code
+):
+    class FakeHfApi:
+        def __init__(self, token=None):
+            self.token = token
+
+        def dataset_info(self, repo_id, revision):
+            return SimpleNamespace(sha="b" * 40)
+
+        def list_repo_tree(self, repo_id, repo_type, revision, recursive, expand):
+            return [{"path": "voice/oto.ini", "size": 64}]
+
+    def fake_snapshot_download(repo_id, repo_type, revision, local_dir,
+                               allow_patterns, token):
+        root = Path(local_dir) / "voice"
+        root.mkdir(parents=True)
+        root.joinpath("oto.ini").write_text(
+            "a.wav=縺薙ｓ縺ｫ縺｡縺ｯ,0,100,-100,20,10\\n",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(HfApi=FakeHfApi, snapshot_download=fake_snapshot_download),
+    )
+    monkeypatch.setattr(
+        audit_script,
+        "analyze_voicebank",
+        lambda root: SimpleNamespace(
+            summary={
+                "oto_files": 1,
+                "oto_entries": 1,
+                "unique_aliases": 1,
+                "prefix_map_files": 0,
+                "prefix_map_entries": 0,
+                "wav_files_checked": 0,
+                "wav_files_invalid": 0,
+                "errors": 0,
+                "warnings": 1,
+            },
+            issues=[
+                SimpleNamespace(
+                    severity="warning",
+                    code="metadata_suspected_mojibake",
+                )
+            ],
+        ),
+    )
+
+    args = SimpleNamespace(
+        repo_id="SEKOIA2900/VO-US",
+        revision="main",
+        file_path_filter="",
+        voicebank_filter="",
+        max_download_mb=10,
+        max_extracted_mb=10,
+        fail_on=fail_on,
+        output_dir=tmp_path / "summary",
+    )
+    summary, exit_code = run_audit(args)
+
+    assert exit_code == expected_exit_code
+    assert summary["totals"]["warnings"] == 1
+    assert summary["banks"][0]["issue_counts"] == {
+        "warning:metadata_suspected_mojibake": 1
+    }
+    markdown = build_markdown(summary)
+    assert "metadata_suspected_mojibake" in markdown
+    assert "縺薙ｓ縺ｫ縺｡縺ｯ" not in markdown
+    assert "voice/oto.ini" not in markdown
+
+
 def test_run_audit_rejects_non_commit_revision_before_listing_or_download(tmp_path, monkeypatch):
     calls = []
 
