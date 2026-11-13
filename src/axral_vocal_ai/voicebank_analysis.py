@@ -196,37 +196,54 @@ def _record_replacement_character_issue(
 _MOJIBAKE_MARKERS = frozenset("縺繧繝譁蜿陦")
 
 
+def _is_reversible_cp932_utf8_mojibake(line: str) -> bool:
+    """Detect text that round-trips from CP932 bytes back into readable UTF-8.
+
+    UTF-8 Japanese text decoded as CP932 and then saved as UTF-8 has a useful
+    signature: encoding that mojibake text as CP932 reconstructs the original
+    UTF-8 byte sequence. A normal Japanese line generally fails this strict
+    round-trip. The recovered text is used only for this boolean check and is
+    never written back to the source metadata.
+    """
+    if not any(character in _MOJIBAKE_MARKERS for character in line):
+        return False
+    try:
+        recovered = line.encode("cp932").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return False
+    if recovered == line:
+        return False
+
+    def has_japanese_script(value: str) -> bool:
+        return any(
+            0x3040 <= ord(character) <= 0x30FF
+            or 0x31F0 <= ord(character) <= 0x31FF
+            or 0x3400 <= ord(character) <= 0x4DBF
+            or 0x4E00 <= ord(character) <= 0x9FFF
+            or 0xF900 <= ord(character) <= 0xFAFF
+            for character in value
+        )
+
+    return has_japanese_script(recovered)
+
+
 def _record_suspected_mojibake_issue(
     text: str, relative_path: str, issues: list[VoicebankIssue]
 ) -> None:
-    """Flag strong Japanese mojibake signatures without attempting repair.
+    """Flag reversible UTF-8/CP932 mojibake without attempting source repair.
 
-    A single character such as 縺 can occur in valid Japanese text. Detection
-    therefore requires repeated high-signal markers, a mixed marker cluster,
-    or the characteristic 繧/繝 plus half-width-katakana pattern.
+    Marker characters alone are not sufficient: some can occur in valid
+    Japanese words. The warning requires a strict CP932-to-UTF-8 byte
+    round-trip that produces different Japanese text.
     """
     for line_number, line in enumerate(text.splitlines(), start=1):
-        marker_counts = Counter(character for character in line if character in _MOJIBAKE_MARKERS)
-        repeated_marker = any(
-            marker_counts.get(character, 0) >= 2
-            for character in ("縺", "繧", "繝")
-        )
-        mixed_marker_cluster = (
-            sum(marker_counts.values()) >= 3 and len(marker_counts) >= 2
-        )
-        half_width_katakana = any("\uff61" <= character <= "\uff9f" for character in line)
-        cp932_katakana_signature = (
-            marker_counts.get("繧", 0) >= 1
-            and marker_counts.get("繝", 0) >= 1
-            and half_width_katakana
-        )
-        if repeated_marker or mixed_marker_cluster or cp932_katakana_signature:
+        if _is_reversible_cp932_utf8_mojibake(line):
             issues.append(VoicebankIssue(
                 "warning",
                 "metadata_suspected_mojibake",
                 relative_path,
                 line_number,
-                "Metadata contains a strong mojibake pattern commonly caused by UTF-8/CP932 mis-decoding. Source text was preserved; review the original bytes and encoding rather than applying an automatic repair.",
+                "Metadata contains text that reverses cleanly from CP932 back to different UTF-8 Japanese text. Source text was preserved; review the original bytes and encoding rather than applying an automatic repair.",
             ))
             return
 
