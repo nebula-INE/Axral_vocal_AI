@@ -96,7 +96,10 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
   - `actions/setup-node`: `949feb2413d6458794dcd2491c4babbbce0c15c1`
   - `actions/setup-python`: `6d4fd22b20465ccc0f7354476588e8df7c9ca0e0`
   - `actions/upload-artifact`: `cf430e030ddbb5b0abf93d22962f4752f3646cd9`
-- [x] Add regression tests that require every `uses:` reference in the affected workflows to be a full 40-character commit SHA. The CI run for this pinning change is in progress; do not count it as passed until both Python jobs finish.
+- [x] Add regression tests that require every `uses:` reference in the affected workflows to be a full 40-character commit SHA.
+- [x] Restrict the shared PR test workflow token to `contents: read`; set `persist-credentials: false` on both checkout steps.
+- [x] Keep the hosted audit workflow at `contents: read` and disable checkout credential persistence there as well.
+- [ ] Verify the latest CI runs after action pinning and least-privilege updates on both Python matrix versions.
 - [x] Verify both Python matrix jobs after the earlier v7 migration; no Node.js 20 deprecation warning appeared in the updated test workflow logs.
 
 ### Remaining verification
