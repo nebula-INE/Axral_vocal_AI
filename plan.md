@@ -99,7 +99,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Add regression tests that require every `uses:` reference in the affected workflows to be a full 40-character commit SHA.
 - [x] Restrict the shared PR test workflow token to `contents: read`; set `persist-credentials: false` on both checkout steps.
 - [x] Keep the hosted audit workflow at `contents: read` and disable checkout credential persistence there as well.
-- [ ] Verify the latest CI runs after action pinning and least-privilege updates on both Python matrix versions.
+- [x] Verify the latest CI runs after action pinning and least-privilege updates: Python 3.10 and 3.12 both passed 623 tests ([run 43434211223](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/43434211223)).
 - [x] Verify both Python matrix jobs after the earlier v7 migration; no Node.js 20 deprecation warning appeared in the updated test workflow logs.
 
 ### Remaining verification
