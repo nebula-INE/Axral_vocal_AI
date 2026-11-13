@@ -15,6 +15,14 @@ def _record(record_id: str, bank: str, split: str, delta: float) -> dict:
         "source_id": f"synthetic-{record_id}",
         "permission_status": "approved",
         "license_id": "SYNTHETIC-TEST-ONLY",
+        "permissions": {
+            "local_processing": "approved",
+            "hosted_processing": "approved",
+            "feature_extraction": "approved",
+            "ml_training": "approved",
+            "model_distribution": "review_required",
+            "audio_redistribution": "prohibited",
+        },
         "voicebank_id": bank,
         "split": split,
         "input": {
