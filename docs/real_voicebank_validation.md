@@ -7,7 +7,7 @@ This checklist is the next validation step after synthetic CI fixtures. Passing 
 - Use only voicebanks whose license/terms permit local testing for this purpose.
 - Keep voicebank WAVs, oto.ini contents, and other restricted assets out of Git commits, issue comments, CI artifacts, and public logs unless redistribution is explicitly permitted.
 - Record the voicebank name/version and license URL locally. Prefer a local report with paths relative to the voicebank root; review it before sharing because aliases and file names may identify a bank.
-- Do not upload a voicebank to an external service as part of this workflow.
+- A local audit can be performed without uploading the voicebank. The GitHub Actions and Kaggle routes are hosted processing: selected archives/audio are transferred to the provider's ephemeral runner or workspace. Use those routes only when the exact voicebank terms explicitly permit that hosted processing.
 
 ## 2. Run a local audit
 
@@ -91,9 +91,12 @@ A bank should not be marked compatible merely because the CLI exits 0. Compatibi
 
 The repository workflow `.github/workflows/hf-utau-voicebank-audit.yml` audits the Hugging Face dataset `SEKOIA2900/VO-US` without placing source voicebank data in Git.
 
-Run it manually from **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**, or allow its weekly schedule after the workflow has been merged to the default branch. The workflow resolves the requested Hub revision to a commit SHA and records that SHA in its report.
+Run it manually from **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**. The workflow is intentionally manual-only; its weekly schedule is disabled until the selected voicebanks' hosted-processing permissions have been reviewed and recorded. It resolves the requested Hub revision to a commit SHA and records that SHA in its report.
+
+Before the first checkout or Hugging Face request, the workflow requires permission_reviewed=yes. The default is no, which stops the job before it checks out code or downloads data. Set it to yes only after you have checked the exact release-specific terms for every voicebank that the file filters can select and confirmed that processing on GitHub Actions is allowed. This is an operator acknowledgement, not an automatic license verifier or a grant of permission.
 
 Manual inputs:
+- permission_reviewed: required choice no or yes; defaults to no. The job exits before checkout/download unless set to yes after the review described above.
 - `revision`: Hub branch, tag, or commit SHA; default `main`. Invalid dataset IDs/revisions (including control characters, path traversal components, and Markdown-injection text) are rejected before Hub API access. The resolved Hub revision must be a full 40-character commit SHA before file listing and download.
 - `file_path_filter`: optional case-insensitive substring matched against Hugging Face file paths before download, reducing the selected bytes. Use a path fragment present in the Hub repository (for example a bank folder or archive name).
 - `voicebank_filter`: optional case-insensitive substring matched against discovered bank directories after extraction. This narrows audited roots but does not reduce the download selection.
@@ -111,3 +114,54 @@ This workflow is a parser/filesystem/signal audit only. It does not infer ML tra
 ## 7. Japanese metadata encoding diagnostics
 
 The audit reports `metadata_replacement_character` when `oto.ini` or `prefix.map` contains U+FFFD, and `metadata_suspected_mojibake` for strong UTF-8/CP932 mojibake signatures. The detector requires a line containing a known mojibake marker to round-trip through CP932 encoding and UTF-8 decoding into different Japanese text. This checks the reversible byte pattern behind common UTF-8-as-CP932 corruption rather than relying on marker counts, so valid Japanese text containing multiple marker characters is not flagged merely for that reason. The original metadata is preserved and never auto-repaired. Both findings are included only as aggregate issue-code counts in the uploaded report. Select `fail_on: warning` when these findings should fail the audit job; the default `error` threshold records warnings without failing the run.
+
+## 8. Starter collection register
+
+The names below are research candidates only. No candidate is marked as licensed for hosted processing, feature extraction, ML training, model distribution, or audio redistribution. The exact release and primary-source terms must be identified before acquisition or processing.
+
+| Candidate | First intended use | Release/permission status | Required gate |
+| --- | --- | --- | --- |
+| つくよみちゃん UTAU voicebank | First audit candidate | Exact release not yet registered; all scopes review_required | Verify source, exact release, hosted-processing permission, ML-training permission, and output restrictions |
+| 桃音モモ | Layout/alias coverage | Exact distribution not yet identified; all scopes review_required | Verify the release-specific terms; fan-use permission does not imply AI-training permission |
+| 重音テト | Compatibility testing candidate | Exact UTAU release not yet registered; all scopes review_required | Check official voice-use rules and FAQ separately for testing, training, and distribution |
+| デフォ子／唄音ウタ | Additional baseline candidate | Exact distribution not yet identified; all scopes review_required | Verify original distributor, exact version, and all applicable terms |
+
+Use docs/voicebank_permission_register.template.csv as the blank collection sheet. Keep completed registers containing private correspondence, non-public source locations, or personal contact details outside the public repository. Do not mark a voicebank approved based on a search result, a secondary summary, or the fact that it is downloadable from Hugging Face.
+
+## 9. Permission scopes are independent
+
+Record each scope separately for every exact voicebank release:
+
+- local_processing: local inventory, metadata parsing, and compatibility tests.
+- hosted_processing: processing on GitHub Actions, Kaggle, or another hosted runner/workspace.
+- feature_extraction: creation of derived metadata/features from source files.
+- ml_training: use as AI training data.
+- model_distribution: publishing, sharing, or selling trained weights/models.
+- audio_redistribution: redistribution of original or derived audio samples.
+
+Use only approved, review_required, or prohibited as register values. An approval in one scope never implies approval in another. In particular, local processing permission does not authorize upload to Kaggle or GitHub Actions; ML training permission does not authorize model publication or audio redistribution. Keep the exact terms URL, date checked, reviewer, and evidence reference with the decision. If a term is unclear, keep the scope at review_required.
+
+The Kaggle training manifest mirrors these scopes per record. Labelled training requires feature_extraction and ml_training to be approved, plus the processing location used by the run (local_processing or hosted_processing). The one-cell Kaggle notebook uses the hosted context and requires the Kaggle Secret AXRAL_HOSTED_PROCESSING_REVIEWED=yes before deleting prior temporary data or downloading a dataset. Set that secret only after reviewing every selected bank's terms. Model distribution and audio redistribution remain independent and are not approved by a successful training run.
+
+## 10. Kaggle dataset lifecycle
+
+Kaggle is an optional training workspace, not the canonical archive for original voicebanks.
+
+1. **Source vault (local, read-only):** keep the original archive, exact version, source URL, terms reference, checksum, and permission decisions. Do not commit this folder to Git.
+2. **Audit workspace (local by default):** keep detailed oto.ini/prefix.map inventory, WAV diagnostics, resolver comparisons, and listening notes locally. Redact and review before sharing.
+3. **Approved training package (private Kaggle dataset):** include only sources whose permissions explicitly cover cloud storage/processing and the intended feature extraction and ML training. Use opaque IDs and a reviewed manifest. Keep review_required and prohibited sources out.
+4. **Training outputs:** check checkpoints, reports, logs, and metrics for embedded samples, aliases, record IDs, local paths, or other source-identifying data before sharing.
+
+Private visibility is an access control, not a substitute for the rights holder's permission or the platform's terms. Do not upload raw WAVs by default; include them only when the method needs them and the permission explicitly covers hosted storage and processing. The current pitch-delta MVP consumes approved metadata/labels and does not train on waveform audio. Do not manufacture pitch labels from unverified curves.
+
+## 11. First permitted real-bank run
+
+- [ ] Exact voicebank release and primary-source terms recorded.
+- [ ] Local processing and hosted processing decisions recorded separately.
+- [ ] Feature extraction and ML training decisions recorded separately.
+- [ ] Model distribution and audio redistribution decisions recorded separately.
+- [ ] Hosted processing on the chosen provider is explicitly allowed before setting the workflow/Kaggle acknowledgement.
+- [ ] Original WAVs and detailed metadata remain out of Git and public artifacts.
+- [ ] Run the audit, inspect sanitized counts, then compare alias and prefix resolution with VO-SE_vocal.
+- [ ] Manually render a small note set with the existing VO-SE_vocal renderer; do not change its synthesis/export path for this audit.
+- [ ] Mark compatibility only after recording resolver and listening evidence, known differences, reviewer, and date.
