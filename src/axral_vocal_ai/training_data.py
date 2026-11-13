@@ -10,6 +10,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 PERMISSION_STATES = {"approved", "review_required", "prohibited"}
+PERMISSION_SCOPES = frozenset({
+    "local_processing", "hosted_processing", "feature_extraction",
+    "ml_training", "model_distribution", "audio_redistribution",
+})
+EXECUTION_CONTEXTS = frozenset({"local", "hosted"})
 SPLITS = {"train", "validation", "test"}
 TARGET_KIND = "pitch_delta_semitones"
 MAX_TRAINING_DELTA_SEMITONES = 2.0
@@ -52,7 +57,9 @@ def validation_error_code(error: BaseException) -> str:
         return "split_leakage"
     if "training readiness requires" in message:
         return "split_requirements_not_met"
-    if "not approved for ml use" in message or "permission_status" in message or "license_id" in message:
+    if ("not approved for ml use" in message or "permission_status" in message
+            or "license_id" in message or "permission scope" in message
+            or "permissions object" in message or "permission scopes" in message):
         return "source_permission_not_approved"
     if "provenance" in message or "review_status" in message:
         return "provenance_not_approved"
@@ -103,7 +110,12 @@ def _check_no_private_payload(value: Any, location: str = "record") -> None:
         _require(not (value.startswith("\\\\") or (len(value) > 2 and value[1] == ":" and value[2] in "\\\\/")), f"{location} must not contain a Windows filesystem path")
 
 
-def validate_record(record: Any, line_number: int, require_labeled: bool = False) -> dict[str, Any]:
+def validate_record(
+    record: Any,
+    line_number: int,
+    require_labeled: bool = False,
+    execution_context: str = "local",
+) -> dict[str, Any]:
     prefix = f"line {line_number}"
     _require(isinstance(record, dict), f"{prefix}: each JSONL row must be an object")
     _check_no_private_payload(record, prefix)
@@ -125,6 +137,38 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     _require(permission == "approved", f"{prefix}: source is not approved for ML use (status={permission})")
     license_id = record["license_id"]
     _require(isinstance(license_id, str) and bool(license_id.strip()), f"{prefix}: approved records require a non-empty license_id")
+
+    _require(
+        execution_context in EXECUTION_CONTEXTS,
+        f"{prefix}: execution_context must be local or hosted",
+    )
+    if require_labeled:
+        permissions = record.get("permissions")
+        _require(
+            isinstance(permissions, dict),
+            f"{prefix}: permissions object is required for training",
+        )
+        missing_scopes = sorted(PERMISSION_SCOPES - permissions.keys())
+        _require(
+            not missing_scopes,
+            f"{prefix}: permission scopes missing: {', '.join(missing_scopes)}",
+        )
+        for scope in sorted(PERMISSION_SCOPES):
+            status = permissions[scope]
+            _require(
+                isinstance(status, str) and status in PERMISSION_STATES,
+                f"{prefix}: invalid permission scope {scope}",
+            )
+        required_approvals = (
+            f"{execution_context}_processing",
+            "feature_extraction",
+            "ml_training",
+        )
+        for scope in required_approvals:
+            _require(
+                permissions[scope] == "approved",
+                f"{prefix}: permission scope {scope} is not approved ({permissions[scope]})",
+            )
 
     _require(isinstance(record["split"], str) and record["split"] in SPLITS, f"{prefix}: split must be train, validation, or test")
     input_data = record["input"]
@@ -200,7 +244,11 @@ def validate_record(record: Any, line_number: int, require_labeled: bool = False
     return record
 
 
-def validate_records(records: Iterable[Any], require_labeled: bool = False) -> dict[str, Any]:
+def validate_records(
+    records: Iterable[Any],
+    require_labeled: bool = False,
+    execution_context: str = "local",
+) -> dict[str, Any]:
     seen_ids: set[str] = set()
     bank_splits: dict[str, str] = {}
     source_splits: dict[str, str] = {}
@@ -210,7 +258,10 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
     for line_number, record in enumerate(records, start=1):
         _require(total < MAX_MANIFEST_RECORDS,
                  f"manifest record limit exceeded ({MAX_MANIFEST_RECORDS})")
-        validated = validate_record(record, line_number, require_labeled=require_labeled)
+        validated = validate_record(
+            record, line_number, require_labeled=require_labeled,
+            execution_context=execution_context,
+        )
         record_id = validated["record_id"]
         _require(record_id not in seen_ids, f"line {line_number}: duplicate record_id {record_id!r}")
         seen_ids.add(record_id)
@@ -247,6 +298,7 @@ def validate_records(records: Iterable[Any], require_labeled: bool = False) -> d
             for split in sorted(SPLITS)
         },
         "require_labeled": require_labeled,
+        "execution_context": execution_context,
     }
 
 
@@ -294,9 +346,14 @@ def iter_jsonl_records(path: str | Path) -> Iterable[Any]:
         raise DatasetValidationError(f"cannot read manifest: {exc}") from exc
 
 
-def validate_jsonl(path: str | Path, require_labeled: bool = False) -> dict[str, Any]:
+def validate_jsonl(
+    path: str | Path,
+    require_labeled: bool = False,
+    execution_context: str = "local",
+) -> dict[str, Any]:
     """Validate a JSON Lines manifest incrementally; the file is metadata only."""
     return validate_records(
         iter_jsonl_records(path),
         require_labeled=require_labeled,
+        execution_context=execution_context,
     )
