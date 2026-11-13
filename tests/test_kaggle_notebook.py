@@ -203,3 +203,17 @@ def test_training_readme_documents_kaggle_secret_prerequisites():
     assert "This value is a human acknowledgement" in documentation
     assert "HF_TOKEN" in documentation
     assert "public datasets do not require that token" in documentation
+
+def test_test_workflow_actions_are_pinned_to_full_commit_shas():
+    workflow = ROOT / ".github" / "workflows" / "tests.yml"
+    source = workflow.read_text(encoding="utf-8")
+    references = re.findall(r"^\\s*uses:\\s*([^\\s]+)", source, flags=re.MULTILINE)
+
+    assert references
+    assert all(
+        re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}", reference)
+        for reference in references
+    )
+    assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7" in source
+    assert "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7" in source
+    assert "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7" in source
