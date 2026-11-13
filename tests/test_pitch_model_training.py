@@ -24,6 +24,14 @@ def record(record_id, bank, split, start, end, midi, targets):
     return {
         "schema_version": 1, "record_id": record_id, "source_id": f"synthetic-source-{record_id}",
         "permission_status": "approved", "license_id": "SYNTHETIC-TEST-ONLY",
+        "permissions": {
+            "local_processing": "approved",
+            "hosted_processing": "approved",
+            "feature_extraction": "approved",
+            "ml_training": "approved",
+            "model_distribution": "review_required",
+            "audio_redistribution": "prohibited",
+        },
         "voicebank_id": bank, "split": split,
         "input": {"notes": [{"start_sec": start, "end_sec": end, "midi_note": midi,
                              "lyric": "synthetic", "voiced": True}]},
@@ -346,6 +354,39 @@ def test_pitch_training_cli_streams_a_validated_jsonl_manifest(tmp_path):
     assert set(report["evaluation_by_split"]) == {"train", "validation", "test"}
     assert report["usable_examples_by_split"]["train"] == 6
 
+
+
+def test_pitch_training_cli_requires_hosted_permission_scope(tmp_path):
+    rows = synthetic_records()
+    rows[0]["permissions"]["hosted_processing"] = "review_required"
+    manifest = tmp_path / "pitch_training_manifest.jsonl"
+    report_path = tmp_path / "pitch_report.json"
+    manifest.write_text(
+        chr(10).join(json.dumps(row, ensure_ascii=False) for row in rows) + chr(10),
+        encoding="utf-8",
+    )
+
+    repository_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repository_root / "training" / "train_pitch_model.py"),
+            str(manifest),
+            "--output",
+            str(report_path),
+            "--execution-context",
+            "hosted",
+        ],
+        cwd=repository_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "permission scope hosted_processing is not approved" in result.stdout
+    assert not report_path.exists()
 
 def test_training_examples_accept_one_pass_record_iterators():
     records = (row for row in synthetic_records())
