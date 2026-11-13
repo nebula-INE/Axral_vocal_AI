@@ -37,8 +37,14 @@ on:
           - error
           - warning
           - never
-  schedule:
-    - cron: "23 3 * * 1"
+      permission_reviewed:
+        description: Confirm per-bank terms explicitly allow hosted processing on GitHub Actions
+        required: true
+        default: "no"
+        type: choice
+        options:
+          - "no"
+          - "yes"
 
 permissions:
   contents: read
@@ -53,7 +59,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       AUDIT_REVISION: ${{ github.event.inputs.revision || 'main' }}
       AUDIT_FILE_FILTER: ${{ github.event.inputs.file_path_filter || '' }}
       AUDIT_FILTER: ${{ github.event.inputs.voicebank_filter || '' }}
@@ -61,6 +66,15 @@ jobs:
       MAX_EXTRACTED_MB: ${{ github.event.inputs.max_extracted_mb || '8192' }}
       FAIL_ON: ${{ github.event.inputs.fail_on || 'error' }}
     steps:
+      - name: Require explicit permission review for hosted processing
+        env:
+          PERMISSION_REVIEWED: ${{ github.event.inputs.permission_reviewed || 'no' }}
+        run: |
+          if [ "$PERMISSION_REVIEWED" != "yes" ]; then
+            echo "::error::Hosted audit is blocked until you confirm that every selected voicebank permits processing on GitHub Actions."
+            exit 1
+          fi
+
       - name: Check out Axral Vocal AI
         uses: actions/checkout@v7
 
@@ -79,6 +93,8 @@ jobs:
       - name: Download and audit VO-US
         id: audit
         continue-on-error: true
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python scripts/audit_hf_voicebanks.py --repo-id "SEKOIA2900/VO-US" --revision "$AUDIT_REVISION" --file-path-filter "$AUDIT_FILE_FILTER" --voicebank-filter "$AUDIT_FILTER" --max-download-mb "$MAX_DOWNLOAD_MB" --max-extracted-mb "$MAX_EXTRACTED_MB" --fail-on "$FAIL_ON" --output-dir "artifacts/hf-voicebank-audit"
 
