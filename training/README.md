@@ -41,6 +41,38 @@ python training/train_pitch_model.py path/to/manifest.jsonl --output artifacts/p
 
 The command validates the manifest and uses only records assigned to `train` for fitting. Validation is incremental rather than loading the whole JSONL into memory. Default safety bounds are 256 MiB per manifest, 1 MiB per JSONL line, and 100,000 records. The metadata MVP additionally stops above 1,000,000 label points or 250,000 usable training examples before constructing dense NumPy matrices. These caps are intentionally conservative for a Kaggle-first experiment; profile peak memory and raise them deliberately only after testing the target runtime. By default it reports mean absolute error (MAE) in semitones for train and validation, plus a zero-delta baseline (predict no pitch correction) and improvement over that baseline; negative improvement means the fitted model performed worse. The held-out test metrics are omitted unless `--evaluate-test` is explicitly supplied after model/settings decisions are finalized. This reduces the risk of tuning against the test set. Labels that fall outside any voiced note are counted and skipped. If any split has no usable voiced labels, the run fails instead of reporting misleading metrics. The JSON output includes the feature version, weights, split counts, model/baseline metrics, and explicit safety limitations. Prediction inputs are checked for non-finite values.
 
+## Permission scopes (required for labelled training)
+
+Every row in a labelled training manifest must carry an explicit `permissions` object. The accepted values for each scope are `approved`, `review_required`, or `prohibited`:
+
+```json
+{
+  "permissions": {
+    "local_processing": "approved",
+    "hosted_processing": "review_required",
+    "feature_extraction": "approved",
+    "ml_training": "approved",
+    "model_distribution": "review_required",
+    "audio_redistribution": "prohibited"
+  }
+}
+```
+
+The execution context is explicit and defaults to local:
+
+```bash
+# Local training: requires local_processing, feature_extraction, and ml_training.
+python training/train_pitch_model.py path/to/manifest.jsonl --execution-context local
+
+# Kaggle or another hosted runner: requires hosted_processing, feature_extraction,
+# and ml_training to be approved for every record.
+python training/train_pitch_model.py path/to/manifest.jsonl --execution-context hosted
+```
+
+The one-cell Kaggle notebook always uses `execution_context="hosted"`. Approval for local processing does not authorize Kaggle/cloud processing. `model_distribution` and `audio_redistribution` are deliberately independent: successful training does not approve sharing a model, redistributing audio, or publishing a voicebank. A `review_required` or `prohibited` status in either distribution scope is allowed during training but must continue to block that separate activity.
+
+These fields are an auditable human-entered permission record, not automatic legal verification. The reviewer must confirm the exact voicebank release, primary-source terms, allowed use, and evidence reference before setting an approval. Do not convert an unknown or ambiguous term into `approved`.
+
 ## Scope and limitations
 
 - This is a tiny linear ridge-regression model over note pitch, relative note phase, and note duration; it is **not** a neural singing synthesis model.
