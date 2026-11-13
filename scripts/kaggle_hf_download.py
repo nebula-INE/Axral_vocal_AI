@@ -451,11 +451,20 @@ def collect_archive_paths(download_dir: Path) -> list[Path]:
 
 
 def discover_voicebank_roots(*scan_roots: Path) -> list[Path]:
-    """Return outer voicebank roots, grouping nested oto.ini files together."""
+    """Find bank roots, using a root-level prefix.map to group nested oto.ini files.
+
+    Some multipitch banks keep their shared prefix.map at the bank root while
+    placing each pitch layer's oto.ini in a child directory. In that layout,
+    the oto.ini directories alone would incorrectly look like separate banks.
+    A real, non-symlink prefix.map is therefore also treated as a root marker.
+    """
     candidates: set[Path] = set()
     for scan_root in scan_roots:
         if not scan_root.exists():
             continue
+
+        oto_directories: set[Path] = set()
+        prefix_map_directories: set[Path] = set()
         for current, dirnames, filenames in os.walk(scan_root, followlinks=False):
             current_path = Path(current)
             dirnames[:] = sorted(
@@ -463,7 +472,28 @@ def discover_voicebank_roots(*scan_roots: Path) -> list[Path]:
                 if not name.startswith(".") and not (current_path / name).is_symlink()
             )
             if any(name.casefold() == "oto.ini" for name in filenames):
-                candidates.add(current_path.resolve())
+                oto_directories.add(current_path.resolve())
+            if any(name.casefold() == "prefix.map" for name in filenames):
+                prefix_path = next(
+                    current_path / name for name in filenames
+                    if name.casefold() == "prefix.map"
+                )
+                if prefix_path.is_file() and not prefix_path.is_symlink():
+                    prefix_map_directories.add(current_path.resolve())
+
+        for oto_directory in oto_directories:
+            # Promote to the outermost enclosing prefix.map directory. A
+            # nested prefix.map remains part of the same bank when a shared
+            # prefix.map also exists above it.
+            enclosing_markers = [
+                marker for marker in prefix_map_directories
+                if marker == oto_directory or marker in oto_directory.parents
+            ]
+            candidates.add(
+                min(enclosing_markers, key=lambda path: len(path.parts))
+                if enclosing_markers else oto_directory
+            )
+
     return sorted(
         (candidate for candidate in candidates
          if not any(parent in candidates for parent in candidate.parents)),
