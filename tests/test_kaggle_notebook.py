@@ -49,6 +49,13 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert "hosted_processing" in source
     notebook_text = "".join("".join(cell["source"]) for cell in notebook["cells"])
     assert "model distribution" in notebook_text.casefold()
+    # Keep the one-time hosted-processing secret instructions visible and precise.
+    assert "One-time Kaggle Secret setup" in notebook_text
+    assert "AXRAL_HOSTED_PROCESSING_REVIEWED" in notebook_text
+    assert "enable access for this notebook" in notebook_text
+    assert "does not verify a license automatically" in notebook_text
+    assert "private Hugging Face dataset" in notebook_text
+    assert "HF_TOKEN" in notebook_text
     assert "validation_error_code(exc)" in source
     assert "training/train_pitch_model.py" in source
     assert "resume_download" not in source
