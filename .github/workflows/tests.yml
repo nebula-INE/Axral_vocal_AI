@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -15,11 +18,14 @@ jobs:
     steps:
       - name: Check out Axral Vocal AI
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Check out VO-SE_vocal parser for integration tests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: nebula-INE/VO-SE_vocal
           path: VO-SE_vocal
+          persist-credentials: false
       - name: Set up Node.js for production Web pitch bridge test
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
