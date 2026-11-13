@@ -45,7 +45,7 @@ def test_all_workflow_actions_are_pinned_to_full_commit_shas():
     for workflow_path in workflow_paths:
         source = workflow_path.read_text(encoding="utf-8")
         references = re.findall(
-            r"^\\s*uses:\\s*([^\\s]+)", source, flags=re.MULTILINE
+            r"^\s*uses:\s*([^\s]+)", source, flags=re.MULTILINE
         )
         assert references, workflow_path
         assert all(
