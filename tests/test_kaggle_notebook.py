@@ -192,3 +192,14 @@ def test_notebook_exception_logging_omits_exception_messages_and_full_paths():
     assert 'log(f"Artifact link display unavailable: {display_error}")' not in source
     assert 'type(display_error).__name__' in source
     assert 'log(f"pipeline failed: unexpected_{error_name}")' in source
+
+def test_training_readme_documents_kaggle_secret_prerequisites():
+    readme = ROOT / "training" / "README.md"
+    documentation = readme.read_text(encoding="utf-8")
+
+    assert "One-time Kaggle Secret setup" in documentation
+    assert "AXRAL_HOSTED_PROCESSING_REVIEWED" in documentation
+    assert "enable access for this notebook" in documentation
+    assert "This value is a human acknowledgement" in documentation
+    assert "HF_TOKEN" in documentation
+    assert "public datasets do not require that token" in documentation
