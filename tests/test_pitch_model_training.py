@@ -338,6 +338,8 @@ def test_pitch_training_cli_streams_a_validated_jsonl_manifest(tmp_path):
             str(manifest),
             "--output",
             str(report_path),
+            "--execution-context",
+            "hosted",
             "--evaluate-test",
         ],
         cwd=repository_root,
@@ -350,6 +352,7 @@ def test_pitch_training_cli_streams_a_validated_jsonl_manifest(tmp_path):
     assert result.returncode == 0, result.stdout
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["manifest_validation"]["records"] == 4
+    assert report["execution_context"] == "hosted"
     assert report["test_evaluation_included"] is True
     assert set(report["evaluation_by_split"]) == {"train", "validation", "test"}
     assert report["usable_examples_by_split"]["train"] == 6
