@@ -13,6 +13,14 @@ def make_record(record_id="r1", bank="bank-a", split="train", permission="approv
         "source_id": record_id,
         "permission_status": permission,
         "license_id": "INTERNAL-ML-PERMISSION-001",
+        "permissions": {
+            "local_processing": "approved",
+            "hosted_processing": "approved",
+            "feature_extraction": "approved",
+            "ml_training": "approved",
+            "model_distribution": "review_required",
+            "audio_redistribution": "prohibited",
+        },
         "voicebank_id": bank,
         "split": split,
         "input": {
@@ -68,6 +76,7 @@ def test_manifest_validation_summarizes_voicebank_level_splits():
         ("line 2: source 'PRIVATE_SOURCE' appears in multiple splits", "split_leakage"),
         ("training readiness requires non-empty test split", "split_requirements_not_met"),
         ("line 1: source is not approved for ML use", "source_permission_not_approved"),
+        ("line 1: permission scope hosted_processing is not approved", "source_permission_not_approved"),
         ("line 1: provenance review_status must be approved", "provenance_not_approved"),
         ("line 1: record.audio_path is not allowed in a metadata manifest", "private_payload_rejected"),
         ("line 1: input.notes[0].midi_note must be numeric", "invalid_note_data"),
@@ -85,6 +94,52 @@ def test_manifest_rejects_unapproved_sources():
     with pytest.raises(DatasetValidationError, match="not approved"):
         validate_records([make_record(permission="review_required")])
 
+
+
+def test_labeled_manifest_requires_explicit_permission_scopes():
+    record = make_record(target=make_target())
+    del record["permissions"]
+
+    with pytest.raises(DatasetValidationError, match="permissions object is required"):
+        validate_records([record], require_labeled=True)
+
+
+@pytest.mark.parametrize("scope", ["feature_extraction", "ml_training", "local_processing"])
+def test_local_training_requires_each_relevant_permission_scope(scope):
+    record = make_record(target=make_target())
+    record["permissions"][scope] = "review_required"
+
+    with pytest.raises(DatasetValidationError, match=f"permission scope {scope} is not approved"):
+        validate_records([record], require_labeled=True, execution_context="local")
+
+
+def test_hosted_training_requires_explicit_cloud_processing_permission():
+    record = make_record(target=make_target())
+    record["permissions"]["hosted_processing"] = "review_required"
+
+    with pytest.raises(DatasetValidationError, match="permission scope hosted_processing is not approved"):
+        validate_records([record], require_labeled=True, execution_context="hosted")
+
+
+def test_hosted_training_allows_unapproved_distribution_scopes_without_granting_them():
+    rows = [
+        make_record("train-1", "bank-a", "train", target=make_target()),
+        make_record("valid-1", "bank-b", "validation", target=make_target()),
+        make_record("test-1", "bank-c", "test", target=make_target()),
+    ]
+    summary = validate_records(rows, require_labeled=True, execution_context="hosted")
+
+    assert summary["status"] == "valid"
+    assert summary["execution_context"] == "hosted"
+    assert rows[0]["permissions"]["model_distribution"] == "review_required"
+    assert rows[0]["permissions"]["audio_redistribution"] == "prohibited"
+
+
+def test_labeled_manifest_rejects_unknown_execution_context():
+    record = make_record(target=make_target())
+
+    with pytest.raises(DatasetValidationError, match="execution_context must be local or hosted"):
+        validate_records([record], require_labeled=True, execution_context="kaggle")
 
 def test_manifest_rejects_voicebank_leakage_across_splits():
     with pytest.raises(DatasetValidationError, match="multiple splits"):
@@ -353,16 +408,20 @@ def test_validate_jsonl_passes_a_streaming_iterator_to_record_validation(tmp_pat
     original = training_data.validate_records
     observed = {}
 
-    def inspect_iterator(records, require_labeled=False):
+    def inspect_iterator(records, require_labeled=False, execution_context="local"):
         observed["is_list"] = isinstance(records, list)
         observed["is_iterator"] = iter(records) is records
-        return original(records, require_labeled=require_labeled)
+        observed["execution_context"] = execution_context
+        return original(
+            records, require_labeled=require_labeled,
+            execution_context=execution_context,
+        )
 
     monkeypatch.setattr(training_data, "validate_records", inspect_iterator)
 
     summary = validate_jsonl(manifest, require_labeled=True)
 
-    assert observed == {"is_list": False, "is_iterator": True}
+    assert observed == {"is_list": False, "is_iterator": True, "execution_context": "local"}
     assert summary["records"] == 3
 
 
