@@ -192,6 +192,24 @@ def test_extract_zip_and_discover_nested_oto_files_as_one_bank(tmp_path):
     assert discover_voicebank_roots(extracted) == [(extracted / "Voice").resolve()]
 
 
+def test_discover_groups_multipitch_oto_files_by_root_prefix_map(tmp_path):
+    bank = tmp_path / "multipitch-bank"
+    (bank / "C4").mkdir(parents=True)
+    (bank / "C5").mkdir()
+    (bank / "prefix.map").write_text("C4\\t-\\t\n", encoding="utf-8")
+    (bank / "C4" / "oto.ini").write_text("", encoding="utf-8")
+    (bank / "C5" / "OTO.INI").write_text("", encoding="utf-8")
+
+    independent = tmp_path / "independent-bank"
+    independent.mkdir()
+    (independent / "oto.ini").write_text("", encoding="utf-8")
+
+    assert discover_voicebank_roots(tmp_path) == [
+        independent.resolve(),
+        bank.resolve(),
+    ]
+
+
 def test_extract_zip_preserves_utf8_and_ascii_member_names(tmp_path):
     archive = tmp_path / "ordinary-names.zip"
     with zipfile.ZipFile(archive, "w") as bundle:
