@@ -221,5 +221,5 @@ def test_test_workflow_actions_are_pinned_to_full_commit_shas():
 def test_test_workflow_uses_read_only_token_and_does_not_persist_checkout_credentials():
     source = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
 
-    assert "permissions:\\n  contents: read" in source
+    assert "permissions:\n  contents: read" in source
     assert source.count("persist-credentials: false") == 2
