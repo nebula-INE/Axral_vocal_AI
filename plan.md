@@ -91,8 +91,13 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Publish validated per-bank audit issue-code aggregates in the Actions Markdown step summary, including `metadata_replacement_character` and `metadata_suspected_mojibake`, without exposing source paths or aliases.
 - [x] Verify `fail_on: error`, `fail_on: warning`, and `fail_on: never` behavior with an end-to-end mocked Hub audit test.
 - [x] CI green after the permission-register/workflow-gate updates: latest matrix run passed 621 tests in each job on Python 3.10 and Python 3.12 ([run 43378470640](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/43378470640)).
-- [x] Migrate repository workflow JavaScript actions to Node.js 24-compatible current major versions: `actions/checkout@v7`, `actions/setup-node@v7`, `actions/setup-python@v7`, and `actions/upload-artifact@v7`.
-- [x] Verify both Python matrix jobs after the migration; no Node.js 20 deprecation warning appears in the updated test workflow logs.
+- [x] Migrate repository workflow actions to Node.js 24-compatible v7 releases and pin each action to its verified full commit SHA. Keep the human-readable v7 tag in a YAML comment:
+  - `actions/checkout`: `3d3c42e5aac5ba805825da76410c181273ba90b1`
+  - `actions/setup-node`: `949feb2413d6458794dcd2491c4babbbce0c15c1`
+  - `actions/setup-python`: `6d4fd22b20465ccc0f7354476588e8df7c9ca0e0`
+  - `actions/upload-artifact`: `cf430e030ddbb5b0abf93d22962f4752f3646cd9`
+- [x] Add regression tests that require every `uses:` reference in the affected workflows to be a full 40-character commit SHA. The CI run for this pinning change is in progress; do not count it as passed until both Python jobs finish.
+- [x] Verify both Python matrix jobs after the earlier v7 migration; no Node.js 20 deprecation warning appeared in the updated test workflow logs.
 
 ### Remaining verification
 
