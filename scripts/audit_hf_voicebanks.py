@@ -511,6 +511,31 @@ def build_markdown(summary: dict[str, Any]) -> str:
                 and count > 0
             ):
                 lines.append(f"| {code} | {count} |")
+    # Aggregate only validated severity/code counters. Never copy issue messages,
+    # filenames, aliases, or paths into the human-readable Actions summary.
+    issue_totals: Counter[str] = Counter()
+    banks = summary.get("banks", [])
+    if isinstance(banks, list):
+        for bank in banks:
+            if not isinstance(bank, dict):
+                continue
+            issue_counts = bank.get("issue_counts", {})
+            if not isinstance(issue_counts, dict):
+                continue
+            for key, count in issue_counts.items():
+                if (
+                    isinstance(key, str)
+                    and re.fullmatch(r"(?:error|warning):[a-z0-9_]{1,80}", key)
+                    and isinstance(count, int)
+                    and not isinstance(count, bool)
+                    and count > 0
+                ):
+                    issue_totals[key] += count
+    if issue_totals:
+        lines.extend(["", "| Audit issue code | Count |", "| --- | ---: |"])
+        for code, count in sorted(issue_totals.items()):
+            lines.append(f"| {code} | {count} |")
+
     lines.extend(["", "| Bank | Fingerprint | OTO entries | WAV checked | Errors | Warnings |",
                   "| ---: | --- | ---: | ---: | ---: | ---: |"])
     for bank in summary.get("banks", []):
