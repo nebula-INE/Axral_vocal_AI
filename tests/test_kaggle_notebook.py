@@ -41,7 +41,10 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     source = "".join(code_cells[0]["source"])
     ast.parse(source)
     assert 'HF_DATA_URL = "https://huggingface.co/datasets/' in source
-    assert "validate_jsonl(manifest, require_labeled=True)" in source
+    assert 'validate_jsonl(manifest, require_labeled=True, execution_context="hosted")' in source
+    assert '"--execution-context", "hosted"' in source
+    assert "hosted_processing" in source
+    assert "model_distribution" in source
     assert "validation_error_code(exc)" in source
     assert "training/train_pitch_model.py" in source
     assert "resume_download" not in source
