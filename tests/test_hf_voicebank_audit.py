@@ -384,7 +384,7 @@ def test_real_voicebank_analysis_does_not_flag_normal_japanese_or_single_marker(
         "a.wav=こんにちは,0,100,-100,20,10\n", encoding="utf-8"
     )
     (tmp_path / "prefix.map").write_text(
-        "C4\t-\t糸が縺れる\n", encoding="utf-8"
+        "C4\t-\t糸が縺れる縺糸\n", encoding="utf-8"
     )
 
     analysis = analyze_voicebank(tmp_path)
