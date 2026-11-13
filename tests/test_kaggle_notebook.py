@@ -207,7 +207,7 @@ def test_training_readme_documents_kaggle_secret_prerequisites():
 def test_test_workflow_actions_are_pinned_to_full_commit_shas():
     workflow = ROOT / ".github" / "workflows" / "tests.yml"
     source = workflow.read_text(encoding="utf-8")
-    references = re.findall(r"^\\s*uses:\\s*([^\\s]+)", source, flags=re.MULTILINE)
+    references = re.findall(r"^\s*uses:\s*([^\s]+)", source, flags=re.MULTILINE)
 
     assert references
     assert all(
