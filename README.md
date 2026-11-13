@@ -47,3 +47,18 @@ The CLI inventories `oto.ini` and `prefix.map`, checks referenced WAV paths and 
 - `models/`: model manifests and documentation; large model artifacts should use an explicit artifact-storage policy
 
 The exact structure may evolve after the initial code audit. Avoid duplicating existing VO-SE_vocal functionality until its interfaces have been reviewed.
+
+
+## Hugging Face real voicebank audit
+
+Axral Vocal AI can audit selected UTAU voicebanks directly from the Hugging Face dataset `SEKOIA2900/VO-US` through a separate GitHub Actions workflow:
+
+- Workflow: `.github/workflows/hf-utau-voicebank-audit.yml`
+- Run: **Actions → Hugging Face UTAU Voicebank Audit → Run workflow**
+- The workflow is manual-only and requires `permission_reviewed=yes` after every selected voicebank's hosted-processing terms have been checked; it has no weekly schedule while permissions remain unverified.
+- It resolves the dataset revision to a commit SHA, applies an optional Hub path filter before downloading, checks archive size limits, safely extracts supported ZIP/UAR and tar archives, discovers `oto.ini` roots, and runs the existing read-only audit. Nested pitch-layer `oto.ini` folders are grouped under an enclosing bank directory with a regular `prefix.map`, while independent roots remain separate.
+- Only sanitized aggregate reports are uploaded. Raw WAVs and detailed aliases/paths stay on the ephemeral runner.
+
+The public, blank-safe permission template is [voicebank_permission_register.template.csv](docs/voicebank_permission_register.template.csv). All starter candidates remain `review_required` until exact releases and primary-source terms are checked. See [Real UTAU Voicebank Validation Gate](docs/real_voicebank_validation.md) and [plan.md](plan.md) for scope definitions, hosted-processing gates, input limits, and remaining live-data verification. This workflow performs technical auditing only; machine-learning training and redistribution permissions must be reviewed separately.
+
+The read-only audit also reports path-free `metadata_replacement_character` and `metadata_suspected_mojibake` issue-code counts for Japanese UTAU metadata. The mojibake check requires a known marker line to round-trip through CP932 encoding and UTF-8 decoding into different Japanese text; source metadata is never rewritten. Use `fail_on: warning` to make metadata warnings fail the workflow.
