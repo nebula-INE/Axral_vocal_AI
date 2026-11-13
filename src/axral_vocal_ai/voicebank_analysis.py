@@ -180,7 +180,7 @@ class VoicebankAnalysis:
 def _record_replacement_character_issue(
     text: str, relative_path: str, issues: list[VoicebankIssue]
 ) -> None:
-    """Report U+FFFD without guessing or rewriting the original characters."""
+    """Warn when metadata already contains U+FFFD and cannot be losslessly restored."""
     for line_number, line in enumerate(text.splitlines(), start=1):
         if "\ufffd" in line:
             issues.append(VoicebankIssue(
@@ -191,7 +191,6 @@ def _record_replacement_character_issue(
                 "Metadata contains U+FFFD replacement text; the original characters cannot be reconstructed safely. Review the source encoding or archive.",
             ))
             return
-
 
 _MOJIBAKE_MARKERS = frozenset("縺繧繝譁蜿陦")
 
