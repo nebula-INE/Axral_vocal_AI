@@ -217,3 +217,9 @@ def test_test_workflow_actions_are_pinned_to_full_commit_shas():
     assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7" in source
     assert "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7" in source
     assert "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7" in source
+
+def test_test_workflow_uses_read_only_token_and_does_not_persist_checkout_credentials():
+    source = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+
+    assert "permissions:\\n  contents: read" in source
+    assert source.count("persist-credentials: false") == 2
