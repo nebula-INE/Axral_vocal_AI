@@ -126,3 +126,13 @@ The live Hub download has not yet been executed from this development session. T
 - [x] Add required `permission_reviewed` input (default `no`) and fail before checkout or Hub access unless the operator explicitly confirms that every selected bank permits hosted processing on GitHub Actions.
 - [x] Keep the optional Hugging Face token scoped to the actual download/audit step, after the permission gate.
 - [ ] Run a live audit only after the selected banks' exact terms and hosted-processing decisions are recorded. The current session has not verified the live Hugging Face repository layout or those permissions.
+
+
+## Kaggle credential-scope hardening (2026-11-14)
+
+- [x] Code review found that the notebook previously assigned `HF_TOKEN` to the kernel-wide `os.environ`, causing later subprocesses to inherit the Hub credential.
+- [x] In PR [#65](https://github.com/nebula-INE/Axral_vocal_AI/pull/65), keep the token out of the notebook kernel environment and strip it from default child-process environments.
+- [x] Pass the optional `HF_TOKEN` only through the explicit environment of `scripts/kaggle_hf_download.py`; unrelated package installation, pytest, audit and training subprocesses do not inherit it.
+- [x] Add a behavioral regression test for default token stripping and explicitly scoped pass-through, plus a notebook wiring assertion.
+- [x] Initial PR CI passed on Python 3.10 and 3.12 (**742 tests each**, run [43559386138](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/43559386138)). Any subsequent commit to this PR must pass the matrix again before merge.
+- [ ] Merge only after the PR's final CI and review are complete.
