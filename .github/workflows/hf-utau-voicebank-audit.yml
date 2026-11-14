@@ -38,7 +38,7 @@ on:
           - warning
           - never
       permission_reviewed:
-        description: Confirm per-bank terms explicitly allow hosted processing on GitHub Actions
+        description: Confirm each selected release has both hosted_processing and github_actions_processing approved, and its terms permit GitHub Actions processing
         required: true
         default: "no"
         type: choice
@@ -71,7 +71,7 @@ jobs:
           PERMISSION_REVIEWED: ${{ github.event.inputs.permission_reviewed || 'no' }}
         run: |
           if [ "$PERMISSION_REVIEWED" != "yes" ]; then
-            echo "::error::Hosted audit is blocked until you confirm that every selected voicebank permits processing on GitHub Actions."
+            echo "::error::Hosted audit is blocked until every selected release has hosted_processing and github_actions_processing approved in the register and its terms permit GitHub Actions processing."
             exit 1
           fi
 
