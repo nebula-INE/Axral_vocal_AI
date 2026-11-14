@@ -126,7 +126,7 @@ The names below are research candidates only. No candidate is marked as licensed
 | 重音テト | Compatibility testing candidate | Exact UTAU release not yet registered; all scopes review_required | Check official voice-use rules and FAQ separately for testing, training, and distribution |
 | デフォ子／唄音ウタ | Additional baseline candidate | Exact distribution not yet identified; all scopes review_required | Verify original distributor, exact version, and all applicable terms |
 
-Use docs/voicebank_permission_register.template.csv as the blank collection sheet. Keep completed registers containing private correspondence, non-public source locations, or personal contact details outside the public repository. Do not mark a voicebank approved based on a search result, a secondary summary, or the fact that it is downloadable from Hugging Face.
+Use docs/voicebank_permission_register.template.csv as the blank collection sheet. Provider-specific hosted processing is recorded separately for GitHub Actions and Kaggle; see Section 12. Keep completed registers containing private correspondence, non-public source locations, or personal contact details outside the public repository. Do not mark a voicebank approved based on a search result, a secondary summary, or the fact that it is downloadable from Hugging Face.
 
 ## 9. Permission scopes are independent
 
@@ -165,3 +165,15 @@ Private visibility is an access control, not a substitute for the rights holder'
 - [ ] Run the audit, inspect sanitized counts, then compare alias and prefix resolution with VO-SE_vocal.
 - [ ] Manually render a small note set with the existing VO-SE_vocal renderer; do not change its synthesis/export path for this audit.
 - [ ] Mark compatibility only after recording resolver and listening evidence, known differences, reviewer, and date.
+
+
+## 12. Provider-specific hosted processing decisions
+
+The permission register keeps the broad `hosted_processing` scope and adds independent provider columns:
+
+- `github_actions_processing`: processing on GitHub-hosted Actions runners.
+- `kaggle_processing`: processing in Kaggle notebooks or Kaggle datasets/workspaces.
+
+For a GitHub Actions audit, both `hosted_processing` and `github_actions_processing` must be `approved` for every selected release. For a Kaggle run, both `hosted_processing` and `kaggle_processing` must be `approved`. A broad hosted-processing approval does not imply either provider-specific approval. Approval for one provider does not imply approval for the other.
+
+The workflow's `permission_reviewed=yes` input and the Kaggle Secret `AXRAL_HOSTED_PROCESSING_REVIEWED=yes` remain human acknowledgements; neither reads or validates the register automatically. Before setting either value, the operator must check the exact release's primary-source terms, record the provider-specific decision and evidence in the register, and confirm every voicebank selected by the run. If the terms do not name a provider, do not assume that provider is permitted; keep the platform field at `review_required` and seek clarification.
