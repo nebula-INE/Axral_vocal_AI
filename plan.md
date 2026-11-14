@@ -108,7 +108,7 @@ The workflow is a data-compatibility and parser-regression gate. It is not an AI
 - [x] Add a pre-download Hub path filter so a maintainer can reduce the amount fetched before snapshot download.
 - [ ] Review the live sanitized report and adjust limits or file-selection rules only if the dataset contents require it.
 
-The live Hub download has not yet been executed from this development session. The current session cannot dispatch a workflow run, and the public Hub tree could not be fetched from this runtime. The workflow and script are covered by CI, but actual `VO-US` file layout, selected size, and voicebank count remain unverified until a maintainer runs the workflow after merging this PR. The implementation resolves the requested revision and discovers file paths dynamically at workflow runtime; this is not a claimed live-data pass.
+At the implementation checkpoint on 2026-11-11, the live Hub download had not been executed and the public Hub tree could not be fetched from that runtime. The post-merge checkpoint below supersedes the session-specific note; it still does not claim a live-data pass.
 
 ### Current archive support and bounds
 
@@ -126,3 +126,30 @@ The live Hub download has not yet been executed from this development session. T
 - [x] Add required `permission_reviewed` input (default `no`) and fail before checkout or Hub access unless the operator explicitly confirms that every selected bank permits hosted processing on GitHub Actions.
 - [x] Keep the optional Hugging Face token scoped to the actual download/audit step, after the permission gate.
 - [ ] Run a live audit only after the selected banks' exact terms and hosted-processing decisions are recorded. The current session has not verified the live Hugging Face repository layout or those permissions.
+
+
+## Post-merge checkpoint (2026-11-14)
+
+### Verified repository state
+
+- [x] PR [#62](https://github.com/nebula-INE/Axral_vocal_AI/pull/62) was merged on 2026-11-13 at 23:31 JST (merge commit `5b30f18210b15fca94d4e5d8aa11fbe781277fe2`).
+- [x] PR [#63](https://github.com/nebula-INE/Axral_vocal_AI/pull/63) was merged on 2026-11-13 at 23:31 JST (merge commit `077aa5575fd7e70407ad2fd901251ff3a312caa4`); this was the `main` HEAD when checked.
+- [x] The post-merge `main` push workflow [run 43443576697](https://github.com/nebula-INE/Axral_vocal_AI/actions/runs/43443576697) completed successfully. Both Python 3.10 and Python 3.12 jobs passed **740 tests each**.
+- [x] The Kaggle notebook `kaggle/Axral_Vocal_AI_OneCell.ipynb` contains one executable code cell. The only editable code setting is `HF_DATA_URL`; hosted-processing acknowledgement and optional Hub authentication are separate Kaggle Secrets.
+- [x] Static inspection confirms the Kaggle permission gate executes before cleanup/download, and the final ZIP is built from an explicit allowlist after temporary source data is removed.
+
+### Live data and permission status — not yet verified
+
+- [ ] No live download or audit of `SEKOIA2900/VO-US` has been completed. Actual repository layout, eligible file list, selected size, and discovered voicebank-root count remain unknown.
+- [ ] The four starter rows in `docs/voicebank_permission_register.template.csv` remain `not_started`; exact releases are `not_identified`, and every permission scope remains `review_required`.
+- [ ] Do not set the GitHub Actions `permission_reviewed=yes` input or Kaggle Secret `AXRAL_HOSTED_PROCESSING_REVIEWED=yes` until the exact releases and terms explicitly allow processing on the respective hosted platform.
+- [ ] No real-data training has been run. The current Kaggle trainer is a metadata-only pitch-delta ridge-regression MVP and requires exactly one fully validated, permission-approved labelled JSONL manifest. A voicebank archive or WAV collection alone does not provide supervised pitch-expression labels and is not a singing-synthesis training set.
+
+### Next execution sequence
+
+1. Identify the exact voicebank releases selected from the dataset and register each release's primary source, terms URL, checked date, and independent permission scopes. Record the hosted platform(s) explicitly in the evidence/notes.
+2. After hosted processing is approved for every selected bank, run the manual GitHub Actions audit with a narrowly scoped `file_path_filter` where the Hub layout is known; inspect only the sanitized aggregate artifact and record the immutable Hub commit SHA.
+3. Separately enable the Kaggle hosted-processing secret only when Kaggle processing is also permitted. Run the one-cell notebook with the dataset URL and optional `HF_TOKEN`; confirm the sanitized report and training-block reason before treating any result as validated.
+4. Keep training, model distribution, and audio redistribution as separate approval decisions. Do not change VO-SE_vocal renderer, playback, or export behavior as part of this audit.
+
+CI success verifies the repository's tested code paths; it does not replace the live-data, license, compatibility, or listening checks above.
