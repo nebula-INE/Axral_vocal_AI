@@ -223,3 +223,69 @@ def test_test_workflow_uses_read_only_token_and_does_not_persist_checkout_creden
 
     assert "permissions:\n  contents: read" in source
     assert source.count("persist-credentials: false") == 2
+
+
+
+def test_notebook_run_does_not_inherit_hf_token_unless_explicitly_scoped(monkeypatch):
+    from types import SimpleNamespace
+
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    source = "".join(
+        "".join(cell["source"]) for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+    )
+    tree = ast.parse(source)
+    function = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "run"
+    )
+
+    calls = []
+
+    class FakeSubprocess:
+        PIPE = -1
+        STDOUT = -2
+
+        @staticmethod
+        def run(cmd, **kwargs):
+            calls.append(kwargs["env"])
+            return SimpleNamespace(returncode=0, stdout="")
+
+    namespace = {
+        "os": __import__("os"),
+        "subprocess": FakeSubprocess,
+        "sys": SimpleNamespace(executable="python"),
+        "PROJECT": Path("."),
+        "log": lambda _message: None,
+        "safe_command_diagnostic": lambda _output: {},
+        "sanitize_dataset_paths": lambda value: value,
+        "json": json,
+        "re": re,
+    }
+    isolated = ast.Module(body=[function], type_ignores=[])
+    exec(compile(isolated, str(NOTEBOOK), "exec"), namespace)
+    run = namespace["run"]
+
+    monkeypatch.setenv("HF_TOKEN", "kernel-secret")
+    run(["python", "unrelated-command"], redact_output=True)
+    assert "HF_TOKEN" not in calls[-1]
+
+    download_env = {"PATH": "/usr/bin", "HF_TOKEN": "download-only-secret"}
+    run(["python", "download-command"], redact_output=True, env=download_env)
+    assert calls[-1] == download_env
+
+
+def test_notebook_passes_hf_token_only_to_downloader():
+    notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    source = "".join(
+        "".join(cell["source"]) for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+    )
+
+    assert 'os.environ["HF_TOKEN"] = token' not in source
+    assert 'child_env.pop("HF_TOKEN", None)' in source
+    assert 'download_env.pop("HF_TOKEN", None)' in source
+    assert 'download_env["HF_TOKEN"] = token' in source
+    download_start = source.index('"scripts/kaggle_hf_download.py"')
+    download_end = source.index('download_summary = json.loads', download_start)
+    assert "env=download_env" in source[download_start:download_end]
