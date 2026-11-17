@@ -66,3 +66,22 @@ def test_workflows_use_read_only_token_and_do_not_persist_checkout_credentials()
     assert "permissions:\n  contents: read" in audit_workflow
     assert test_workflow.count("persist-credentials: false") == 2
     assert audit_workflow.count("persist-credentials: false") == 1
+
+
+
+def test_provider_specific_permission_scopes_are_named_at_both_hosted_gates():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    notebook_path = ROOT / "kaggle" / "Axral_Vocal_AI_OneCell.ipynb"
+    import json
+
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    markdown = "".join(
+        "".join(cell["source"]) for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    )
+
+    assert "hosted_processing" in workflow
+    assert "github_actions_processing" in workflow
+    assert "hosted_processing" in markdown
+    assert "kaggle_processing" in markdown
+    assert "This secret is a human acknowledgement" in markdown
