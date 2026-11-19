@@ -1,9 +1,10 @@
 """Execute real VO-SE_vocal Desktop and Web pitch samplers in Axral's CI.
 
-The integration checkout is supplied by .github/workflows/tests.yml. These tests
-exercise production implementations without modifying or wrapping them. They
-characterize Desktop linear sampling and the Web bridge's existing slew limit
-and Hz-domain smoothing; they do not require identical interior samples.
+The integration checkout is supplied by .github/workflows/tests.yml. The Web
+probe invokes the current production buildPitchAndPortamento helper and adapts
+its base-Hz plus cent-offset output through the same cents-to-Hz equation used
+by the native engine. These tests characterize the current pitch data contract;
+they do not execute the complete audio renderer.
 """
 from __future__ import annotations
 
@@ -104,13 +105,9 @@ def test_actual_web_bridge_matches_desktop_sampler_for_shared_positive_pitch_cur
     )
 
     assert web_curve.shape == desktop_curve.shape == (3,)
-    # Both runtimes agree at the endpoints. The Web bridge then applies its
-    # existing three-point smoothing in Hz, so the midpoint is not the raw
-    # linearly interpolated Desktop midpoint.
-    assert web_curve[[0, 2]] == pytest.approx(desktop_curve[[0, 2]], rel=1e-7, abs=1e-7)
-    expected_web_midpoint = 0.25 * desktop_curve[0] + 0.50 * desktop_curve[1] + 0.25 * desktop_curve[2]
-    assert web_curve[1] == pytest.approx(expected_web_midpoint, rel=1e-7, abs=1e-7)
-    assert web_curve[1] != pytest.approx(desktop_curve[1], rel=1e-7, abs=1e-7)
+    # The current Web bridge keeps a base-Hz curve and a separate cent-offset
+    # curve; applying the native cents-to-Hz conversion matches Desktop here.
+    assert web_curve == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
 
 
 
@@ -138,16 +135,11 @@ def test_actual_web_bridge_matches_desktop_sampler_for_shared_negative_pitch_cur
         engine, events, note, 3, is_pitch=True
     )
     web_curve = web_curves["negative"]
-    assert web_curve[[0, 2]] == pytest.approx(desktop_curve[[0, 2]], rel=1e-7, abs=1e-7)
-    # As in the positive case, Web smoothing is applied after converting
-    # semitone offsets to Hz and therefore changes the midpoint.
-    expected_web_midpoint = 0.25 * desktop_curve[0] + 0.50 * desktop_curve[1] + 0.25 * desktop_curve[2]
-    assert web_curve[1] == pytest.approx(expected_web_midpoint, rel=1e-7, abs=1e-7)
-    assert web_curve[1] != pytest.approx(desktop_curve[1], rel=1e-7, abs=1e-7)
+    assert web_curve == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
 
 
-def test_actual_web_bridge_steep_bend_keeps_web_slew_limit_distinct_from_desktop() -> None:
-    """A steep bend must expose the existing Web slew limit, not force false parity."""
+def test_actual_web_bridge_preserves_steep_pitch_offsets_through_native_contract() -> None:
+    """A 10-semitone Web bend is passed as 1000 cents and converted by the native path."""
     engine_class = _desktop_engine_class()
     root = Path(os.environ["VO_SE_VOCAL_ROOT"]).resolve()
     probe = Path(__file__).with_name("web_pitch_runtime_probe.mjs")
@@ -170,15 +162,7 @@ def test_actual_web_bridge_steep_bend_keeps_web_slew_limit_distinct_from_desktop
     desktop_curve = engine_class._get_sampled_curve(
         engine, events, note, 3, is_pitch=True
     )
-    expected_web_raw = 440.0 * np.power(2.0, np.array([0.0, 4.0, 8.0]) / 12.0)
-    expected_web = expected_web_raw.copy()
-    expected_web[1] = 0.25 * expected_web_raw[0] + 0.50 * expected_web_raw[1] + 0.25 * expected_web_raw[2]
-    assert web_curves["steep"] == pytest.approx(expected_web, rel=1e-7, abs=1e-7)
-    assert desktop_curve == pytest.approx(
-        440.0 * np.power(2.0, np.array([0.0, 5.0, 10.0]) / 12.0),
-        rel=1e-5,
-        abs=1e-4,
-    )
-    # The endpoints intentionally differ after Web slew limiting; this is a
-    # characterization of existing behavior, not an instruction to reconcile it.
-    assert web_curves["steep"][-1] != pytest.approx(desktop_curve[-1], rel=1e-4)
+    expected_steep = 440.0 * np.power(2.0, np.array([0.0, 5.0, 10.0]) / 12.0)
+    assert web_curves["steep"] == pytest.approx(expected_steep, rel=1e-7, abs=1e-7)
+    assert desktop_curve == pytest.approx(expected_steep, rel=1e-5, abs=1e-4)
+    assert web_curves["steep"] == pytest.approx(desktop_curve, rel=1e-7, abs=1e-7)
