@@ -121,18 +121,22 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert '"audit_failures": audit_failures' in source
     assert '(OUT / "download_summary.json").write_text' in source
     assert "license/readme documents indexed" in source
-    assert '["git", "status", "--porcelain"]' in source
+    assert "tempfile.TemporaryDirectory" in source
+    assert 'PROJECT_TEMP_ROOT = Path("/kaggle/temp")' in source
+    assert 'PROJECT = Path(PROJECT_TEMP.name) / "Axral_vocal_AI"' in source
+    assert '"/kaggle/working/Axral_vocal_AI"' not in source
+    assert '["git", "status", "--porcelain"]' not in source
+    assert "Existing Axral_vocal_AI checkout has local changes" not in source
+    assert "PROJECT_TEMP.cleanup()" in source
     assert '["git", "remote", "get-url", "--all", "origin"]' in source
     assert "is_trusted_axral_origin(origin_urls)" in source
-    assert "Existing checkout origin is not the trusted Axral_vocal_AI GitHub repository" in source
-    assert source.index("origin_result = subprocess.run") < source.index('["git", "fetch", "--depth", "1", "origin", "main"]')
-    assert '["git", "fetch", "--depth", "1", "origin", "main"]' in source
+    assert source.index('["git", "clone", "--depth", "1"') < source.index("origin_result = subprocess.run")
     assert "required_pipeline_files" in source
     assert '["git", "fetch", "--depth", "1", "origin", "feat/kaggle-one-url-pipeline"]' in source
     assert "Default branch does not contain the Kaggle pipeline helpers yet" in source
     assert "Axral checkout is missing required Kaggle pipeline files" in source
+    # A hard reset is allowed only on the disposable clone, never on the user's working checkout.
     assert '["git", "reset", "--hard", "FETCH_HEAD"]' in source
-    assert "local changes" in source
     assert "source_commit" in source
     assert "MAX_MANIFEST_BYTES" in source
     assert "MAX_JSONL_LINE_BYTES" in source
