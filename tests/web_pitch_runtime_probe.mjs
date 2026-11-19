@@ -17,26 +17,26 @@ const compiledUtility = ts.transpileModule(utilitySource, {
 const utilityUrl = 'data:text/javascript;base64,' + Buffer.from(compiledUtility, 'utf8').toString('base64');
 
 const clientSource = readFileSync(resolve(root, 'assets/src/voseCoreClient.ts'), 'utf8');
-const framePeriodMatch = clientSource.match(/const PITCH_FRAME_PERIOD_MS = (\\d+);/);
+const framePeriodMatch = clientSource.match(/const PITCH_FRAME_PERIOD_MS = (\d+);/);
 assert.ok(framePeriodMatch, 'production pitch frame period was not found');
 const framePeriod = Number(framePeriodMatch[1]);
 assert.ok(Number.isFinite(framePeriod) && framePeriod > 0, 'production pitch frame period is invalid');
 
-const normalizeMatch = clientSource.match(/function normalizeTrailingControlPoint\\([\\s\\S]*?\\n}\\n\\n/);
+const normalizeMatch = clientSource.match(/function normalizeTrailingControlPoint\([\s\S]*?\n}\n\n/);
 assert.ok(normalizeMatch, 'production normalizeTrailingControlPoint helper was not found');
 const helperMatch = clientSource.match(
-  /function buildPitchAndPortamento\\([\\s\\S]*?\\n}\\n\\nfunction silentFrames/
+  /function buildPitchAndPortamento\([\s\S]*?\n}\n\nfunction silentFrames/
 );
 assert.ok(helperMatch, 'production buildPitchAndPortamento helper was not found');
 
 const normalizeSource = normalizeMatch[0];
-const helperSource = helperMatch[0].replace(/\\n\\nfunction silentFrames$/, '');
+const helperSource = helperMatch[0].replace(/\n\nfunction silentFrames$/, '');
 const bridgeSource =
   'import { parsePitchBend, softClampSemitone, sampleSemitoneAt, ' +
   'hasExplicitUstPortamento, generateUtauPortamentoPoints } from ' +
-  JSON.stringify(utilityUrl) + ';\\n' +
-  'const PITCH_FRAME_PERIOD_MS = ' + framePeriod + ';\\n' +
-  normalizeSource + helperSource + '\\nexport { buildPitchAndPortamento };';
+  JSON.stringify(utilityUrl) + ';\n' +
+  'const PITCH_FRAME_PERIOD_MS = ' + framePeriod + ';\n' +
+  normalizeSource + helperSource + '\nexport { buildPitchAndPortamento };';
 const compiledBridge = ts.transpileModule(bridgeSource, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
