@@ -43,6 +43,10 @@ def test_kaggle_notebook_is_valid_json_and_has_one_executable_cell():
     assert 'HF_DATA_URL = "https://huggingface.co/datasets/' in source
     assert "AXRAL_HOSTED_PROCESSING_REVIEWED" in source
     assert 'hosted_processing_review.strip().casefold() != "yes"' in source
+    assert "hosted_processing_secret_error = type(exc).__name__" in source
+    assert "Secret is missing or empty" in source
+    assert "Kaggle Secret access failed or is disabled" in source
+    assert "The configured value is not exactly 'yes'" in source
     assert source.index("AXRAL_HOSTED_PROCESSING_REVIEWED") < source.index("if DATA_ROOT.exists(): shutil.rmtree(DATA_ROOT)")
     assert 'validate_jsonl(manifest, require_labeled=True, execution_context="hosted")' in source
     assert '"--execution-context", "hosted"' in source
