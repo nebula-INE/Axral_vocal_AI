@@ -584,3 +584,16 @@ The repository owner confirmed in chat that `SEKOIA2900/VO-US` is **private**.
 - [ ] Keep source-specific license, hosted-processing, ML-training, commercial-use, model-distribution, and raw-audio redistribution checks separate. Private visibility does not itself grant any of these permissions.
 
 This status is based on the owner's confirmation, not an independently retrieved Hub API response. The earlier screenshots still establish the visible Files/Card UI state only.
+
+
+### Dataset Card draft prepared (2026-11-25)
+
+- [x] Draft a documentation-only Dataset Card at [`docs/VO-US_DATASET_CARD_DRAFT.md`](docs/VO-US_DATASET_CARD_DRAFT.md).
+- [x] Include only screenshot-supported inventory and approximate archive sizes; label the screenshot date and pending full Hub inventory.
+- [x] Record that VO-US is owner-confirmed private.
+- [x] Leave the repository-wide `license` metadata unset because the three archives may have different source terms and no repository-wide license has been verified.
+- [x] State that no common loading schema or train/evaluation splits are declared, and that the Dataset Viewer reported empty on the inspection date.
+- [x] Separate engineering/compatibility goals from actual permissions; default all unverified use scopes to review required.
+- [x] Create the draft in Axral_vocal_AI and re-fetch it from GitHub to verify the saved content.
+- [ ] Review the draft and capture the full VO-US Hub tree, immutable revision, and exact archive metadata.
+- [ ] Only after that review, upload the approved card as `README.md` to the private VO-US repository. No Hugging Face write has been performed by this draft step.
