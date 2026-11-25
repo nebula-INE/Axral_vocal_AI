@@ -608,3 +608,14 @@ This status is based on the owner's confirmation, not an independently retrieved
 - [ ] Re-open the Dataset Card tab and verify the rendered card.
   
 The current execution environment has no authenticated Hugging Face write connection. The upload was therefore **not performed**. The ready-to-upload file is attached to the conversation as `README.md`. Do not paste or share a Hugging Face access token in chat. Use the Hugging Face UI (Dataset card → Add dataset card / Create Dataset Card) or an already-authenticated local `hf upload` session to add this one file at repository root; do not select or re-upload the existing ZIP archives.
+
+
+### VO-US Dataset Card registration reported complete (2026-11-25)
+
+- [x] User confirmed that the prepared root-level `README.md` Dataset Card has been reflected in the private `SEKOIA2900/VO-US` repository.
+- [x] The registration is treated as a documentation-only addition; the three existing UTAU ZIP archives were not part of the upload operation described in the preceding steps.
+- [ ] Re-open the Hub Dataset Card tab and verify the rendered content and latest repository commit/tree from the UI or authenticated Hub API.
+- [ ] Capture the full immutable Hub revision SHA and recursive file tree as the new baseline.
+- [ ] Continue with source-by-source permission records and archive-content audit only after the relevant processing permissions are established.
+
+The completion status above is based on the owner's report in chat. The post-upload Hub page and resulting commit SHA have not yet been independently inspected in this session.
