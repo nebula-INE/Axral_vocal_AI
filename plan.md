@@ -619,3 +619,34 @@ The current execution environment has no authenticated Hugging Face write connec
 - [ ] Continue with source-by-source permission records and archive-content audit only after the relevant processing permissions are established.
 
 The completion status above is based on the owner's report in chat. The post-upload Hub page and resulting commit SHA have not yet been independently inspected in this session.
+
+
+### Post-registration Dataset Card visual verification (2026-11-25)
+
+The owner supplied a screenshot of the VO-US Dataset Card page after registration.
+
+Observed directly in the screenshot:
+
+- The repository title shows the **private** badge.
+- The tags `utau`, `voicebank`, and `axral` are displayed.
+- The Dataset Card is rendered, including the `VO-US` heading, English/Japanese description, and Repository status section.
+- The right sidebar shows **75 downloads last month** and **863 MB total file size**.
+- The page offers **Edit dataset card**, confirming that a card is present and editable.
+- The Dataset Viewer notice states that the Viewer for private datasets is available only to PRO users and Team or Enterprise organizations.
+
+Correction to the earlier interpretation:
+
+- The prior “dataset is currently empty” Viewer message must not be treated as evidence that the repository has no stored files or that the ZIP archives are missing.
+- The new screenshot identifies a private-dataset Viewer access restriction. It does not prove whether a dataset loading configuration would otherwise be supported or whether the archive contents are parseable.
+- The README wording in `docs/VO-US_DATASET_CARD_DRAFT.md` has been corrected to describe this private Viewer access limitation and to avoid implying that the archive data is absent.
+
+Verification status:
+
+- [x] Confirm the Dataset Card is registered and visibly rendered on the Hub page, based on the supplied screenshot.
+- [x] Confirm private badge and displayed tags.
+- [x] Correct the Dataset Viewer explanation in the GitHub draft.
+- [ ] Apply the corrected Dataset Viewer wording to the live VO-US `README.md` using the Hugging Face UI.
+- [ ] Capture the full Hub revision SHA and recursive tree.
+- [ ] Audit the three existing ZIP archives only after individual source permissions and the processing environment have been reviewed.
+
+This is screenshot-based verification. The exact live Hub commit SHA and full recursive tree remain unverified in this session.
