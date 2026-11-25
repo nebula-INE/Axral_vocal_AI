@@ -314,3 +314,114 @@ Keep objective metrics and listening evaluations separate. A low F0 error does n
 - No candidate corpus is pre-approved for commercial model training by this plan.
 - No large-scale human-singing dataset collection, universal-model training result, unseen-voicebank success, or AI audio-generation quality result is claimed here.
 - The immediate milestone is a permission-cleared, reproducible pilot dataset and a small baseline that can be measured on held-out singers and voicebanks.
+
+
+---
+
+## Free commercial-use dataset catalog and zero-budget adoption plan (2026-11-25)
+
+> Scope: a solo student/indie-developer workflow with no dataset budget and no expectation of negotiating individual paid licenses. The catalog is a research shortlist, not legal advice or proof that every third-party right is cleared. No dataset is automatically approved for model training merely because it is downloadable.
+
+### Adoption rules
+
+1. Prefer datasets whose published terms explicitly permit commercial singing-voice-synthesis (SVS) training, or whose declared license is a permissive commercial license such as CC BY 4.0 / CC0 1.0.
+2. Keep datasets with CC BY-SA 4.0 or custom restrictions in a separate data group. Commercial use may be allowed, but attribution, share-alike, model-release, parallel-training, voice-identity, and raw-audio redistribution clauses must be followed. Do not combine them into a production checkpoint until the model-distribution implications have been reviewed.
+3. Do not use NC, ND, research-only, or unclear-license sources for commercial-model training. Do not solve an unclear license by assuming that a research paper, GitHub mirror, or third-party dataset index overrides the original rights.
+4. A dataset license only covers rights the provider can grant. Check the source record and included LICENSE/NOTICE, plus recording, composition, lyrics, arrangement, and performer permissions where applicable. If the musical-work rights are unclear, do not use that recording in the commercial corpus.
+5. Do not redistribute source audio. Keep source data outside Git history, release packages, public CI artifacts, and public Kaggle outputs. Record URLs, exact revision/version, retrieval date, file hashes, license text/hash, attribution, and permitted-use scopes in the dataset manifest.
+6. No paid acquisition or private negotiation is assumed by this plan. If a candidate requires written permission not already granted by its public terms, mark it `hold_no_contact` and do not train on it.
+
+### Candidate catalog
+
+The following catalog separates singing supervision from speech/phonetic support. The priority is based on fit to Axral's universal shared-model objective, not just hours of audio.
+
+| ID | Dataset and source URL | Public terms / commercial position | Content and best Axral use | Decision |
+| --- | --- | --- | --- | --- |
+| D01 | [Lem the Shapeshifter — organic singing corpus](https://huggingface.co/datasets/wik-wav/lem-singing-corpus) | Dataset card/declared LICENSE reports CC BY 4.0. The separate [synthetic range-extension dataset](https://huggingface.co/datasets/wik-wav/lem-singing-corpus-synthetic) is CC BY-NC-SA 4.0 and is excluded. The Lem voicebank/character terms are a separate layer if the model is presented as Lem. | English and Japanese phoneme/reclist material with aligned singing annotations; useful for phoneme coverage, note/phoneme alignment, and first end-to-end training preparation. The Japanese material is phoneme/reclist coverage, not natural Japanese sentences. Limited voice identity diversity. | **P1 candidate.** Use only the organic repository. Snapshot its CC BY 4.0 LICENSE and verify recording/composition provenance and character-term boundaries before training. Never merge the synthetic repository. |
+| D02 | [VocalSet — Zenodo 1193957](https://zenodo.org/records/1193957) | Listed as CC BY 4.0 in public singing-dataset indexes. Re-check the live Zenodo license metadata and the downloaded archive's notices before training. | 10.1 hours, 20 professional singers, all five vowels, standard and extended vocal techniques; useful for voice diversity, vowels, sustained notes, and expressive/vocal-technique features. About 2.1 GB. Not a score/lyrics-aligned corpus. | **P1 candidate.** Strong general singing-expression auxiliary set after the exact license/NOTICE is captured. |
+| D03 | [vocadito — Zenodo 5578807](https://zenodo.org/records/5578807) | Public dataset references identify CC BY 4.0; verify the exact record metadata and archive notices at retrieval. | 40 short monophonic solo-singing excerpts in seven languages; frame-level F0, two note-annotation versions, lyrics, and language labels. About 58.5 MB. Excellent small baseline/evaluation set, not a large training corpus. | **P1 candidate.** First download for pipeline smoke tests after license snapshot. |
+| D04 | [Choral Singing Dataset — Zenodo 2649950](https://zenodo.org/records/2649950) | Listed as CC BY 4.0 in dataset/tool indexes; confirm the current Zenodo record and archive LICENSE/README before training. Do not confuse this with the unrelated Children's Song Dataset (CSD), which is non-commercial. | 16 individual singers, three a cappella pieces, individual vocal tracks, frame-wise F0, note annotations, and semi-synchronized MIDI; about 1.1 GB. Useful for multi-singer pitch/intonation and note-conditioning. Choral repertoire is not equivalent to pop solo singing. | **P1/P2 candidate.** High value for F0/score alignment and singer hold-out testing. |
+| D05 | [Dagstuhl ChoirSet — Zenodo 4608395](https://zenodo.org/records/4608395) | Listed as CC BY 4.0 by public corpus indexes; verify the live record license and archive notices before use. | About 5.1 GB; amateur ensemble, choir and quartet settings, multitrack close-up microphones for individual singers. Useful for choir/individual-voice separation, F0, intonation, and robust acoustic evaluation; only two choir pieces, so avoid overfitting. | **P2 candidate.** Useful auxiliary/evaluation corpus rather than primary solo-SVS supervision. |
+| D06 | [Jingju a Cappella Recordings Collection (JaCRC) — Zenodo 6536490](https://zenodo.org/records/6536490) | Dataset catalog lists CC BY 4.0. The collection includes 53 recordings originating from earlier sources; do not automatically assume those 53 inherit the collection's rights. | 314 vocal recordings in the collection; most were newly created for it. Manual segmentation for 217 recordings, lyrics for 156, and score-line alignment for a subset. Useful for ornamentation, expressive pitch movement, and non-Western vocal technique. Genre-specific Jingju singing. | **P2 conditional.** Use only recordings whose provenance is clearly within the collection's grant; exclude the 53 pre-existing-source recordings unless their own rights are independently clear. |
+| D07 | [ViCa — GitHub](https://github.com/apleGitHub/ViCa) | CC BY 4.0 plus explicit Terms of Use: permits multispeaker SVS training and commercial SVS training; raw-audio redistribution is prohibited. Multispeaker training is prohibited when any other included vocalist lacks AI-training permission. It also prohibits SVC/voice-conversion use and public release of a standalone model of this voice. | Vietnamese singing corpus with DiffSinger-compatible labels/phoneme inventory. Valuable as a clearly stated commercial-SVS example and language-phoneme coverage. It is one voice provider, not broad multi-singer diversity. | **P1 conditional candidate.** Respect the extra Terms of Use in addition to CC BY 4.0; use only in an SVS multi-speaker context whose other speakers are also cleared. No raw data mirroring. |
+| D08 | [LIEE Filipino Singing Corpus — GitHub](https://github.com/julieraptor/LIEE-Filipino-Singing-Corpus-for-Singing-Voice-Synthesis) | Free public terms explicitly allow use as parallel training material for DiffSinger and other SVS databases (including NNSVS/ENUNU), and commercial distribution of vocal-synthesis databases created using it as parallel material, with credit. Raw-file redistribution and publishing a LIEE-specific clone/version without written permission are prohibited. | About 17 min 40 sec, 44.1 kHz/16-bit, WAV + LAB + DS; Filipino singing and labels. Useful as multilingual phoneme and parallel-training supplementation, not a large corpus. | **P1 conditional candidate.** Use only as the stated parallel-learning material and credit LIEE. Do not release its raw files or a LIEE voice-specific model. |
+| D09 | [ACV-001 — GitHub](https://github.com/Archivoice/ACV-001) | CC BY-SA 4.0 for direct use and models mainly featuring this voice. The author states that this license does not apply to models trained via parallel training and that supplementary use may follow the resulting model's own license. Attribution remains required. | Multilingual labeled singing: Cantonese, Mandarin, English, Japanese via romaji, Korean, and Taiwanese; WAV/LAB and DiffSinger-oriented annotations. The English slur/pitch annotations have a documented quality warning. | **P2 parallel-only candidate.** Use only as supplemental/parallel data, never as a dedicated ACV-001 voice model. Filter or re-audit the English section. |
+| D10 | [ACV-002 — GitHub](https://github.com/Archivoice/ACV-002) | CC BY-SA 4.0 with the same stated parallel-training exception as ACV-001. | A second vocal presentation from the same voice provider, with Mandarin and English labels, phonation/exhale/vocal-fry labels, WAV/LAB and DS annotations. It is not an independent additional singer. | **P2 parallel-only candidate.** Same conditions as D09; do not count it as a new independent singer. |
+| D11 | [ACV-003 — GitHub](https://github.com/Archivoice/ACV-003) | CC BY-SA 4.0 with the same stated parallel-training exception as ACV-001. | Peking-opera singing with manually corrected labels, WAV/LAB and DS annotations including F0/note-slur data. Same voice provider as ACV-001/002. | **P2 parallel-only candidate.** Useful for genre/ornamentation coverage, not speaker-count expansion. |
+| D12 | [PJS — Phoneme-balanced Japanese Singing Voice Corpus](https://sites.google.com/site/shinnosuketakamichi/research-topics/pjs_corpus) | CC BY-SA 4.0. Commercial use is not excluded by the NC term (there is none), but attribution/share-alike obligations remain. The effect on proprietary model weights must be reviewed before inclusion in a closed commercial release. | Japanese phoneme-balanced singing material with score/MIDI/MusicXML and phoneme-oriented design. Strong Japanese phoneme coverage; not a large multi-singer corpus. | **P2 conditional / isolated data group.** Do not mix into production weights until share-alike/model distribution handling is documented. |
+| D13 | [Mozilla Common Voice — Japanese dataset catalog](https://commonvoice.mozilla.org/ja/datasets) | The catalog lists Japanese Scripted Speech 27.0 under CC0-1.0. Use the exact selected version and retain its dataset card/metadata. | Read speech, not singing. Japanese pronunciation/phoneme and speech-side auxiliary work only; it cannot teach singing phrasing, vibrato, or score-to-song mapping. Japanese v27 is listed at about 14.36 GB. | **Speech-only auxiliary.** Keep in a separate speech manifest and separate task; do not present it as singing supervision. |
+
+### Known blocked or excluded sources
+
+| Dataset | Publicly visible restriction / reason | Action |
+| --- | --- | --- |
+| [GTSinger](https://huggingface.co/datasets/GTSinger/GTSinger) | CC BY-NC-SA 4.0 (NonCommercial). | Exclude from all Axral commercial-model training and product validation datasets. |
+| [M4Singer](https://github.com/M4Singer/M4Singer) | CC BY-NC-SA 4.0 (NonCommercial). | Exclude. |
+| [OpenCPOP](https://wenet.org.cn/opencpop/) | CC BY-NC-ND / restrictive terms reported for the corpus; ND is unsuitable for model-training derivatives without clear permission. | Exclude unless the original terms are changed by the rights holder. |
+| [JSUT-song](https://sites.google.com/site/shinnosuketakamichi/research-topics/jsut) | Published comparison reports CC BY-NC-ND. | Exclude. |
+| [NUS-48E](https://huggingface.co/datasets/guey-khala-mari/NUS-48E) | Research-only terms; dataset card/README explicitly says research use only. | Exclude from commercial training. |
+| [Singing Voice Audio Dataset (Isophonics)](https://isophonics.net/SingingVoiceDataset.html) | CC BY-NC-SA. | Exclude. |
+| [Children's Song Dataset (CSD)](https://zenodo.org/records/1319597) | CC BY-NC-SA according to public SVS dataset indexes. This is not the Choral Singing Dataset D04. | Exclude. |
+| [Project AI❤dol Public English Dataset](https://github.com/lottev1991/Project-AIdol-Public-English-Dataset) | CC BY-SA 4.0; its terms ask that models featuring the voice not be publicly released without prior permission. | `hold_no_contact`; do not use in a public commercial model absent the permission the author requires. |
+| [NIT-SONG070-F001](https://sinsy.sourceforge.net/readme_hts_voice_nitech_jp_song070_f001.php) | A paper/source describes the license only generically as "CC"; the exact license and commercial model-weight permissions were not established in this review. | `hold_license_unclear`; do not train until an exact license file and rights scope are verified. |
+| [Lem synthetic range extension](https://huggingface.co/datasets/wik-wav/lem-singing-corpus-synthetic) | CC BY-NC-SA 4.0, explicitly non-commercial. | Exclude; use only D01's organic source corpus if approved. |
+| [Alex Floarea 2.0 / CSD / other MakeDiffSinger candidates](https://github.com/openvpi/MakeDiffSinger/wiki/Public-datasets) | The public dataset index marks several as CC BY-NC or CC BY-NC-SA, or custom terms not cleared for this no-contact plan. | Check individually; never bulk-download/train from the index. |
+
+### Data grouping and manifest requirements
+
+Do not merge all sources into one undifferentiated dataset. Create separate manifests and dataset groups:
+
+- `commercial_cc_by_cc0/`: sources with a captured CC BY 4.0 / CC0 1.0 record and a completed source/provenance review (initial targets D01-D06 and D13, but only after their exact source files and rights are checked).
+- `commercial_custom_terms/`: explicit SVS commercial-use sources with extra constraints (D07-D08).
+- `parallel_training_sharealike/`: D09-D11. Keep separated and enforce each source's parallel-training exception and attribution.
+- `sharealike_review_required/`: D12 PJS. Keep out of production checkpoints until model-distribution implications are resolved.
+- `speech_auxiliary/`: D13 Common Voice speech. Do not use as singing waveform targets.
+- `blocked/`: all NC, ND, research-only, unclear, or permission-required sources.
+
+Each manifest entry must include:
+`dataset_id`, `canonical_url`, `version_or_commit`, `retrieved_at`, `archive_sha256`, `license_id`, `license_url`, `license_text_sha256`, `attribution_text`, `commercial_svs_allowed`, `parallel_training_only`, `model_weights_distribution_allowed`, `raw_audio_redistribution_allowed`, `hosted_processing_allowed`, `third_party_composition_status`, `performer_rights_status`, `provenance_notes`, and `decision`.
+
+Allowed decision values:
+- `review_required`: not yet inspected or captured.
+- `approved_local_pilot`: source and scope approved for local-only pilot processing.
+- `approved_hosted_pilot`: hosted processing separately approved.
+- `approved_commercial_svs_training`: all relevant source, performer, composition, and training permissions documented.
+- `approved_parallel_only`: only the precise parallel-training use described by the source terms is approved.
+- `hold_no_contact`: requires private/written permission not available under this plan.
+- `hold_license_unclear`: exact license or source provenance unresolved.
+- `blocked_noncommercial`: NC/research-only restriction.
+- `blocked_no_derivatives`: ND restriction or incompatible derivative restriction.
+
+The manifest must default every newly added source to `review_required`. A public license badge alone must never set a permission field to true. Keep hosted-processing permission separate from local processing and commercial-training permission. The existing Hugging Face voicebank audit workflow's default-deny gate remains in force; approval of a voicebank never approves a human-singing dataset.
+
+### Zero-budget download and execution order
+
+1. **Small smoke-test set:** D03 vocadito first (about 58.5 MB) to validate audio loading, F0, note, lyric, and split code without spending storage or GPU time.
+2. **Phoneme/alignment pilot:** D01 organic Lem corpus after capturing its CC BY 4.0 license and recording/song provenance. Never use its synthetic NC-SA sibling.
+3. **Vocal-expression pilot:** D02 VocalSet after archiving the exact license and notices. Use for voice-technique and acoustic representation tasks, not fake score alignment.
+4. **Multi-singer/F0 evaluation:** D04 Choral Singing Dataset. Then D05 Dagstuhl ChoirSet if disk/compute limits permit.
+5. **Commercially permitted custom SVS augmentation:** D07 ViCa and D08 LIEE only with their explicit multi-speaker/parallel-training restrictions enforced.
+6. **Genre and parallel-training expansion:** D06 JaCRC clean-provenance subset and D09-D11 ACV sources. Maintain per-source groups and attribution.
+7. **Japanese-specific coverage:** D12 PJS only in its isolated share-alike group until checkpoint terms are settled; use D13 Common Voice solely for speech/phonetic auxiliary tasks.
+8. Before any large training run, calculate storage and compute budgets from selected manifests. Do not automatically download every candidate. The initial target is a small reproducible data-preparation pilot, not a production-scale model.
+
+### Required dataset evaluation work
+
+- [ ] Create `datasets/manifests/` entries for D01-D13 with all new records defaulting to `review_required`.
+- [ ] Save a source/license snapshot for every candidate: dataset-card/README, LICENSE/NOTICE, terms, version/revision, and SHA-256. Do not rely on a mutable `main` branch without recording its commit.
+- [ ] Re-check the exact CC license metadata for Zenodo records D02-D06 at retrieval time; their record pages and public corpus indexes may expose license metadata differently. Keep them on hold until the archive and record agree.
+- [ ] Verify Lem D01's organic dataset and separate its NC-SA synthetic sibling at the file-selection layer, not merely by operator convention.
+- [ ] Verify the composition/lyrics and recording provenance of the songs in every singing corpus. CC BY on a corpus page does not prove every underlying composition or included third-party recording is covered.
+- [ ] Add license-scope unit tests that reject NC, ND, research-only, unknown, and unreviewed entries from the commercial-training manifest.
+- [ ] Add group-isolation tests so `parallel_training_sharealike/`, `sharealike_review_required/`, and `speech_auxiliary/` cannot be silently merged into the clean commercial group.
+- [ ] Add a report that states, per dataset, what can be used for local inspection, hosted preprocessing, feature extraction, commercial SVS training, model-weight distribution, and raw-audio redistribution.
+- [ ] Run the first pilot locally or in a separately approved runtime. No source audio or detailed labels may be uploaded to CI artifacts or committed to GitHub.
+- [ ] Keep the held-out split grouped by singer, song, and voicebank. For the universal-model test, reserve complete singers and complete voicebanks that do not appear in training.
+
+### Current decision
+
+- The best zero-budget starting combination is **vocadito + organic Lem + VocalSet**, followed by the 16-singer Choral Singing Dataset. This combination provides a manageable first pass across F0/notes/lyrics, phoneme alignment, singing technique, and multiple singers.
+- The best explicitly stated custom commercial-SVS supplements are **ViCa and LIEE**, but their use is restricted to the exact SVS/multispeaker/parallel-training purposes in their terms.
+- **ACV-001/002/003** are possible parallel-training supplements, not three independent singers. Their CC BY-SA license and stated exception must remain attached to their manifest entries.
+- PJS is valuable Japanese singing coverage but remains isolated because of CC BY-SA obligations. Common Voice is speech-only auxiliary data.
+- No dataset is marked `approved_commercial_svs_training` by this plan update. Actual source versions, notices, and underlying recording/composition rights still need to be captured and reviewed before the first commercial training run.
