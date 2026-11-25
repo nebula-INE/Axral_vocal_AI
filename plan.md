@@ -514,3 +514,36 @@ Do not declare the entire VO-US repository as one homogeneous train split. UTAU 
 ### Current status
 
 This plan now designates `SEKOIA2900/VO-US` as the intended canonical repository and supersedes the earlier idea of creating a separate `axral-singing-datasets` repository. No Hugging Face files have been changed by this plan update. The live VO-US tree, current visibility, storage usage, and write access still require an authenticated inspection before any repository mutation.
+
+
+### GUI inspection evidence (2026-11-25)
+
+A read-only screenshot of the Hugging Face **Files** tab was supplied on 2026-11-25 (screen clock 10:21 JST). This is visual evidence only; it does not replace an API/CLI tree snapshot or a local archive audit.
+
+Observed on branch `main`:
+
+- The Files page reports a repository size of approximately **863 MB** and **4 commits**.
+- The visible root contains `.gitattributes` (2.5 kB) and three UTAU ZIP archives:
+  - `つくよみちゃんUTAU音源.zip` — approximately **479 MB**.
+  - `桃音モモSoft.zip` — approximately **107 MB**.
+  - `波音リツ連続音Ver1.5.1.zip` — approximately **277 MB**.
+- The screenshot displays an abbreviated commit identifier `e0469ff` and a Verified indicator near the latest-upload header. The full revision SHA and exact commit-to-file mapping are not established by the screenshot.
+- No `README.md` appears in the visible root listing. The Dataset card tab exists in the UI, but its contents were not opened or verified.
+- Xet badges are visible for the large ZIP files.
+
+Implications:
+
+- The currently visible layout is a small, flat root-level archive collection, not yet the proposed structured corpus/manifest layout.
+- Preserve all three ZIP paths and their bytes. Do not rename, move, replace, or re-upload them while adding catalog/manifest documentation.
+- The displayed sizes sum to about 863 MB, consistent with the repository-size badge (rounding may apply).
+- The screenshot does **not** establish the repository's public/private setting, full current commit SHA, archive-internal voicebank roots, license/provenance, or permission to use the audio for hosted processing or ML training.
+
+Updated verification state:
+
+- [x] Capture a screenshot-level baseline of the visible root file inventory and approximate size.
+- [ ] Obtain the full immutable revision SHA, full recursive tree, and exact metadata from the Hub API/CLI.
+- [ ] Inspect the Dataset card content and Settings visibility/access state.
+- [ ] Audit archive contents and discover actual voicebank roots only after a local/hosted processing permission decision has been recorded for each bank.
+- [ ] Do not run the hosted GitHub Actions audit merely because the repository is accessible; retain the existing default-deny per-bank permission gate.
+
+The repository has not been modified on Hugging Face. This plan update records the screenshot observation only; it does not assert that the voicebank archives have been downloaded, extracted, licensed for training, or audited.
