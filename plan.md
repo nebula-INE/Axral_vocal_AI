@@ -572,3 +572,15 @@ Implications and next actions:
 - [ ] Before creating or uploading a README/Dataset Card on Hugging Face, inspect the full repository revision, visibility, and write/access state. No Hugging Face files have been changed by this inspection.
 
 Current evidence remains screenshot-level. Full Hub metadata, recursive tree, and exact current revision SHA are still pending authenticated CLI/API inspection.
+
+
+### Repository visibility confirmation (2026-11-25)
+
+The repository owner confirmed in chat that `SEKOIA2900/VO-US` is **private**.
+
+- [x] Record owner-confirmed private visibility.
+- [ ] Independently verify visibility and exact repository metadata through the authenticated Hub API/CLI before any write operation.
+- [ ] Confirm owner write access and storage quota before adding files.
+- [ ] Keep source-specific license, hosted-processing, ML-training, commercial-use, model-distribution, and raw-audio redistribution checks separate. Private visibility does not itself grant any of these permissions.
+
+This status is based on the owner's confirmation, not an independently retrieved Hub API response. The earlier screenshots still establish the visible Files/Card UI state only.
