@@ -18,7 +18,7 @@ tags:
 - **Maintainer:** SEKOIA2900.
 - **Observed revision:** The exact full Hub commit SHA has not yet been captured in the current audit.
 - **Dataset format:** Individually packaged UTAU voicebank ZIP archives.
-- **Dataset Viewer:** On 2026-11-25, the Hub page reported that the dataset was empty for Dataset Viewer purposes. No common loading configuration, examples, or train/evaluation splits have been defined.
+- **Dataset Viewer:** On 2026-11-25, the Hub displayed a notice that Dataset Viewer for private datasets is available only to PRO users and Team or Enterprise organizations. The earlier empty-state message must not be interpreted as evidence that the stored ZIP archives are missing. This repository does not currently declare a common loading configuration or train/evaluation splits.
 - **Scope:** Voicebank archive catalog and compatibility/audit input. This repository is not currently presented as a unified, ready-to-train machine-learning dataset.
 
 ## Current archive inventory
