@@ -597,3 +597,14 @@ This status is based on the owner's confirmation, not an independently retrieved
 - [x] Create the draft in Axral_vocal_AI and re-fetch it from GitHub to verify the saved content.
 - [ ] Review the draft and capture the full VO-US Hub tree, immutable revision, and exact archive metadata.
 - [ ] Only after that review, upload the approved card as `README.md` to the private VO-US repository. No Hugging Face write has been performed by this draft step.
+
+
+### VO-US Dataset Card upload preparation (2026-11-25)
+
+- [x] Prepare the final upload artifact as `README.md` using the reviewed draft content.
+- [x] Keep the card documentation-only: no repository-wide license tag, no inferred training permissions, and no guessed Dataset Viewer schema or splits.
+- [x] Preserve the existing three archive paths; the upload operation must add only root-level `README.md`.
+- [ ] Upload `README.md` to `SEKOIA2900/VO-US` and verify the resulting Hub commit and Files tree.
+- [ ] Re-open the Dataset Card tab and verify the rendered card.
+  
+The current execution environment has no authenticated Hugging Face write connection. The upload was therefore **not performed**. The ready-to-upload file is attached to the conversation as `README.md`. Do not paste or share a Hugging Face access token in chat. Use the Hugging Face UI (Dataset card → Add dataset card / Create Dataset Card) or an already-authenticated local `hf upload` session to add this one file at repository root; do not select or re-upload the existing ZIP archives.
