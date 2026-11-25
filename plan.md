@@ -425,3 +425,92 @@ The manifest must default every newly added source to `review_required`. A publi
 - **ACV-001/002/003** are possible parallel-training supplements, not three independent singers. Their CC BY-SA license and stated exception must remain attached to their manifest entries.
 - PJS is valuable Japanese singing coverage but remains isolated because of CC BY-SA obligations. Common Voice is speech-only auxiliary data.
 - No dataset is marked `approved_commercial_svs_training` by this plan update. Actual source versions, notices, and underlying recording/composition rights still need to be captured and reviewed before the first commercial training run.
+
+
+---
+
+## Canonical Hugging Face dataset repository: extend VO-US (2026-11-25)
+
+### Repository decision
+
+Use the existing Hugging Face Dataset repository [`SEKOIA2900/VO-US`](https://huggingface.co/datasets/SEKOIA2900/VO-US) as the canonical Axral data catalog and storage entry point. Do **not** create a second `axral-singing-datasets` repository unless storage, access control, or dataset-loader constraints later make separation necessary.
+
+The repository already serves as the UTAU voicebank data location used by the voicebank audit workflow. Preserve its existing paths and files. Add new corpus areas alongside the existing voicebank data; do not move, rename, rewrite, or bulk-reupload the current VO-US contents as part of this change.
+
+This is a repository-organization decision only. It does not grant permission to copy or redistribute any source corpus, does not change any source license, and does not mean the listed candidate datasets have been downloaded or approved.
+
+### Required separation inside VO-US
+
+Use the following as the **proposed additive layout**. Before creating directories, inspect the live repository tree and adapt names to its existing layout. Existing paths take precedence.
+
+```text
+VO-US/
+├── README.md
+├── voicebanks/                  # Existing UTAU source banks; preserve current paths
+├── corpora/
+│   ├── singing/
+│   │   ├── commercial_cc_by_cc0/
+│   │   ├── commercial_custom_terms/
+│   │   ├── parallel_training_sharealike/
+│   │   └── sharealike_review_required/
+│   └── speech_auxiliary/
+├── manifests/
+│   ├── datasets.yaml
+│   ├── permissions.yaml
+│   ├── splits.yaml
+│   └── checksums.sha256
+├── licenses/
+│   ├── source_records/
+│   ├── license_snapshots/
+│   └── attribution/
+├── processed/
+│   ├── audio_features/
+│   ├── f0/
+│   ├── phonemes/
+│   ├── alignments/
+│   └── expression_labels/
+└── reports/
+    ├── license_audit/
+    └── dataset_audit/
+```
+
+Folder names are organizational labels, not permission states. A file can enter a source or processed folder only when the specific source terms permit that copy and processing. For candidates that do not permit raw-audio redistribution or private mirroring, store only metadata, canonical source URL, exact revision/version, license evidence references, and hashes; retrieve the source directly from its origin when permitted.
+
+### Repository visibility and access gate
+
+- [ ] Inspect current Hugging Face repository metadata and confirm whether `SEKOIA2900/VO-US` is public or private. The URL supplied in chat was not independently readable from this development session, so its current visibility is not asserted here.
+- [ ] If it is public, do not upload restricted source audio or private-only materials. Keep it public only for content whose terms allow public distribution; otherwise make a deliberate visibility decision before any sensitive upload.
+- [ ] If changing an existing public repository to private is considered, evaluate the impact on current consumers of VO-US first. Hugging Face documents that private repositories disappear from other users' search results and visitors without access receive a 404; this is a breaking access change.
+- [ ] Confirm owner write access, current storage use/quota, and whether any collaborators or existing workflows depend on the repository's present layout.
+- [ ] Keep tokens in local/Kaggle secret stores. Never commit a Hugging Face token, credential file, or signed download URL.
+
+### Dataset-loader isolation
+
+Because Hugging Face Datasets can automatically infer files and splits from repository structure, do not put all corpus audio under generic root-level `train/`, `test/`, `audio/`, or `data/` directories. Keep every dataset under its own source-specific path, and use explicit dataset-card `configs` / `data_files` only for formats intended to be loaded by `datasets.load_dataset()`.
+
+Do not declare the entire VO-US repository as one homogeneous train split. UTAU banks, human singing, choral recordings, parallel-training-only material, speech-only material, and evaluation sets must remain separately addressable and must not be silently mixed.
+
+### Migration and implementation order
+
+1. [ ] Run an authenticated, read-only tree and metadata inspection first (for example, `hf datasets ls SEKOIA2900/VO-US --tree` and `hf repos ls --filter dataset --limit 0`). Save the current tree, revision SHA, visibility, and storage size as a baseline.
+2. [ ] Map existing paths to the proposed logical groups without moving or renaming current files.
+3. [ ] Add `manifests/datasets.yaml` and `manifests/permissions.yaml` first, with every candidate defaulting to `review_required`.
+4. [ ] Add source/license snapshots and attribution only after checking the exact source version. Do not store source audio just to make the catalog complete.
+5. [ ] Add only those source files or derived features whose terms explicitly permit the corresponding storage and processing. Enforce the source-specific restrictions already recorded in the free commercial dataset catalog above.
+6. [ ] Update the dataset card with explicit configurations or keep it documentation-only if no common loadable dataset schema is ready.
+7. [ ] Re-run the existing VO-US voicebank audit and confirm that the added folders do not change voicebank discovery, download selection, or audit output.
+8. [ ] Record final repository revision and a diff summary. Do not claim live repository integration until an authenticated upload has been performed and the resulting tree re-fetched.
+
+### Acceptance criteria
+
+- The existing VO-US contents and current UTAU audit behavior remain intact.
+- Human singing corpora and UTAU voicebanks are clearly separated and independently selectable.
+- Each candidate has a source URL, immutable revision/version, license evidence, attribution, SHA-256, and granular permission statuses.
+- Blocked, unclear, share-alike, speech-only, and parallel-training-only sources cannot silently enter the clean commercial training group.
+- No source audio is uploaded when terms prohibit raw-audio redistribution or copying to this repository.
+- The repository's visibility is explicitly verified before any restricted data is uploaded.
+- The Hugging Face Dataset loader does not infer one mixed train split from unrelated corpora.
+
+### Current status
+
+This plan now designates `SEKOIA2900/VO-US` as the intended canonical repository and supersedes the earlier idea of creating a separate `axral-singing-datasets` repository. No Hugging Face files have been changed by this plan update. The live VO-US tree, current visibility, storage usage, and write access still require an authenticated inspection before any repository mutation.
