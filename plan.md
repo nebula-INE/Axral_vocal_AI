@@ -547,3 +547,28 @@ Updated verification state:
 - [ ] Do not run the hosted GitHub Actions audit merely because the repository is accessible; retain the existing default-deny per-bank permission gate.
 
 The repository has not been modified on Hugging Face. This plan update records the screenshot observation only; it does not assert that the voicebank archives have been downloaded, extracted, licensed for training, or audited.
+
+
+### Dataset Card / Viewer inspection evidence (2026-11-25)
+
+A second read-only screenshot of the Hugging Face **Dataset card** tab was supplied on 2026-11-25 (screen clock 11:27 JST).
+
+Observed in the UI:
+
+- The page shows **“No dataset card yet”** and offers **“Create Dataset Card”** / **“Add dataset card”**.
+- The Dataset Viewer panel says: **“The dataset is currently empty. Upload or create new data files. Then, you will be able to explore them in the Dataset Viewer.”**
+- The sidebar reports **75 downloads last month** and **863 MB total file size**.
+- This screenshot does not show the Dataset Card contents because no card is present.
+- This screenshot does not establish that the repository has no stored files. The earlier Files-tab screenshot visibly listed three UTAU ZIP archives. The Viewer message therefore must be recorded as a Viewer/card state, not as proof that the repository storage is empty.
+
+Implications and next actions:
+
+- [x] Confirm that no Dataset Card is currently displayed.
+- [x] Confirm that the Dataset Viewer currently reports no loadable dataset data.
+- [ ] Create a descriptive Dataset Card only after documenting the repository's actual purpose, current ZIP inventory, provenance, and known limitations.
+- [ ] Keep the initial card documentation-only: do not add a generic dataset loading configuration or declare a mixed training split while the repository contains only separately packaged UTAU voicebanks and no validated common schema.
+- [ ] Explicitly explain that the repository currently acts as a voicebank archive/catalog and that the Viewer message does not imply the ZIP files are absent.
+- [ ] Record each voicebank's source, exact terms, and permission scope independently. Do not imply that download availability or the 75 monthly downloads authorize hosted processing, ML training, commercial use, or redistribution.
+- [ ] Before creating or uploading a README/Dataset Card on Hugging Face, inspect the full repository revision, visibility, and write/access state. No Hugging Face files have been changed by this inspection.
+
+Current evidence remains screenshot-level. Full Hub metadata, recursive tree, and exact current revision SHA are still pending authenticated CLI/API inspection.
