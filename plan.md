@@ -650,3 +650,75 @@ Verification status:
 - [ ] Audit the three existing ZIP archives only after individual source permissions and the processing environment have been reviewed.
 
 This is screenshot-based verification. The exact live Hub commit SHA and full recursive tree remain unverified in this session.
+
+
+---
+
+## Priority update: ingest human singing corpora before deep UTAU archive audit (2026-11-25)
+
+### Decision
+
+Prioritize the acquisition, provenance capture, and small-scale validation of **human singing corpora** before spending effort on a full internal audit of the three already-stored UTAU voicebank ZIPs.
+
+Reason: UTAU banks are important for voice identity, phoneme coverage, pronunciation, and voicebank conditioning, but human singing recordings are the direct source for learning natural performance behavior such as pitch movement, note transitions, timing, phrasing, dynamics, vibrato, and expressive delivery. Keep the UTAU archives in VO-US unchanged; continue only the minimal UTAU checks needed to preserve compatibility and unblock dataset integration.
+
+This changes the work order, not the permission rules. No source is approved merely because the repository is private or the archive is downloadable.
+
+### First pilot: vocadito
+
+- Source: [Zenodo record 5578807, version 3](https://zenodo.org/records/5578807), DOI `10.5281/zenodo.5578807`.
+- Published inventory: 40 short excerpts of solo monophonic singing, 7 languages, approximately 58.5 MB.
+- Available labels: frame-level F0, two annotators' note annotations, lyrics, and language.
+- Why first: small enough for a low-cost ingest and parser smoke test, and has direct audio-to-pitch/note/lyric supervision.
+- Public metadata evidence: the `mirdata` vocadito loader identifies the license as Creative Commons Attribution 4.0; OpenAIRE also indexes the record as CC BY. The Zenodo record's Rights field must still be captured directly with the exact source version before mirroring any audio.
+- Decision: `review_required` pending an archived source license/rights snapshot, attribution record, immutable source revision, checksum, and confirmation that any repository copy and intended processing are covered. Do not call it approved for commercial model training until those checks are recorded.
+
+### Follow-on order
+
+1. **vocadito** — first technical pilot for aligned F0, note, lyric, and audio loading.
+2. **Organic Lem singing corpus only** — next candidate after re-checking the source repository's CC BY 4.0 card and LICENSE at the exact revision, underlying performer/character terms, and source separation. Never mix in `lem-singing-corpus-synthetic`, which is marked CC BY-NC-SA 4.0 and is excluded from commercial training.
+3. **VocalSet + Annotated-VocalSet** — add a vocal-technique and singer-diversity branch after recording exact source rights. VocalSet v1.2 describes 10.1 hours from 20 singers and extended vocal techniques; Annotated-VocalSet adds F0 contour, note on/off, transitions, note F0/duration, MIDI pitch, and lyrics. The primary VocalSet Zenodo page's current visible Rights section does not expose a specific license in the page extract, so capture the actual rights metadata and notice before copying audio.
+4. **Choral Singing Dataset / Dagstuhl ChoirSet** — later evaluation/ensemble branch, not a substitute for initial solo-singing supervision.
+5. **ViCa / LIEE / ACV / PJS** — preserve existing source-specific custom, parallel-only, or share-alike isolation rules; do not flatten these into the primary commercial training corpus.
+
+### VO-US organization for the first singing-data additions
+
+Use additive, source-isolated paths; do not upload all candidate audio to a generic root-level folder or mix it with the existing UTAU ZIPs.
+
+Proposed first additions (after rights capture):
+
+```text
+corpora/
+  singing/
+    vocadito/
+      source/          # only if source terms permit mirroring
+      manifests/
+      licenses/
+      reports/
+    lem_organic/
+      manifests/
+      licenses/
+      reports/
+    vocalset/
+      manifests/
+      licenses/
+      reports/
+manifests/
+  singing_corpora.yaml
+```
+
+Keep source audio hosted at its canonical origin when mirroring is not allowed or not yet confirmed; store only the source URL, immutable version, file list, checksums (when obtainable without violating terms), citation, license snapshot, and review status in VO-US. Use per-source configs and splits. Keep singer-disjoint and song-disjoint evaluation; never let excerpts from the same singer/song leak across train and test.
+
+### Initial implementation sequence
+
+- [ ] Create the human-singing corpus manifest first, with all candidates defaulting to `review_required`.
+- [ ] Capture vocadito's exact version, Zenodo Rights metadata, license text/snapshot, citation, archive checksum, and attribution before a copy is uploaded.
+- [ ] Run a small local/approved-runtime ingest pilot and validate audio decoding, F0 timebase, both note-annotation tracks, lyrics/language alignment, missing values, and duration consistency.
+- [ ] Record any conversion/normalization as derived artifacts with their own provenance; never overwrite source audio.
+- [ ] Only then add the approved source files or pointers under `corpora/singing/vocadito/` in VO-US.
+- [ ] Build the common singing-data schema from observed source fields rather than assuming all corpora use the same label conventions.
+- [ ] Keep full UTAU archive-content audits as the next parallel compatibility task after the first singing-corpus pilot is established.
+
+### Pilot scope limitation
+
+Vocadito is a small annotated solo-singing pilot, not enough data to train the universal production model by itself. Its first purpose is to validate the data pipeline and establish supervised F0/note/lyric handling. Natural expression and broad singer/style generalization will require additional independently cleared corpora and held-out evaluation.
